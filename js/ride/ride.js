@@ -7,6 +7,9 @@ import { planHazards, makeHazardMesh, freeHazard, HZ, warmPeds } from './hazards
 import { pickEvent } from './events.js';
 import { makeBike } from './vehicle.js';
 import { buildRibbon } from './ribbon.js';
+import { createFx } from './fx.js';
+import { makeDog, makeBird, makeBall, makeDoorCar, makePoliceCar, makePerson } from './actors.js';
+import { buzz } from '../haptics.js';
 import { makeChar, loadKit, pieceParts } from '../assets.js';
 import { scoreOrder } from '../orders.js';
 import * as St from '../state.js';
@@ -26,6 +29,25 @@ export function createRide(ctx) {
     orders: [], legMeters: 0, meters: 0, stats: null, shake: 0, camFov: 60, bike: null, agent: null, offer: null, hornCd: 0,
     lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0, 0], recentEvents: [], arcs: [], blend: null, yawOff: 0, camYaw: null, fines: 0, rideTime: 0,
   };
+  const pfx = createFx(scene); // particles (R.fx is the skill table)
+  // ---- Flow: chaining stunts builds a tip multiplier (×2 max) and refills turbo; mistakes break it ----
+  const FLOW_TIME = 7;
+  function flow(label, pts = 1) {
+    const F = R.flow;
+    F.n += pts; F.t = FLOW_TIME; F.mult = Math.min(2, 1 + 0.1 * Math.floor(F.n));
+    R.stats.bestFlow = Math.max(R.stats.bestFlow, F.mult);
+    R.energy = Math.min(R.energyMax, R.energy + 7 * pts);
+    ctx.ui.flowPop?.(label, F);
+    ctx.audio?.play('qte-good', { vol: 0.35, rate: 1 + Math.min(0.6, F.n * 0.05) });
+    R.bike?.cheer?.();
+    buzz(18);
+  }
+  function flowBreak() {
+    const F = R.flow;
+    if (F.n >= 3) ctx.ui.flowPop?.('FLOW LOST', F, true);
+    F.n = 0; F.t = 0; F.mult = 1;
+  }
+  const wp = new THREE.Vector3();
   const agent = { kind: 'player', tile: 0, din: 0, dout: 0, s: 0, v: 0, len: 2.2, off: LANE, pos: [0, 0, 0], curve: null, cx: 0, cz: 0 };
   R.agent = agent;
   let bikeId = null;
@@ -55,7 +77,8 @@ export function createRide(ctx) {
     R.job = job; R.leg = 0; R.active = true; R.timeScale = 1; R.fines = 0; R.rideTime = 0;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
     R.orders = job.orders.map((o) => ({ o, elapsed: 0, heat: 100, integrity: 100, picked: false, done: false, tipMult: 1, ratingAdj: 0, result: null }));
-    R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0 };
+    R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1 };
+    R.flow = { n: 0, t: 0, mult: 1 };
     R.meters = 0;
     scene.add(R.bike.root);
     if (!traffic.agents.includes(agent)) traffic.addAgent(agent);
@@ -85,7 +108,7 @@ export function createRide(ctx) {
     // hazards
     for (const h of R.hazards) freeHazard(h);
     const tutorial = St.S.stats.deliveries < 2;
-    R.hazards = planHazards(R.route, city, rng, { density: tutorial ? 0.6 : 1, tutorial });
+    R.hazards = planHazards(R.route, city, rng, { density: tutorial ? 0.6 : 1, tutorial, rain: ctx.weather?.rain || 0 });
     for (const h of R.hazards) { h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); }
     // event
     const isDrop = leg.kind === 'drop';
@@ -94,7 +117,7 @@ export function createRide(ctx) {
     if (rng() < p && R.route.length > 90) {
       const foods = R.orders.filter((x) => x.picked && !x.done).map((x) => x.o.food);
       const ev = pickEvent(rng, { district: city.tiles[R.route.steps[0].tile].d, lvl: St.S.lvl, hasFood: foods.length > 0, foods, skills: St.S.skills,
-        breakdown: R.vs.breakdown, clock: St.S.clock, recent: R.recentEvents });
+        breakdown: R.vs.breakdown, clock: St.S.clock, recent: R.recentEvents, raining: (ctx.weather?.rain || 0) > 0.2 });
       if (ev) R.event = { ev, s: R.route.length * (0.3 + rng() * 0.35) };
     }
     // forced breakdown chance for junk bikes
@@ -102,6 +125,8 @@ export function createRide(ctx) {
       const ev = pickEvent(() => 0, { district: 'oldtown', lvl: 1, hasFood: true, foods: [], skills: {}, breakdown: 1, clock: St.S.clock, recent: [] });
       if (ev && ev.breakdown) R.event = { ev, s: R.route.length * (0.25 + rng() * 0.4) };
     }
+    clearActors();
+    if (R.event && R.event.ev.pre) prePlace(R.event);
     R.phase = 'ride';
     if (ribbon) ribbon.visible = true;
     ctx.ui.rideLeg(leg, R);
@@ -215,7 +240,7 @@ export function createRide(ctx) {
     if (best && bd < v * T * 0.95 + 1) {
       best.hopped = true;
       const perfect = bd > v * 0.16 && bd < v * T * 0.62;
-      if (perfect) { R.stats.perfect++; R.energy = Math.min(R.energyMax, R.energy + 15); ctx.ui.toast('PERFECT HOP!', 'good'); St.goalProgress('perfect'); R.hop.perfect = true; }
+      if (perfect) { R.stats.perfect++; R.energy = Math.min(R.energyMax, R.energy + 15); St.goalProgress('perfect'); R.hop.perfect = true; R.hop.sparkle = true; }
     }
   }
   function doHorn() {
@@ -243,7 +268,8 @@ export function createRide(ctx) {
   }
   function doOvertake() {
     const t = canOvertake(); if (!t) return;
-    R.ot = { t: 0, dir: 1, car: t.car || null, hz: t.hz || null, until: 0, time: 0 };
+    R.ot = { t: 0, dir: 1, car: t.car || null, hz: t.hz || null, until: 0, time: 0, clean: true };
+    R.bike?.lookBack?.();
     R.stats.overtakes++; St.goalProgress('overtake');
     ctx.audio?.play('boost', { vol: 0.4, rate: 1.2 });
   }
@@ -322,6 +348,7 @@ export function createRide(ctx) {
     R.arcs = routeArcs(route);
     startBlend();
     R.offer = null; R.stats.shortcuts++; St.goalProgress('shortcut');
+    flow('SHORTCUT!');
     // hazards: drop ones from the old route, plan for the new tail
     for (const h of R.hazards) freeHazard(h);
     R.hazards = planHazards(route, city, rng, { startS: R.s + 20 }).filter((h) => h.s > R.s + 15);
@@ -334,15 +361,19 @@ export function createRide(ctx) {
   // ---------- damage ----------
   function hurtFood(amount, why) {
     for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(0, x.integrity - amount * x.o.fragile * R.vs.bump);
-    if (amount > 0) { R.stats.bumps++; R.shake = Math.min(1, R.shake + amount / 25); ctx.ui.flash?.('bump'); }
+    if (amount > 0) { R.stats.bumps++; R.shake = Math.min(1, R.shake + amount / 25); ctx.ui.flash?.('bump'); buzz(amount > 12 ? 60 : 30); }
   }
   function crash(why) {
     if (R.crash > 0) return;
     ctx.audio?.play('skid', { vol: 0.8 });
     R.crash = 1.8; R.v = 0; R.stats.crashes++;
+    if (R.ot) R.ot.clean = false;
+    flowBreak();
     hurtFood(20, why);
     R.shake = 1;
     ctx.audio?.play('crash');
+    if (R.bike) { const p = R.bike.root.position; pfx.spawn('spark', p.x, 0.6, p.z, { n: 26, spread: 0.6, up: 1.5 }); pfx.spawn('dust', p.x, 0.3, p.z, { n: 10, spread: 0.8 }); for (let i = 0; i < 4; i++) pfx.skidMark(p.x + Math.sin(R.bike.root.rotation.y) * i * 0.4, p.z + Math.cos(R.bike.root.rotation.y) * i * 0.4, R.bike.root.rotation.y + 0.4); }
+    buzz([80, 40, 120]);
     ctx.ui.toast(why || 'Crash!', 'bad');
     if (R.ot) R.ot.dir = -1;
   }
@@ -350,9 +381,10 @@ export function createRide(ctx) {
   // ---------- events ----------
   async function runEvent(e) {
     R.event.fired = true;
+    if (e.actor === 'light') { const L = nextLight(); if (!L || L.d > 45 || L.d < 6) return; R.event.light = L; }
     R.stats.events++;
     R.recentEvents.push(e.id); if (R.recentEvents.length > 4) R.recentEvents.shift();
-    R.timeScale = 0.08;
+    R.timeScale = 0.12;
     R.boost = false;
     if (e.spawn === 'ped') {
       // put the actor in front of the bike so the card has something to look at
@@ -360,10 +392,151 @@ export function createRide(ctx) {
       h.obj = makeHazardMesh(h);
       if (h.ped) { scene.add(h.obj); placeHazard(h); h.walking = true; h.px = -3; R.hazards.push(h); }
     }
+    const actor = stageEvent(e, R.event);
     ctx.audio?.play(e.sfx || 'event-pop');
+    buzz(40);
+    R.eventCam = true;
     const res = await ctx.ui.event(e, R);
+    R.eventCam = false;
     R.timeScale = 1;
+    actor?.resolve?.(res || {});
+    if (e.actor === 'light' && res?.__act === 'go' && R.event.light) { R.runLight = R.event.light.tile; R.runLightState = 'y'; R.lightJudged = true; }
     applyEffect(res || {});
+  }
+
+  // ---------- event actors: the event happens in the street, not only on the card ----------
+  const actors = [];
+  function along(sAbs, lat) {
+    const o = sampleRoute(R.route, Math.max(0, Math.min(R.route.length, sAbs)), [0, 0, 0, 0, 0]);
+    const rx = -Math.cos(o[2]), rz = Math.sin(o[2]);
+    return { x: o[0] + rx * lat, z: o[1] + rz * lat, h: o[2] };
+  }
+  function addActor(a) { a.t = 0; actors.push(a); return a; }
+  function disposeActor(a) { for (const o of a.objs || [a.obj]) o?.removeFromParent(); }
+  function clearActors() { for (const a of actors) disposeActor(a); actors.length = 0; }
+  function updateActors(dt) {
+    for (let i = actors.length - 1; i >= 0; i--) {
+      const a = actors[i];
+      a.t += dt; a.update?.(dt);
+      if (a.dead || (a.s != null && R.s - a.s > 45) || a.t > (a.ttl || 90)) { disposeActor(a); actors.splice(i, 1); }
+    }
+  }
+  const place = (obj, p, lat = 0, y = ROAD_Y, turn = 0) => { obj.position.set(p.x, y, p.z); obj.rotation.y = p.h + turn; scene.add(obj); };
+  // props that must already be visible down the road before the event fires
+  function onStraight(s0, s1) { return !R.arcs.some((a) => a.s1 > s0 && a.s0 < s1); }
+  function prePlace(E) {
+    const ev = E.ev;
+    if (!onStraight(E.s + ev.pre - 6, E.s + ev.pre + 6)) {
+      // slide the event (and its prop) to the nearest stretch of straight road
+      let best = null;
+      for (let d = 2; d < 60 && best == null; d += 2) for (const sg of [1, -1]) { const s = E.s + sg * d; if (s > 8 && s + ev.pre + 8 < R.route.length && onStraight(s + ev.pre - 6, s + ev.pre + 6)) { best = s; break; } }
+      if (best == null) { E.ev = { ...ev, actor: null, pre: 0 }; return; }
+      E.s = best;
+    }
+    if (ev.actor === 'door') {
+      const car = makeDoorCar(rng() < 0.5 ? 'sedan' : 'taxi');
+      place(car.obj, along(E.s + ev.pre, 2.9));
+      E.prop = addActor({ obj: car.obj, s: E.s + ev.pre, car, update: (dt) => car.animate(dt) });
+    } else if (ev.actor === 'police') {
+      const car = makePoliceCar();
+      place(car.obj, along(E.s + ev.pre, 2.9));
+      const a = E.prop = addActor({ obj: car.obj, objs: [car.obj], s: E.s + ev.pre, car, update(dt) { car.animate(dt); if (a.cop) { a.cop.mixer.update(dt); a.walk?.(dt); } } });
+      makePerson('male-c').then((cop) => { if (!actors.includes(a)) return; a.cop = cop; a.objs.push(cop.obj); place(cop.obj, along(E.s + ev.pre - 3.5, 0.3), 0, ROAD_Y, Math.PI); });
+    } else if (ev.actor === 'works') {
+      const h = { type: 'barrier', s: E.s + ev.pre, lane: 1, tile: stepAt().tile };
+      h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); R.hazards.push(h);
+      const a = E.prop = addActor({ objs: [], s: E.s + ev.pre, h, update(dt) { if (a.man) { a.man.mixer.update(dt); a.walk?.(dt); } } });
+      makePerson('male-b').then((man) => { if (!actors.includes(a)) return; a.man = man; a.objs.push(man.obj); place(man.obj, along(E.s + ev.pre + 0.6, 2.7), 0, 0.2, -Math.PI / 2); });
+    } else if (ev.actor === 'birds') {
+      const birds = [];
+      const a = E.prop = addActor({ objs: [], s: E.s + ev.pre, fly: false, birds, update(dt) {
+        for (const b of birds) {
+          if (a.fly) { b.v.y += 2.5 * dt; b.obj.position.x += b.v.x * dt; b.obj.position.y += b.v.y * dt; b.obj.position.z += b.v.z * dt; }
+          b.bird.animate(dt, a.fly);
+        }
+      } });
+      for (let i = 0; i < 7; i++) {
+        const bird = makeBird(), p = along(E.s + ev.pre + rng() * 4, -1.4 + rng() * 2.8);
+        place(bird.obj, p, 0, ROAD_Y, rng() * 6.28);
+        birds.push({ bird, obj: bird.obj, v: new THREE.Vector3((rng() - 0.5) * 6, 2 + rng() * 2, (rng() - 0.5) * 6) });
+        a.objs.push(bird.obj);
+      }
+    }
+  }
+  // returns { resolve(result) } for the card's outcome
+  function stageEvent(e, E) {
+    const p = E.prop;
+    switch (e.actor) {
+      case 'door': p?.car.setOpen(1); return { resolve(r) { if (r.__good) R.dodge = { lat: -1.8, s1: E.s + e.pre + 4 }; setTimeout(() => p?.car.setOpen(0), 2500); } };
+      case 'police': return { resolve() {
+        const cop = p?.cop; if (!cop) return;
+        const from = cop.obj.position.clone(), to = along(E.s + e.pre - 3.5, 3.6); let t = 0;
+        cop.play('walk'); cop.obj.rotation.y = to.h - Math.PI / 2;
+        p.walk = (dt) => { t = Math.min(1, t + dt / 1.6); cop.obj.position.set(from.x + (to.x - from.x) * t, ROAD_Y, from.z + (to.z - from.z) * t); if (t >= 1 && !p.walked) { p.walked = true; cop.play('idle'); cop.obj.rotation.y = to.h + Math.PI / 2; } };
+      } };
+      case 'works': return { resolve(r) {
+        if (!p) return;
+        if (r.__act === 'sidewalk') { p.h.done = true; R.dodge = { lat: 3.1, s1: p.s + 5 }; return; }
+        // waiting: the worker drags the barrier to the kerb when the wait is over
+        const obj = p.h.obj, from = obj.position.clone(), to = along(p.s, 3.2); let t = -5.5;
+        p.man?.play('walk');
+        p.walk = (dt) => { t += dt; if (t < 0) return; const k = Math.min(1, t / 1.5); obj.position.set(from.x + (to.x - from.x) * k, from.y, from.z + (to.z - from.z) * k); if (k >= 1 && !p.h.done) { p.h.done = true; p.man?.play('idle'); } };
+      } };
+      case 'birds': return { resolve(r) { if (!p) return; if (r.__good) p.fly = true; else setTimeout(() => { p.fly = true; }, 3500); } };
+      case 'dog': {
+        const d = makeDog(rng());
+        const a = addActor({ obj: d.obj, mode: 'chase', y: 0, vy: 0, sp: 0, bark: 0, barkT: 0.6, update(dt) {
+          const b = R.bike.root, hd = b.rotation.y, fx = Math.sin(hd), fz = Math.cos(hd), rx = -Math.cos(hd), rz = Math.sin(hd);
+          const o = d.obj.position;
+          let tx = b.position.x + fx * 0.3 + rx * 1.5, tz = b.position.z + fz * 0.3 + rz * 1.5, max = Math.max(7.5, R.v * 1.08); // runs beside the bike, barking
+          if (a.mode === 'giveup') max = Math.max(0, a.sp - 6 * dt);
+          if (a.mode === 'jump') { tx = b.position.x - fx * 0.6; tz = b.position.z - fz * 0.6; max = R.v + 4; }
+          const dx = tx - o.x, dz = tz - o.z, dist = Math.hypot(dx, dz);
+          a.sp = a.mode === 'giveup' ? max : Math.min(max, dist * 4);
+          if (dist > 0.05 && a.sp > 0.05) { const k = Math.min(dist, a.sp * dt) / dist; o.x += dx * k; o.z += dz * k; d.obj.rotation.y = Math.atan2(dx, dz); }
+          if (a.mode === 'jump') { a.vy -= 20 * dt; a.y = Math.max(0, a.y + a.vy * dt); if (a.y === 0 && a.vy < 0) a.mode = 'giveup'; }
+          o.y = 0.2 + a.y;
+          a.barkT -= dt; if (a.mode === 'chase' && a.barkT <= 0) { a.barkT = 1.4; a.bark = 0.4; ctx.audio?.play('dog-bark', { vol: 0.5 }); }
+          a.bark = Math.max(0, a.bark - dt);
+          d.animate(dt, a.sp, { sit: a.mode === 'giveup' && a.sp < 0.3 ? 1 : 0, bark: a.bark });
+        }, ttl: 25 });
+        place(d.obj, along(R.s + 0.5, 3.4), 0, 0.2);
+        return { resolve(r) { if (r.__good) { a.mode = 'giveup'; a.ttl = a.t + 6; } else { a.mode = 'jump'; a.vy = 6; a.ttl = a.t + 8; ctx.audio?.play('dog-bark'); } } };
+      }
+      case 'ball': {
+        const ball = makeBall();
+        const sB = R.s + Math.max(10, R.v * 1.3);
+        const a = addActor({ obj: ball.obj, s: sB, lat: 4.6, hopWhen: false, bonk: false, update(dt) {
+          a.lat -= 4.2 * dt;
+          const p2 = along(sB, a.lat);
+          const bounce = Math.abs(Math.sin(a.t * 6)) * 0.6;
+          ball.obj.position.set(p2.x, ROAD_Y + 0.34 + bounce, p2.z); ball.obj.rotation.x += dt * 8;
+          const ahead = sB - R.s;
+          if (a.hopWhen && ahead < Math.max(2.4, R.v * 0.32) && ahead > 0) { a.hopWhen = false; doHop(); }
+          if (a.lat < -7) a.dead = true;
+        }, ttl: 12 });
+        scene.add(ball.obj);
+        return { resolve(r) { if (r.__good) a.hopWhen = true; } };
+      }
+      case 'rival': {
+        const a = addActor({ objs: [], rs: R.s + 1.2, v: R.v, mode: 'ride', ttl: 30, update(dt) {
+          if (!a.bike) return;
+          a.v = a.mode === 'ride' ? R.v : a.mode === 'lose' ? Math.max(0, a.v - 3 * dt) : a.v + 4 * dt;
+          a.rs += a.v * dt;
+          if (a.rs > R.route.length - 2 || a.rs - R.s > 70 || R.s - a.rs > 30) { a.dead = true; return; }
+          const o = sampleRoute(R.route, a.rs, [0, 0, 0, 0, 0]), rx = -Math.cos(o[2]), rz = Math.sin(o[2]);
+          a.bike.root.position.set(o[0] - rx * 2.1, ROAD_Y, o[1] - rz * 2.1); a.bike.root.rotation.y = o[2];
+          a.bike.update(dt, a.v, -Math.atan(a.v * a.v * o[4] / 9.81) * 0.8, 0);
+          if (a.bike.pose) a.bike.pose.tuck = a.mode === 'win' ? 1 : 0;
+        } });
+        makeBike(rng() < 0.5 ? 'viper' : 'zippy', { paint: '#43b34a', box: '#2b2f38', char: 'male-e', helmet: '#43b34a' }).then((bk) => { if (!actors.includes(a)) return; a.bike = bk; a.objs.push(bk.root); scene.add(bk.root); });
+        return { resolve(r) { a.mode = r.__act === 'race' && r.__good ? 'lose' : 'win'; if (a.mode === 'win') ctx.audio?.play('boost', { vol: 0.5 }); } };
+      }
+      case 'rain': ctx.weather?.startRain?.(); return null;
+      case 'stall': R.stall = true; R.wobble = 1; return { resolve(r) { R.stall = false; if (r.__good) { const b = R.bike.root.position; pfx.spawn('smokeBlack', b.x, 0.6, b.z, { n: 12, spread: 0.6, size: 1.4 }); } } };
+      case 'flat': R.wobble = 2.6; return null;
+    }
+    return null;
   }
   function applyEffect(f) {
     if (f.wait) R.wait = Math.max(R.wait, f.wait);
@@ -412,7 +585,9 @@ export function createRide(ctx) {
       await ctx.ui.drop(x.o, R, x);
       R.bike.openLid(true); ctx.audio?.play('bag-rustle');
       x.done = true;
-      x.result = scoreOrder(x.o, { elapsed: x.elapsed, heat: x.heat, integrity: x.integrity, tipMult: x.tipMult, ratingAdj: x.ratingAdj });
+      x.flow = R.flow.mult;
+      x.result = scoreOrder(x.o, { elapsed: x.elapsed, heat: x.heat, integrity: x.integrity, tipMult: x.tipMult * R.flow.mult, ratingAdj: x.ratingAdj });
+      x.result.flow = R.flow.mult;
       if (npc) npc.c.play(x.result.stars >= 4 ? 'emote-yes' : 'emote-no', 0.2, { once: true });
       ctx.audio?.play(x.result.stars >= 3 ? 'order-complete' : 'order-late');
       await ctx.ui.rated(x.o, x.result, R);
@@ -469,6 +644,7 @@ export function createRide(ctx) {
 
   function finish() {
     R.phase = 'done'; R.active = false;
+    pfx.clear(); pfx.clearSkids(); clearActors(); R.dodge = null; R.dodgeLat = 0; R.stall = false; R.wobble = 0;
     if (ribbon) { ribbon.removeFromParent(); ribbon = null; }
     for (const h of R.hazards) freeHazard(h); R.hazards = [];
     ctx.audio?.engine(false);
@@ -479,6 +655,7 @@ export function createRide(ctx) {
     R.xpBonus = 0;
   }
   function abort() {
+    clearActors();
     if (ribbon) { ribbon.removeFromParent(); ribbon = null; }
     for (const h of R.hazards) freeHazard(h); R.hazards = [];
     if (npc) { npc.c.obj.removeFromParent(); npc = null; }
@@ -504,6 +681,8 @@ export function createRide(ctx) {
       drive(dt);
     }
     if (R.bike) R.bike.update(dt, R.v, R.lean, R.steer);
+    if (ctx.renderer) pfx.update(dt, camera, ctx.renderer);
+    updateActors(dt);
     camUpdate(dtReal);
     ctx.ui.rideFrame(R);
   }
@@ -517,7 +696,7 @@ export function createRide(ctx) {
     // ---- target speed ----
     let top = R.vs.top * (R.boost ? 1.45 * R.vs.boost : 1) * (st.alley ? 0.72 : 1);
     let target = top;
-    const corner = R.vs.corner * (R.boost ? 1.22 : 1);
+    const corner = R.vs.corner * (R.boost ? 1.22 : 1) * (1 - 0.2 * (ctx.weather?.rain || 0)); // wet roads grip less
     for (const a of R.arcs) {
       if (a.s1 < R.s) continue;
       if (a.s0 > R.s + 80) break;
@@ -551,6 +730,7 @@ export function createRide(ctx) {
     if (R.crash > 0) { R.crash -= dt; target = 0; }
     R.blockedBy = blockedBy;
     // ---- integrate ----
+    const vBefore = R.v;
     const acc = R.vs.accel * (R.boost ? 1.7 : 1);
     if (target > R.v) R.v = Math.min(target, R.v + acc * dt);
     else R.v = Math.max(target, R.v - 11 * dt);
@@ -573,7 +753,7 @@ export function createRide(ctx) {
         if (ot.hz) until = ot.hz.s + (HZ[ot.hz.type].len || 2) / 2 + 3;
         if (R.s > until || ot.time > 7) ot.dir = -1;
       }
-      if (ot.dir < 0 && ot.t <= 0) R.ot = null;
+      if (ot.dir < 0 && ot.t <= 0) { if (ot.clean && !ot.slow) flow('OVERTAKE!'); R.ot = null; }
       // head-on check
       if (R.ot && R.ot.t > 0.5) { const on = oncoming(); if (on.dist < 1.2) { crash('Head-on! Oops.'); if (on.who) on.who.wait = 2; } }
     }
@@ -583,14 +763,20 @@ export function createRide(ctx) {
       const list = traffic.byTile.get(st.tile) || [];
       for (const a of list) if (a.kind === 'car' && a.v > 1 && (a.din & 1) !== (st.din & 1) && Math.hypot(a.pos[0] - R.bike.root.position.x, a.pos[1] - R.bike.root.position.z) < 3.2) { crash('T-boned at the junction!'); a.wait = 2; break; }
       if (!R.lightJudged) { R.lightJudged = true; if (R.runLightState === 'r' && rng() < 0.22) { const fine = Math.round(3 + 4 * (DISTRICT[city.tiles[st.tile].d]?.pay || 1)); R.fines += fine; ctx.audio?.play('camera-shutter'); ctx.ui.toast(`Red-light camera! −$${fine}`, 'bad'); } }
-    } else if (R.runLight >= 0 && route.steps[R.sampled[3]].s0 > 0 && st.tile !== R.runLight && R.lightJudged) { R.runLight = -1; R.lightJudged = false; }
+    } else if (R.runLight >= 0 && route.steps[R.sampled[3]].s0 > 0 && st.tile !== R.runLight && R.lightJudged) { if (R.runLightState === 'r' && R.crash <= 0) flow('RED RUNNER!'); R.runLight = -1; R.lightJudged = false; }
     // ---- hop ----
     let y = 0;
     if (R.hop) {
       R.hop.t += dt;
       const f = R.hop.t / R.hop.T;
       y = 4 * 1.05 * f * (1 - f);
-      if (f >= 1) { y = 0; if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land); ctx.audio?.play('land'); R.hop = null; R.shake = Math.max(R.shake, 0.25); }
+      if (f >= 1) {
+        y = 0; if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land);
+        ctx.audio?.play('land'); R.shake = Math.max(R.shake, 0.25); buzz(15);
+        const p = R.bike.root.position; pfx.spawn('dust', p.x, 0.2, p.z, { n: 9, spread: 0.7, up: 0.3 });
+        if (R.hop.perfect) { pfx.spawn('star', p.x, 1.2, p.z, { n: 16, spread: 0.9, up: 1 }); flow('PERFECT HOP!'); }
+        R.hop = null;
+      }
     }
     // ---- hazards ----
     for (const h of R.hazards) {
@@ -605,8 +791,9 @@ export function createRide(ctx) {
         if (H.pickup) {
           if (inMyLane) {
             h.done = true; h.obj.visible = false;
-            if (h.type === 'cash') { const n = Math.max(1, Math.round((1 + rng() * 2) * (St.S.lvl > 4 ? 2 : 1))); R.stats.cash += n; ctx.audio?.play('pickup-bonus'); ctx.ui.toast(`+$${n}`, 'cash'); }
-            else { R.energy = Math.min(R.energyMax, R.energy + 40); ctx.audio?.play('pickup-bonus', { rate: 1.3 }); ctx.ui.toast('+Energy', 'good'); }
+            const bp = R.bike.root.position;
+            if (h.type === 'cash') { const n = Math.max(1, Math.round((1 + rng() * 2) * (St.S.lvl > 4 ? 2 : 1))); R.stats.cash += n; ctx.audio?.play('pickup-bonus'); ctx.ui.toast(`+$${n}`, 'cash'); pfx.spawn('cash', bp.x, 1.2, bp.z, { n: 14, spread: 0.8, up: 1 }); buzz(12); if (R.flow.n > 0) { R.flow.n += 0.5; R.flow.t = FLOW_TIME; } }
+            else { R.energy = Math.min(R.energyMax, R.energy + 40); ctx.audio?.play('pickup-bonus', { rate: 1.3 }); ctx.ui.toast('+Energy', 'good'); pfx.spawn('star', bp.x, 1.2, bp.z, { n: 14, spread: 0.8, up: 1, color: [0.45, 0.85, 1] }); buzz(12); }
           }
         } else if (h.type !== 'ped' && h.type !== 'parked') {
           if (!inMyLane) { h.done = true; continue; }
@@ -616,6 +803,9 @@ export function createRide(ctx) {
           hurtFood(H.dmg || 6);
           R.v *= H.slow || 0.6;
           ctx.audio?.play(H.sfx || 'bump');
+          if (h.type !== 'puddle') flowBreak();
+          if (h.type === 'puddle') pfx.spawn('splash', h.x, 0.3, h.z, { n: 22, spread: 0.9, up: 1.4 });
+          else pfx.spawn('dust', h.x, 0.25, h.z, { n: 10, spread: 0.8, up: 0.5 });
           if (h.type === 'cones' || h.type === 'barrier' || h.type === 'crates') { for (const c of h.obj.children) { c.rotation.z = (rng() - 0.5) * 2; c.position.x += (rng() - 0.5) * 2; } }
         }
       }
@@ -640,10 +830,13 @@ export function createRide(ctx) {
     for (const o of KAP_OFFS) { sampleRoute(route, R.s + lead + o, ahead); kap += ahead[4]; }
     kap /= KAP_OFFS.length;
     // lane changes (overtaking) turn the nose toward the new lane
-    const dLat = R.lat - (R.prevLat ?? R.lat); R.prevLat = R.lat;
+    if (R.dodge && R.s > R.dodge.s1) R.dodge = null;
+    R.dodgeLat = (R.dodgeLat || 0) + ((R.dodge ? R.dodge.lat : 0) - (R.dodgeLat || 0)) * Math.min(1, dt * 3.5);
+    const latT = R.lat + R.dodgeLat;
+    const dLat = latT - (R.prevLat ?? latT); R.prevLat = latT;
     const yawT = ds > 1e-4 ? -Math.atan2(dLat, ds) : 0;
     R.yawOff += (yawT - R.yawOff) * Math.min(1, dt * 10);
-    let px = R.sampled[0] + rx * R.lat, pz = R.sampled[1] + rz * R.lat, ph = hd + R.yawOff;
+    let px = R.sampled[0] + rx * latT, pz = R.sampled[1] + rz * latT, ph = hd + R.yawOff;
     if (R.blend && R.blend.t > 0) {
       R.blend.t = Math.max(0, R.blend.t - dt / 0.8);
       const e = smooth(R.blend.t);
@@ -655,9 +848,58 @@ export function createRide(ctx) {
     R.lean = -THREE.MathUtils.clamp(leanAngle, -0.5, 0.5);
     R.steer = THREE.MathUtils.clamp(-Math.atan(1.4 * kap) * 1.3 + R.yawOff * 1.2, -0.45, 0.45);
     if (R.crash > 0) { b.rotation.z = Math.sin(R.crash * 20) * 0.1 * R.crash; }
+    else if (R.wobble > 0) { R.wobble -= dt; b.rotation.z = Math.sin(R.rideTime * 26) * 0.07 * Math.min(1, R.wobble); }
     else b.rotation.z = 0;
+    emit(dt, ds, (vBefore - R.v) / Math.max(dt, 1e-4));
+    nearMisses(dt);
+    if (R.flow.n > 0) { R.flow.t -= dt; if (R.flow.t <= 0) { R.flow.n = 0; R.flow.mult = 1; } }
+    if (R.bike.pose) R.bike.pose.tuck = R.boost ? 1 : 0;
+    if (R.slowmo > 0) { R.slowmo -= dt / Math.max(0.05, R.timeScale); if (R.slowmo <= 0 && !document.querySelector('.evdock')) R.timeScale = 1; }
     // ---- arrival ----
     if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0) arrive();
+  }
+  // close calls: a car slides past within a lane's width while we're moving fast
+  function nearMisses() {
+    if (R.crash > 0 || R.v < 6) return;
+    const b = R.bike.root.position, hd = R.bike.root.rotation.y, fx = Math.sin(hd), fz = Math.cos(hd), now = R.rideTime;
+    for (const a of traffic.agents) {
+      if (a.kind !== 'car' && a.kind !== 'rider') continue;
+      const rx = a.pos[0] - b.x, rz = a.pos[1] - b.z;
+      if (rx * rx + rz * rz > 16) continue;
+      const lon = rx * fx + rz * fz, lat = Math.abs(rx * fz - rz * fx);
+      const ahd = a.pos[2], rel = Math.hypot(Math.sin(ahd) * a.v - fx * R.v, Math.cos(ahd) * a.v - fz * R.v);
+      if (Math.abs(lon) < 1.8 && lat < 2.5 && lat > 0.9 && rel > 5 && !(a.nm > now - 4)) {
+        a.nm = now; R.stats.nearMisses++;
+        flow('CLOSE CALL!', 2);
+        if (R.timeScale === 1) { R.timeScale = 0.35; R.slowmo = 0.35; }
+      }
+    }
+  }
+  // exhaust smoke / turbo flame / skid marks / rain spray
+  let smokeT = 0, skidAcc = 0, sprayT = 0;
+  function emit(dt, ds, decel) {
+    const b = R.bike.root, hd = b.rotation.y, fx = Math.sin(hd), fz = Math.cos(hd);
+    const electric = R.vs.v.engine === 'engine-electric', junk = St.S.active === 'rustbucket';
+    if (R.bike.exhaust) R.bike.exhaust.getWorldPosition(wp); else wp.set(b.position.x - fx * 0.9, 0.45, b.position.z - fz * 0.9);
+    if (!electric) {
+      smokeT -= dt;
+      if (smokeT <= 0) {
+        smokeT = (junk ? 0.05 : 0.11) / (0.7 + R.v / 10 + (R.boost ? 1.2 : 0));
+        pfx.spawn(junk ? 'smokeBlack' : 'smoke', wp.x, wp.y, wp.z, { vx: -fx * 1.3, vz: -fz * 1.3, vy: 0.25, spread: 0.08, size: junk ? 1.15 : 0.8, up: 0.2 });
+      }
+    }
+    if (R.stall && Math.random() < 0.5) pfx.spawn('smokeBlack', wp.x, wp.y + 0.2, wp.z, { n: 2, spread: 0.3, size: 1.5, up: 0.6 });
+    if (R.boost) pfx.spawn('flame', wp.x, wp.y, wp.z, { vx: -fx * 6, vz: -fz * 6, spread: 0.05, n: 2, up: 0, color: electric ? [0.35, 0.9, 1] : undefined });
+    // rubber on the road: hard braking, or turbo through a corner
+    if ((decel > 8.5 && R.v > 2) || (R.boost && Math.abs(R.sampled[4]) > 0.06 && R.v > 9)) {
+      skidAcc += ds;
+      if (skidAcc > 0.32) { skidAcc = 0; pfx.skidMark(b.position.x - fx * 0.66, b.position.z - fz * 0.66, hd); }
+    }
+    const rain = ctx.weather?.rain || 0;
+    if (rain > 0.25 && R.v > 3) {
+      sprayT -= dt;
+      if (sprayT <= 0) { sprayT = 0.05 / rain; pfx.spawn('splash', b.position.x - fx * 0.8, 0.25, b.position.z - fz * 0.8, { vx: -fx * R.v * 0.25, vz: -fz * R.v * 0.25, n: 2, spread: 0.3, up: 0.9, size: 1.3 }); }
+    }
   }
   function updatePed(h, d, dt) {
     if (!h.ped) { h.done = true; return; }
@@ -689,7 +931,10 @@ export function createRide(ctx) {
     let pos, look;
     if (R.camMode === 'scene' && R.sceneCam) { pos = R.sceneCam.pos; look = R.sceneCam.look; }
     else {
-      const back = portrait ? 6.6 : 6.0, up = portrait ? 3.15 : 2.8, aheadD = portrait ? 10 : 9;
+      // while an event card is docked at the bottom, pull up and back so the bike and the action sit above it
+      R.evCamK = (R.evCamK || 0) + ((R.eventCam ? 1 : 0) - (R.evCamK || 0)) * Math.min(1, dt * 3);
+      const ek = R.evCamK;
+      const back = (portrait ? 6.6 : 6.0) + ek * 2.4, up = (portrait ? 3.15 : 2.8) + ek * 2.6, aheadD = (portrait ? 10 : 9) - ek * 5;
       // the camera swings round behind the bike with a little lag instead of being bolted to it
       if (R.camYaw == null || R.snapCam) R.camYaw = hd;
       let dy = hd - R.camYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
@@ -700,7 +945,7 @@ export function createRide(ctx) {
       if (R.route && R.phase === 'ride') {
         sampleRoute(R.route, Math.min(R.route.length, R.s + aheadD), camAhead);
         const lx = b.x + fx * aheadD, lz = b.z + fz * aheadD;
-        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, 1.5, lz * 0.45 + camAhead[1] * 0.55);
+        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, 1.5 - ek * 1.6, lz * 0.45 + camAhead[1] * 0.55);
       } else look = v3b.set(b.x + fx * aheadD, 1.5, b.z + fz * aheadD);
     }
     const k = 1 - Math.exp(-dt * (R.camMode === 'scene' ? 2.5 : 8));
@@ -737,6 +982,8 @@ export function createRide(ctx) {
     return chasePose();
   }
 
-  return { R, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, get offer() { return R.offer; } };
+  // test hook: schedule an event a little ahead (props placed like a real one)
+  function testEvent(ev, lead = 2) { R.event = { ev, s: R.s + lead }; if (ev.pre) prePlace(R.event); }
+  return { R, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, get offer() { return R.offer; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);

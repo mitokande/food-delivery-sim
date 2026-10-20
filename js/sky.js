@@ -46,7 +46,9 @@ export function createSky(scene) {
   scene.fog = new THREE.Fog(0xffffff, 80, 400);
 
   const tmp = { top: new THREE.Color(), hor: new THREE.Color(), sun: new THREE.Color(), hemiS: new THREE.Color(), hemiG: new THREE.Color(), fog: new THREE.Color() };
-  const state = { night: 0, clock: 480 };
+  const state = { night: 0, clock: 480, rain: 0 };
+  const RAIN = { top: new THREE.Color(0x6c7787), hor: new THREE.Color(0x9ca5b2), fog: new THREE.Color(0x8f98a5), sun: new THREE.Color(0xc9d0da) };
+  const rc = new THREE.Color();
   function set(clock) {
     let m = clock; if (m < keys[0].t) m += 24 * 60;
     let a = keys[0], b = keys[1];
@@ -60,9 +62,15 @@ export function createSky(scene) {
     const az = night > 0.5 ? -0.9 : THREE.MathUtils.lerp(-1.9, 1.9, dayF);
     const el = THREE.MathUtils.degToRad(Math.max(3, elev));
     state.dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el) * 0.6 + 0.4).normalize();
+    const r = state.rain || 0;
+    if (r > 0) {
+      const dark = 1 - 0.65 * night;
+      for (const k of ['top', 'hor', 'fog']) tmp[k].lerp(rc.copy(RAIN[k]).multiplyScalar(dark), r * 0.8);
+      tmp.sun.lerp(RAIN.sun, r * 0.7);
+    }
     uni.top.value.copy(tmp.top); uni.hor.value.copy(tmp.hor); uni.sunCol.value.copy(tmp.sun); uni.sunDir.value.copy(state.dir); uni.night.value = night;
-    sun.color.copy(tmp.sun); sun.intensity = si;
-    hemi.color.copy(tmp.hemiS); hemi.groundColor.copy(tmp.hemiG); hemi.intensity = hi;
+    sun.color.copy(tmp.sun); sun.intensity = si * (1 - 0.62 * r);
+    hemi.color.copy(tmp.hemiS); hemi.groundColor.copy(tmp.hemiG); hemi.intensity = hi * (1 - 0.1 * r);
     scene.fog.color.copy(tmp.fog);
     state.night = night; state.clock = clock;
   }

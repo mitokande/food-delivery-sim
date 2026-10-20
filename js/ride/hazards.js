@@ -27,7 +27,7 @@ const MIX = {
 const pickW = (rng, list) => { let t = 0; for (const [, w] of list) t += w; let r = rng() * t; for (const [k, w] of list) { r -= w; if (r <= 0) return k; } return list[0][0]; };
 
 // choose hazards along a route (s positions in metres)
-export function planHazards(route, city, rng, { density = 1, startS = 0, tutorial = false } = {}) {
+export function planHazards(route, city, rng, { density = 1, startS = 0, tutorial = false, rain = 0 } = {}) {
   const out = [];
   let lastS = startS + 26;
   for (let k = 1; k < route.steps.length - 1; k++) {
@@ -41,7 +41,7 @@ export function planHazards(route, city, rng, { density = 1, startS = 0, tutoria
     const s = st.s0 + st.len * (0.3 + rng() * 0.4);
     if (s - lastS < 24 || route.length - s < 26) continue;
     if (rng() > 0.42 * density) continue;
-    let type = pickW(rng, MIX[t.d] || MIX.oldtown);
+    let type = rain > 0.35 && rng() < 0.4 ? 'puddle' : pickW(rng, MIX[t.d] || MIX.oldtown);
     if (tutorial && !['pothole', 'cash', 'parked'].includes(type)) type = 'pothole';
     const lane = (type === 'cash' || type === 'energy') && rng() < 0.35 ? -1 : 1;
     out.push({ type, s, lane, tile: st.tile });

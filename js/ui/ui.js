@@ -4,6 +4,7 @@ import { S } from '../state.js';
 import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, FOODS, ORDER_TYPES, RESTAURANT,
   FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END } from '../data.js';
 import { HZ } from '../ride/hazards.js';
+import { W as WEATHER, RAIN_PAY } from '../weather.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 export const money = (n, dec = false) => {
@@ -31,7 +32,7 @@ export function createUI(game) {
       <span class="res rate">${ICON('ui-star')}<b class="ratev">4.5</b></span>
       <button class="gear" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
     </header>
-    <div class="clockbar"><span class="day">Day 1</span><b class="clock">08:00</b><span class="rush" hidden></span><button class="fleetbank" data-act="collect" hidden>${ICON('ui-cash')}<b></b></button></div>
+    <div class="clockbar"><span class="day">Day 1</span><b class="clock">08:00</b><span class="rush" hidden></span><span class="rainchip" hidden>${ICON('ui-rain')}Rain pay ×${RAIN_PAY}</span><button class="fleetbank" data-act="collect" hidden>${ICON('ui-cash')}<b></b></button></div>
     <section id="sheet" class="sheet"><div class="grab" data-act="grab"><i></i></div><div class="sheet-body"></div></section>
     <div id="startbar" hidden></div>
     <nav class="tabs">
@@ -43,6 +44,9 @@ export function createUI(game) {
     </nav>
   </div>
   <div id="ridehud" hidden>
+    <div id="speedlines"></div>
+    <div class="r-flow" hidden><b>FLOW <em>×1.0</em></b><i><u></u></i></div>
+    <div class="r-pops"></div>
     <div class="r-top">
       <div class="r-order"><span class="r-food"></span><span class="r-what"><small class="r-verb">Pick up at</small><b class="r-name"></b></span><span class="r-dist"></span></div>
       <div class="r-timer">${ICON('ui-clock')}<b>0:00</b></div>
@@ -100,6 +104,7 @@ export function createUI(game) {
     $('.clock', hub).textContent = clockStr(S.clock);
     const r = St.rushMult(); const rs = $('.rush', hub);
     rs.hidden = r.m <= 1; rs.textContent = `${r.name} ×${r.m}`;
+    $('.rainchip', hub).hidden = !(WEATHER.rain > 0.35);
     const fb = $('.fleetbank', hub);
     const bank = Math.floor(S.fleet.bank);
     fb.hidden = !(S.fleet.office && bank >= 1);
@@ -154,7 +159,7 @@ export function createUI(game) {
     return `<div class="ocard ${taken ? 'taken' : ''} ${game.selOrder === o.id ? 'sel' : ''}" data-act="order" data-id="${o.id}">
       <span class="ofood">${ICON(FOODS[o.food].icon)}</span>
       <span class="oinfo"><b>${esc(o.restName)}</b><small>to ${esc(o.name)} · <i style="color:${d.color}">${d.name}</i></small>
-        <span class="ometa">${ICON('ui-route')}${km(o.pickM + o.dropM)} ${ICON('ui-clock')}${mmss(o.eta)} <i class="est ${est <= o.eta * 0.85 ? 'fast' : est > o.eta ? 'slow' : ''}">you ~${mmss(est)}</i>${T.badge ? `<em class="badge b-${o.type}">${T.badge}</em>` : ''}${o.size > 1 ? `<em class="badge">${o.size} slots</em>` : ''}</span></span>
+        <span class="ometa">${ICON('ui-route')}${km(o.pickM + o.dropM)} ${ICON('ui-clock')}${mmss(o.eta)} <i class="est ${est <= o.eta * 0.85 ? 'fast' : est > o.eta ? 'slow' : ''}">you ~${mmss(est)}</i>${T.badge ? `<em class="badge b-${o.type}">${T.badge}</em>` : ''}${o.rain ? '<em class="badge b-rain">RAIN</em>' : ''}${o.size > 1 ? `<em class="badge">${o.size} slots</em>` : ''}</span></span>
       <span class="opay"><b>${money(o.base)}</b><small>+ tips</small><span class="otake">${taken ? '✓' : '+'}</span></span>
       <i class="olife" style="width:${Math.min(100, left / o.life * 100)}%"></i>
     </div>`;
@@ -432,6 +437,16 @@ export function createUI(game) {
     ring: $('.boost .fg', hud), boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud),
   };
   const mapCtx = rh.map.getContext('2d');
+  const flowEl = $('.r-flow', hud), flowMult = $('.r-flow em', hud), flowBar = $('.r-flow u', hud), pops = $('.r-pops', hud), speedEl = $('#speedlines', hud);
+  function flowPop(label, F, lost = false) {
+    const el = document.createElement('div');
+    el.className = 'pop' + (lost ? ' lost' : '');
+    el.innerHTML = lost ? label : `${label}<small>×${F.mult.toFixed(1)}</small>`;
+    pops.append(el);
+    setTimeout(() => el.remove(), 1100);
+    while (pops.children.length > 3) pops.firstChild.remove();
+    if (!lost) { flowEl.classList.remove('hit'); void flowEl.offsetWidth; flowEl.classList.add('hit'); }
+  }
   let ctxKey = '';
   // ride buttons: pointer events (hold for turbo)
   hud.addEventListener('pointerdown', (e) => {
@@ -522,6 +537,13 @@ export function createUI(game) {
       }
     }
     rh.speed.textContent = Math.round(R.v * 3.6);
+    const F = R.flow;
+    if (F) {
+      flowEl.hidden = !(F.n > 0);
+      if (F.n > 0) { flowMult.textContent = '×' + F.mult.toFixed(1); flowBar.style.width = Math.max(0, F.t / 7 * 100) + '%'; flowEl.classList.toggle('max', F.mult >= 2); }
+    }
+    const sp = R.phase === 'ride' ? Math.max(0, Math.min(1, (R.v - 6.5) / 7)) * (R.boost ? 1 : 0.35) : 0;
+    speedEl.style.opacity = sp.toFixed(2);
     const e = R.energy / R.energyMax;
     rh.ring.style.strokeDashoffset = String(283 * (1 - e));
     rh.boost.classList.toggle('empty', R.energy < 5);
@@ -559,18 +581,30 @@ export function createUI(game) {
   function flash(kind) { hud.classList.remove('flash-' + kind); void hud.offsetWidth; hud.classList.add('flash-' + kind); }
 
   // ---------- event cards / QTE ----------
+  function dock(html) {
+    const wrap = document.createElement('div');
+    wrap.className = 'evdock';
+    wrap.innerHTML = `<div class="card">${html}</div>`;
+    hud.append(wrap); hud.classList.add('evmode');
+    requestAnimationFrame(() => wrap.classList.add('in'));
+    const close = () => { wrap.classList.remove('in'); wrap.classList.add('out'); setTimeout(() => { wrap.remove(); if (!hud.querySelector('.evdock')) hud.classList.remove('evmode'); }, 220); };
+    return { el: wrap, card: wrap.firstElementChild, close };
+  }
   function event(ev, R) {
     return new Promise((resolve) => {
       const react = St.skillFx().react;
       const opts = ev.options;
       const qte = ev.qte;
-      const m = modal(`<div class="ev-head">${ICON(ev.icon || 'ui-bolt', 'evi')}<h2>${esc(ev.title)}</h2></div><p>${esc(ev.text)}</p>
-        <div class="ev-body"></div><div class="ev-timer"><i></i></div>`, { cls: 'event' });
+      // the card docks at the bottom of the screen so the street (where the event happens) stays visible
+      const m = dock(`<div class="ev-head">${ICON(ev.icon || 'ui-bolt', 'evi')}<h2>${esc(ev.title)}</h2></div><p>${esc(ev.text)}</p>
+        <div class="ev-body"></div><div class="ev-timer"><i></i></div>`);
       const bodyEl = m.card.querySelector('.ev-body'), bar = m.card.querySelector('.ev-timer i');
       let done = false, raf = 0, keyH = null;
+      const cleanups = [];
       const finish = (res) => {
         if (done) return; done = true; cancelAnimationFrame(raf);
         if (keyH) removeEventListener('keydown', keyH);
+        for (const f of cleanups) f();
         if (res && (res.__good || res.__bad)) m.card.classList.add(res.__good ? 'good' : 'bad');
         setTimeout(() => { m.close(); resolve(res); }, res && (res.__good || res.__bad) ? 450 : 120);
       };
@@ -579,7 +613,8 @@ export function createUI(game) {
         const loop = () => { const f = 1 - (performance.now() - t0) / T; bar.style.width = Math.max(0, f * 100) + '%'; if (f <= 0) onTimeout(); else raf = requestAnimationFrame(loop); };
         raf = requestAnimationFrame(loop);
       };
-      const outcome = (ok, okFx, failFx) => { game.audio?.play(ok ? 'qte-good' : 'qte-bad'); finish({ ...(ok ? okFx : failFx), __good: ok, __bad: !ok }); };
+      let act = null;
+      const outcome = (ok, okFx, failFx) => { game.audio?.play(ok ? 'qte-good' : 'qte-bad'); finish({ ...(ok ? okFx : failFx), __good: ok, __bad: !ok, __act: act }); };
       const runQte = (q, okFx, failFx) => {
         bodyEl.innerHTML = '';
         if (q.kind === 'mash') {
@@ -609,13 +644,16 @@ export function createUI(game) {
           bodyEl.innerHTML = `<div class="swipe-pad"><span class="arr">${arrow}</span><small>Swipe ${q.dir}${q.dir === 'up' ? '' : ''} (or press the arrow key)</small></div>`;
           const pad = bodyEl.querySelector('.swipe-pad');
           let s0 = null;
-          m.el.addEventListener('pointerdown', (e) => { s0 = { x: e.clientX, y: e.clientY }; });
-          m.el.addEventListener('pointerup', (e) => {
+          // swipe anywhere on the screen
+          const dn = (e) => { s0 = { x: e.clientX, y: e.clientY }; };
+          const upH = (e) => {
             if (!s0) return; const dx = e.clientX - s0.x, dy = e.clientY - s0.y; s0 = null;
             const dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
             if (Math.hypot(dx, dy) < 30) { pad.classList.add('nudge'); return; }
             outcome(dir === q.dir, okFx, failFx);
-          });
+          };
+          addEventListener('pointerdown', dn, true); addEventListener('pointerup', upH, true);
+          cleanups.push(() => { removeEventListener('pointerdown', dn, true); removeEventListener('pointerup', upH, true); });
           keyH = (e) => { const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', KeyA: 'left', KeyD: 'right', KeyW: 'up' }; if (map[e.code]) { e.preventDefault(); outcome(map[e.code] === q.dir, okFx, failFx); } };
           addEventListener('keydown', keyH);
           timed(q.time, () => outcome(false, okFx, failFx));
@@ -638,9 +676,10 @@ export function createUI(game) {
         const choose = (i) => {
           const o = opts[i]; if (!o) return;
           tap();
+          act = o.act || null;
           if (o.qte) { cancelAnimationFrame(raf); if (keyH) removeEventListener('keydown', keyH); runQte(o.qte, o.ok, o.fail); return; }
-          if (o.risk) { const bad = Math.random() < o.risk.p; game.audio?.play(bad ? 'qte-bad' : 'qte-good'); finish({ ...(bad ? o.risk.bad : o.risk.good), __good: !bad, __bad: bad }); return; }
-          finish(o.effect || {});
+          if (o.risk) { const bad = Math.random() < o.risk.p; game.audio?.play(bad ? 'qte-bad' : 'qte-good'); finish({ ...(bad ? o.risk.bad : o.risk.good), __good: !bad, __bad: bad, __act: act }); return; }
+          finish({ ...(o.effect || {}), __act: act });
         };
         bodyEl.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) choose(+b.dataset.i); });
         keyH = (e) => { const n = +e.key; if (n >= 1 && n <= opts.length) choose(n - 1); }; addEventListener('keydown', keyH);
@@ -676,6 +715,7 @@ export function createUI(game) {
     return new Promise((resolve) => {
       const lines = [];
       if (r.early) lines.push(`<span class="good">Early bonus +${money(r.bonus)}</span>`);
+      if (r.flow > 1) lines.push(`<span class="good">Flow ×${r.flow.toFixed(1)} on the tip</span>`);
       if (r.late) lines.push(`<span class="bad">Late${r.latePenalty ? ` −${money(r.latePenalty)}` : ''}</span>`);
       if (r.cond < 85) lines.push(`<span class="bad">Food ${r.cond < 35 ? 'ruined' : r.cond < 60 ? 'damaged' : 'a bit shaken'}</span>`);
       const quote = r.stars >= 5 ? ['Perfect, thank you!!', 'Still hot! You\'re the best.', 'Wow, that was fast!'] : r.stars >= 4 ? ['Thanks!', 'Great, cheers!'] : r.stars >= 3 ? ['Okay… thanks.', 'Bit late, but fine.'] : ['Seriously?', 'It\'s all cold…', 'What happened to my food?!'];
@@ -749,7 +789,7 @@ export function createUI(game) {
 
   return {
     setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial,
-    rideLeg, rideFrame, routeChanged, flash, coach, get tab() { return tab; },
+    rideLeg, rideFrame, routeChanged, flash, coach, flowPop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };
 }

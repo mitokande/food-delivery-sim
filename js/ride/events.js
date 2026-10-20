@@ -6,16 +6,16 @@
 
 export const EVENTS = [
   {
-    id: 'dog', title: 'A dog is chasing you!', icon: 'ui-dog', sfx: 'dog-bark', where: ['hills', 'oldtown', 'harbor'], w: 3,
+    id: 'dog', title: 'A dog is chasing you!', icon: 'ui-dog', sfx: 'dog-bark', where: ['hills', 'oldtown', 'harbor'], w: 3, actor: 'dog',
     text: 'A very excited terrier wants your burger. Tap fast to outrun it!',
     qte: { kind: 'mash', n: 14, time: 3.2 },
     ok: { say: 'Lost him!', xp: 8, energy: -10 }, fail: { say: 'It got a fry. Or five.', dmg: 18, time: 3 },
   },
   {
-    id: 'yellow', title: 'Light turning yellow', icon: 'ui-traffic-light', where: ['downtown', 'oldtown', 'harbor'], w: 3,
+    id: 'yellow', title: 'Light turning yellow', icon: 'ui-traffic-light', where: ['downtown', 'oldtown', 'harbor'], w: 3, actor: 'light',
     text: 'The junction ahead is about to go red.',
     options: [
-      { label: 'Floor it', sub: 'Fast. Risky.', risk: { p: 0.35, bad: { say: 'Flash! Speed camera fine.', cash: -15, sfx: 'camera-shutter' }, good: { say: 'Made it!', time: -3 } } },
+      { label: 'Floor it', sub: 'Fast. Risky.', act: 'go', risk: { p: 0.35, bad: { say: 'Flash! Speed camera fine.', cash: -15, sfx: 'camera-shutter' }, good: { say: 'Made it!', time: -3 } } },
       { label: 'Brake', sub: '+4 s', effect: { wait: 4, say: 'Safe and patient.' } },
     ],
   },
@@ -36,47 +36,47 @@ export const EVENTS = [
     ],
   },
   {
-    id: 'roadworks', title: 'Road works ahead', icon: 'ui-wrench', where: ['downtown', 'harbor', 'oldtown'], w: 2,
+    id: 'roadworks', title: 'Road works ahead', icon: 'ui-wrench', where: ['downtown', 'harbor', 'oldtown'], w: 2, actor: 'works', pre: 15,
     text: 'The lane is closed. A worker shrugs at you.',
     options: [
-      { label: 'Sidewalk!', sub: 'quick but bumpy', effect: { dmg: 12, time: 1, say: 'Bumpity bump.' } },
+      { label: 'Sidewalk!', sub: 'quick but bumpy', act: 'sidewalk', effect: { dmg: 12, time: 1, say: 'Bumpity bump.' } },
       { label: 'Wait for the gap', sub: '+6 s', effect: { wait: 6 } },
     ],
   },
   {
-    id: 'door', title: 'Car door!', icon: 'ui-overtake', where: ['downtown', 'oldtown'], w: 2,
+    id: 'door', title: 'Car door!', icon: 'ui-overtake', where: ['downtown', 'oldtown'], w: 2, actor: 'door', pre: 8,
     text: 'A parked car door swings open! Swipe to dodge!',
     qte: { kind: 'swipe', dir: 'left', time: 1.4 },
     ok: { say: 'Dodged!', xp: 10 }, fail: { say: 'Ouch. Sorry, sir!', crash: true, dmg: 22, time: 3 },
   },
   {
-    id: 'ball', title: 'Ball on the road!', icon: 'ui-jump', where: ['hills', 'oldtown'], w: 2,
+    id: 'ball', title: 'Ball on the road!', icon: 'ui-jump', where: ['hills', 'oldtown'], w: 2, actor: 'ball',
     text: 'A football bounces into the street. Hop over it!',
     qte: { kind: 'swipe', dir: 'up', time: 1.3 },
     ok: { say: 'Nice hop!', xp: 10, energy: 15 }, fail: { say: 'Boing.', dmg: 14 },
   },
   {
-    id: 'stall', title: 'Engine stalled!', icon: 'ui-wrench', sfx: 'engine-stall', w: 4, breakdown: true,
+    id: 'stall', title: 'Engine stalled!', icon: 'ui-wrench', sfx: 'engine-stall', w: 4, breakdown: true, actor: 'stall',
     text: 'The Rust Bucket coughs and dies. Kick-start it — tap when the needle is in the green!',
     qte: { kind: 'timing', zone: [0.62, 0.8], time: 4.5, tries: 3 },
     ok: { say: 'Vroom! Back in business.', sfx: 'engine-start' }, fail: { say: 'Pushed it for a while…', wait: 6, energy: -20 },
   },
   {
-    id: 'flat', title: 'Flat tyre!', icon: 'ui-wrench', sfx: 'tire-pop', w: 2, breakdown: true,
+    id: 'flat', title: 'Flat tyre!', icon: 'ui-wrench', sfx: 'tire-pop', w: 2, breakdown: true, actor: 'flat',
     text: 'Pssssht. Pump it back up — tap as fast as you can!',
     qte: { kind: 'mash', n: 18, time: 4.5, sfx: 'pump' },
     ok: { say: 'Good as new (ish).', wait: 1.5 }, fail: { say: 'Wobbly ride to go.', wait: 4, dmg: 10 },
   },
   {
-    id: 'rival', title: 'Rival courier!', icon: 'ui-nitro', where: ['downtown', 'harbor'], w: 2, minLvl: 3,
+    id: 'rival', title: 'Rival courier!', icon: 'ui-nitro', where: ['downtown', 'harbor'], w: 2, minLvl: 3, actor: 'rival',
     text: 'A courier in a green jacket revs next to you. “Race you to the next corner?”',
     options: [
-      { label: 'Race!', sub: 'mash to win', qte: { kind: 'mash', n: 16, time: 3 }, ok: { say: 'You win! +$10', cash: 10, xp: 15, time: -3 }, fail: { say: 'He smirks and zooms off.', energy: -20 } },
+      { label: 'Race!', sub: 'mash to win', act: 'race', qte: { kind: 'mash', n: 16, time: 3 }, ok: { say: 'You win! +$10', cash: 10, xp: 15, time: -3 }, fail: { say: 'He smirks and zooms off.', energy: -20 } },
       { label: 'Nah', sub: 'stay cool', effect: {} },
     ],
   },
   {
-    id: 'rain', title: 'It starts to rain', icon: 'ui-rain', sfx: 'rain-start', w: 2, minLvl: 2,
+    id: 'rain', title: 'It starts to rain', icon: 'ui-rain', sfx: 'rain-start', w: 2, minLvl: 2, actor: 'rain', dry: true,
     text: 'Big fat drops. The road is getting slippery.',
     options: [
       { label: 'Slow down', sub: 'safe · +4 s', effect: { wait: 0, time: 4, say: 'Steady wins.' } },
@@ -84,7 +84,7 @@ export const EVENTS = [
     ],
   },
   {
-    id: 'police', title: 'Police check', icon: 'ui-police', sfx: 'siren-short', where: ['downtown', 'harbor'], w: 1, minLvl: 3,
+    id: 'police', title: 'Police check', icon: 'ui-police', sfx: 'siren-short', where: ['downtown', 'harbor'], w: 1, minLvl: 3, actor: 'police', pre: 16,
     text: '“License and registration, please.” The officer eyes your box.',
     options: [
       { label: 'Smile & hand over', sub: '+6 s', effect: { wait: 6, say: '“Drive safe.”' } },
@@ -100,7 +100,7 @@ export const EVENTS = [
     ],
   },
   {
-    id: 'pigeons', title: 'Pigeons!', icon: 'ui-horn', where: ['oldtown', 'downtown'], w: 2,
+    id: 'pigeons', title: 'Pigeons!', icon: 'ui-horn', where: ['oldtown', 'downtown'], w: 2, actor: 'birds', pre: 10,
     text: 'A whole squad of pigeons is having a meeting on the road. Hold the horn!',
     qte: { kind: 'hold', time: 2.5, need: 1.1, sfx: 'horn' },
     ok: { say: 'Flap flap flap!' }, fail: { say: 'They did not move. You did.', wait: 3 },
@@ -139,6 +139,7 @@ export function pickEvent(rng, ctx) {
     if (e.needsSkill && !ctx.skills[e.needsSkill]) return false;
     if (e.breakdown && !(rng() < ctx.breakdown * 2.5)) return false;
     if (e.minClock && (ctx.clock < e.minClock || ctx.clock > e.maxClock)) return false;
+    if (e.dry && ctx.raining) return false;
     if (ctx.recent.includes(e.id)) return false;
     return true;
   });

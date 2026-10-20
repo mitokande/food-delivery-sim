@@ -1,7 +1,8 @@
 // Boot + main loop + mode router (hub ⇄ ride).
 import * as THREE from 'three';
 import { generateCity, DIRS, OPP } from './city/gen.js';
-import { buildCityView, waterTime, cullChunks, setCityNight, lampUni } from './city/view.js';
+import { buildCityView, waterTime, cullChunks, setCityNight, lampUni, cityMaterials } from './city/view.js';
+import { createWeather, W as WEATHER } from './weather.js';
 import { findPath, buildRoute, sampleRoute, dirBetween } from './city/graph.js';
 import { createTraffic, createPeds } from './city/traffic.js';
 import { createSky } from './sky.js';
@@ -61,6 +62,7 @@ const peds = await createPeds(city, scene, { count: isTouch ? 8 : 12, ids: isTou
 fill.style.width = '88%';
 
 const audio = createAudio();
+const weather = createWeather(scene, cityMaterials);
 const rng = mulberry32(Date.now() & 0xffffff);
 const garageLot = city.lots[city.specials.garage];
 const officeLot = city.lots[city.specials.office];
@@ -75,7 +77,7 @@ const game = {
   canOvertake: () => ride.canOvertake(),
 };
 const ui = createUI(game);
-const ride = createRide({ scene, camera, city, traffic, sky, audio, ui, onFinish: (s) => finishJob(s) });
+const ride = createRide({ scene, camera, renderer, city, traffic, sky, audio, ui, weather, onFinish: (s) => finishJob(s) });
 game.ride = ride;
 
 const playerTile = () => (S.pos != null && city.tiles[S.pos]?.k === 1 ? S.pos : garageLot.door);
@@ -260,7 +262,7 @@ game.startJob = async () => {
   const dir0 = p && p.length > 1 ? dirBetween(city, p[0], p[1]) : playerDir();
   const pose = await ride.stage(from, dir0);
   ride.R.bike.rider?.play('drive', 0.3);
-  audio.loop('music', 'music-ride'); audio.loop('amb', sky.state.night > 0.5 ? 'amb-night' : 'amb-city');
+  audio.loop('music', 'music-ride');
   ride.R.takeCamera = false;
   await tweenCam(pose.pos, pose.quat, pose.fov, 1.5);
   ride.R.takeCamera = true;
@@ -319,7 +321,7 @@ async function finishJob(sum) {
 }
 async function backToHub() {
   game.mode = 'tween';
-  audio.loop('music', 'music-hub'); audio.loop('amb', null);
+  audio.loop('music', 'music-hub');
   const b = await parkBike();
   const x = b.root.position.x, z = b.root.position.z;
   const pose = hubCam.pose(x, z, 230);
@@ -379,7 +381,7 @@ game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV)
 // ---------------------------------------------------------------- keyboard
 const KEYS = { Space: 'boost', KeyW: 'hop', ArrowUp: 'hop', KeyH: 'horn', KeyA: 'overtake', ArrowLeft: 'overtake', KeyG: 'go', KeyS: 'shortcut' };
 addEventListener('keydown', (e) => {
-  if (game.mode !== 'ride' || document.querySelector('.modal')) return;
+  if (game.mode !== 'ride' || document.querySelector('.modal, .evdock')) return;
   if (e.code === 'KeyE') { const b = document.querySelector('.r-ctx .ctx'); if (b) ride.input(b.dataset.ride, true); e.preventDefault(); return; }
   const k = KEYS[e.code]; if (!k) return;
   e.preventDefault();
@@ -387,7 +389,7 @@ addEventListener('keydown', (e) => {
   ride.input(k, true);
 });
 addEventListener('keyup', (e) => { if (e.code === 'Space' && game.mode === 'ride') ride.input('boost', false); });
-addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); } }, { capture: true });
+addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); game.amb = undefined; } }, { capture: true });
 
 // ---------------------------------------------------------------- boot finish
 St.ensureGoals();
@@ -442,7 +444,7 @@ if (q.has('fps')) { const el = document.createElement('div'); el.style.cssText =
 
 // ---------------------------------------------------------------- loop
 const timer = new THREE.Timer();
-let boardT = 0, fleetT = 0, lastNight = -1, lifeT = 0;
+let boardT = 0, fleetT = 0, lastNight = -1, lifeT = 0, topT = 0;
 function frame() {
   timer.update();
   const dt = Math.min(0.05, timer.getDelta());
@@ -465,8 +467,12 @@ function frame() {
     peds.update(dt * ts, b.x, b.z, 110);
     cullChunks(view, b.x, b.z, QV === 'low' ? 200 : 300);
     sky.focus(b.x, b.z, 90, camera);
-    scene.fog.near = QV === 'low' ? 50 : 80; scene.fog.far = QV === 'low' ? 190 : 290;
-    sky.set(Math.min(DAY_END - 1, S.clock + ride.R.rideTime * GAME_MIN_PER_SEC));
+    const clk = Math.min(DAY_END - 1, S.clock + ride.R.rideTime * GAME_MIN_PER_SEC);
+    weather.update(dt * ts, clk, S.day, camera);
+    const wr = weather.rain;
+    scene.fog.near = (QV === 'low' ? 50 : 80) * (1 - 0.45 * wr); scene.fog.far = (QV === 'low' ? 190 : 290) * (1 - 0.4 * wr);
+    sky.state.rain = wr;
+    sky.set(clk);
     audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost);
   } else {
     if (game.mode === 'hub') hubCam.update(dt);
@@ -478,17 +484,23 @@ function frame() {
     const fx = hubCam.st.x, fz = hubCam.st.z;
     peds.update(dt, fx, fz, 160);
     sky.focus(fx, fz, Math.min(900, hubCam.st.dist * 1.7), camera);
-    scene.fog.near = hubCam.st.dist * 1.6; scene.fog.far = hubCam.st.dist * 5.5;
+    weather.update(dt, S.clock, S.day, camera);
+    sky.state.rain = weather.rain; sky.set(S.clock);
+    scene.fog.near = hubCam.st.dist * 1.6 * (1 - 0.3 * weather.rain); scene.fog.far = hubCam.st.dist * 5.5 * (1 - 0.3 * weather.rain);
     if (game.mode === 'hub') {
       document.getElementById('markers').hidden = showroom.on;
       for (const m of fleetMarkers) m.pos.set(m.data.pos[0], 7, m.data.pos[1]);
       markers.update(innerWidth, innerHeight);
       lifeT += dt; if (lifeT > 1) { lifeT = 0; const now = performance.now(); for (const el of document.querySelectorAll('.ocard')) { const o = game.board.find((x) => x.id === +el.dataset.id); if (o && !game.taken.includes(o)) el.querySelector('.olife').style.width = Math.max(0, 100 - (now - o.born) / 10 / o.life) + '%'; } }
+      topT += dt; if (topT > 1) { topT = 0; ui.refreshTop(); }
       boardT += dt; if (boardT > 4) { boardT = 0; if (fillBoard()) { updateMarkers(); if (ui.tab === 'city' && !document.querySelector('.modal')) ui.render(); } }
     }
   }
   fleetT += dt; if (fleetT > 1) { fleetT = 0; St.tickFleet(); }
   if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); lampUni.uNight.value = lastNight; ride.setNight?.(lastNight); renderer.toneMappingExposure = 1.05 + lastNight * 0.25; }
+  // rain sound follows the weather (ride: city / night ambience otherwise)
+  const ambWant = weather.rain > 0.3 ? 'amb-rain' : game.mode === 'ride' ? (sky.state.night > 0.5 ? 'amb-night' : 'amb-city') : null;
+  if (ambWant !== game.amb) { game.amb = ambWant; audio.loop('amb', ambWant); }
   adapt(dt);
   renderer.render(scene, camera);
 }
@@ -496,7 +508,7 @@ renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) St.save(true); });
 // headless test hook: advance the simulation without rendering
 game.skipTween = () => { if (tween) tween.t = 1; };
-game.testEvent = (id) => { const R = ride.R; if (R.active) R.event = { ev: EVENT[id], s: R.s + 0.5 }; };
+game.testEvent = (id, lead) => { if (ride.R.active) ride.testEvent(EVENT[id], lead); };
 game.sim = (sec, step = 1 / 30) => { for (let t = 0; t < sec; t += step) { traffic.update(step * (game.mode === 'ride' ? ride.R.timeScale : 1)); if (ride.R.active) ride.update(step); } };
 window.game = Object.assign(game, { scene, camera, renderer, view, sky, hubCam, St, traffic, peds, ui, markers });
 window.ready = true;

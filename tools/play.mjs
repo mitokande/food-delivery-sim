@@ -34,6 +34,7 @@ const press = (process.env.PRESS || '').split(',').filter(Boolean);
 while (Date.now() - t0 < +(process.env.MAXMS || 150000)) {
   const st = await page.evaluate(() => { const R = game.ride.R; return { mode: game.mode, phase: R.phase, s: Math.round(R.s), len: Math.round(R.route?.length || 0), v: +R.v.toFixed(1), leg: R.leg, blocked: R.blockedBy, modal: [...document.querySelectorAll('.modal')].map((m) => m.className).join('|'), ctx: [...document.querySelectorAll('.r-ctx .ctx')].map((b) => b.dataset.ride).join(',') }; });
   if (Date.now() - lastShot > +(process.env.EVERY || 6000)) { lastShot = Date.now(); console.log(JSON.stringify(st)); await shot(n++); }
+  if (await page.evaluate(() => !!document.querySelector('.evdock.in'))) { await shot('event' + n++); await page.evaluate(() => { const b = document.querySelector('.evdock .opt, .evdock .btn'); if (b) { b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.click(); } }); }
   if (st.modal.includes('event')) { await shot('event' + n++); await page.evaluate(() => { const b = document.querySelector('.modal.event .opt, .modal.event .btn'); if (b) { b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.click(); } }); }
   if (st.modal.includes('scene')) { await sleep(700); await shot('scene' + n++); await clickSel('.modal.scene [data-x]'); }
   if (st.modal.includes('rated')) { await sleep(600); await shot('rated' + n++); await clickSel('.modal.rated'); }

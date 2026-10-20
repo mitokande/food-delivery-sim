@@ -81,6 +81,25 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
     }
   }
   const st = { spin: 0, lean: 0, pitch: 0, bob: 0 };
+  // rider reactions are small bone offsets layered on the 'drive' clip. The mixer skips bones whose keyframes don't
+  // change, so offsets are undone before every mixer update and re-applied after it.
+  const bones = {};
+  if (ch) ch.obj.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+  const pose = { tuck: 0, tuckV: 0, cheer: 0, look: 0 };
+  const saved = [];
+  const qa = new THREE.Quaternion(), ax = new THREE.Vector3(1, 0, 0), ay = new THREE.Vector3(0, 1, 0);
+  function offset(bone, axis, ang) { if (!bone || Math.abs(ang) < 1e-4) return; saved.push([bone, bone.quaternion.clone()]); bone.quaternion.multiply(qa.setFromAxisAngle(axis, ang)); }
+  function applyPose(dt) {
+    pose.tuckV += (pose.tuck - pose.tuckV) * Math.min(1, dt * 6);
+    pose.cheer = Math.max(0, pose.cheer - dt); pose.look = Math.max(0, pose.look - dt);
+    const ch1 = pose.cheer > 0 ? Math.min(1, (0.9 - pose.cheer) / 0.2, pose.cheer / 0.25) : 0; // raise, hold, lower
+    const lk = pose.look > 0 ? Math.sin(Math.PI * (1 - pose.look / 0.9)) : 0;
+    offset(bones.torso, ax, 0.32 * pose.tuckV);
+    offset(bones.head, ax, -0.22 * pose.tuckV);
+    offset(bones['arm-right'], ax, -2.2 * ch1);
+    offset(bones.head, ay, 1.1 * lk);
+  }
+  function undoPose() { while (saved.length) { const [b, q] = saved.pop(); b.quaternion.copy(q); } }
   function update(dt, speed, leanTarget = 0, steerAng = 0) {
     st.spin += speed * dt / 0.27;
     for (const w of wheels) w.rotation.x = st.spin;
@@ -89,8 +108,10 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
     lean.rotation.z = -st.lean;
     st.bob += dt * (6 + speed * 0.6);
     model.position.y = Math.sin(st.bob) * 0.012 * Math.min(1, speed / 3);
-    if (ch) ch.mixer.update(dt);
+    if (ch) { undoPose(); ch.mixer.update(dt); applyPose(dt); }
   }
+  const cheer = () => { if (pose.cheer <= 0.2) pose.cheer = 0.9; };
+  const lookBack = () => { pose.look = 0.9; };
   function openLid(open) { if (lid) lid.rotation.x = open ? -1.2 : 0; }
-  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id };
+  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id, pose, cheer, lookBack };
 }

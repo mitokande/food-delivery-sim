@@ -150,5 +150,17 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   dönüş kavşaktan önce başlıyor). Yön yolun teğeti, yatma `atan(v²κ/g)` (κ birkaç metrede ortalanıyor, en fazla ~29°),
   şerit değiştirirken burun döner, ayak geçişlerinde poz yumuşak harmanlanır, kamera gecikmeli döner ve yolun ilerisine bakar.
   Kırmızıda durma çizgisi yayın başına alındı. Arabaların karo içi dönüşleri de çeyrek çember.
+- 2026-10-20: sürükleyicilik paketi 1.
+  - **His:** `ride/fx.js` (egzoz — külüstürde siyah, elektrikte yok —, turbo alevi, toz, sıçrama, kıvılcım, para/yıldız
+    parıltısı, fren izi), turboda CSS hız çizgileri, Android titreşimi (`haptics.js`).
+  - **Flow serisi:** mükemmel zıplama, sollama, kıl payı (motorun yanından yakın geçen araç → kısa ağır çekim),
+    kestirme, kırmızıda başarılı geçiş; ×2'ye kadar bahşiş çarpanı, turbo doldurur, çukur/çarpışma bozar.
+  - **Sürücü tepkileri:** turboda eğilme, başarıda kol kaldırma, sollarken arkaya bakma (mixer sonrası kemik ofsetleri).
+  - **Dünya içi olaylar** (`ride/actors.js`, kodla üretilen bloklu köpek ve güvercin): köpek yanında koşar, top yola
+    zıplar, park etmiş arabanın kapısı açılır, güvercinler, rakip kurye, polis çevirmesi, yol çalışması.
+    Kart alttaki panelde (`.evdock`), ağır çekim 0,12, kamera olay sırasında yükselir.
+    Önceden yerleştirilen aksesuarlar hep düz yola konur.
+  - **Yağmur** (`weather.js`): güne göre tohumlanmış yağmur saatleri, shader yağmuru, ıslak şehir, gri gök, sis.
+    Ödeme ×1,25, bahşiş ×1,2, ETA +%8; viraj tutuşu −%20, daha çok su birikintisi, tekerden su sıçraması.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

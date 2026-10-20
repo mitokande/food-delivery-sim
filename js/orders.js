@@ -3,6 +3,7 @@ import { DISTRICT, RESTAURANT, RESTAURANTS, FOODS, ORDER_TYPES, FIRST_NAMES, CHA
 import { findPath, buildRoute } from './city/graph.js';
 import { S, rushMult, skillFx } from './state.js';
 import { pick } from './rng.js';
+import { W, rainBonus } from './weather.js';
 
 const REF_SPEED = { oldtown: 4.7, downtown: 5.4, harbor: 6.2, hills: 6.9 }; // m/s an average courier manages
 let nextId = 1;
@@ -46,12 +47,13 @@ export function makeOrder(city, rng, { from, restId, type } = {}) {
   const pickM = from != null ? pathMeters(city, from, restLot.door) : 150;
   const D = DISTRICT[R.district];
   const rush = rushMult();
-  const base = Math.max(5, Math.round((3 + 0.03 * dropM + 0.01 * pickM) * D.pay * T.pay * rush.m));
-  const eta = Math.round(((pickM + dropM) / REF_SPEED[R.district] + 14) * T.eta * fx.eta);
+  const wet = rainBonus();
+  const base = Math.max(5, Math.round((3 + 0.03 * dropM + 0.01 * pickM) * D.pay * T.pay * rush.m * wet));
+  const eta = Math.round(((pickM + dropM) / REF_SPEED[R.district] + 14) * T.eta * fx.eta * (wet > 1 ? 1.08 : 1));
   return {
     id: nextId++, rest: R.id, restName: R.name, food: R.food, restLot: restLot.id, cust: cust.id, district: R.district,
     custDistrict: cust.d, name: pick(rng, FIRST_NAMES), char: pick(rng, CHAR_IDS), type: tid, base, eta, dropM, pickM,
-    size: T.size || 1, fragile: (FOODS[R.food].fragile || 1) * (T.fragile || 1), rush: rush.m > 1 ? rush.name : '',
+    size: T.size || 1, fragile: (FOODS[R.food].fragile || 1) * (T.fragile || 1), rush: rush.m > 1 ? rush.name : '', rain: wet > 1,
     born: performance.now(), life: 70 + rng() * 80,
   };
 }
@@ -78,7 +80,7 @@ export function scoreOrder(o, { elapsed, heat, integrity, tipMult = 1, ratingAdj
   const early = ratio < 0.85;
   const tipPct = [0, 0, 0.03, 0.08, 0.16, 0.28][stars];
   const T = ORDER_TYPES[o.type];
-  const tip = Math.round(o.base * tipPct * T.tip * fx.tips * tipMult * (early ? 1.15 : 1));
+  const tip = Math.round(o.base * tipPct * T.tip * fx.tips * tipMult * (early ? 1.15 : 1) * (W.rain > 0.35 ? 1.2 : 1));
   const bonus = early ? Math.round(o.base * 0.15) : 0;
   const latePenalty = ratio > 1.5 ? Math.round(o.base * 0.25) : 0;
   return { stars, early, late: ratio > 1, ratio, tip, bonus, latePenalty, pay: o.base - latePenalty, cond };

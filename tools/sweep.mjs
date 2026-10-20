@@ -22,7 +22,7 @@ const screens = {
   jobs: () => game.ui.setTab('jobs'),
   fleet: () => game.ui.setTab('fleet'),
   ride: () => { game.ui.setTab('city'); document.querySelector('.ocard')?.click(); game.startJob(); return 1; },
-  event: () => { game.testEvent('yellow'); game.sim(0.3); },
+  event: () => { game.testEvent('granny', 1); game.sim(0.4); },
   receipt: () => { game.ui.receipt({ lines: [{ label: 'Sunny Burger → Emma ★★★★★', amount: 12 }, { label: 'Tip from Emma', amount: 3.5, cls: 'pos' }, { label: 'Fuel (0.42 km)', amount: -0.46, cls: 'neg' }], total: 15.04, xp: 34, avgStars: 5, goals: '1 goal done!' }); },
 };
 let bad = 0;
