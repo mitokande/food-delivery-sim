@@ -923,6 +923,11 @@ export function createRide(ctx) {
   // ---------- camera ----------
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
   let camInit = false;
+  // default chase framing: a bit higher and further back, looking slightly down at the road
+  const CAM = {
+    portrait: { back: 7.2, up: 4.3, ahead: 10, lookY: 1.1, fov: 62 },
+    landscape: { back: 6.6, up: 3.8, ahead: 9, lookY: 1.1, fov: 52 },
+  };
   function camUpdate(dt) {
     if (!R.bike) return;
     const b = R.bike.root.position, hd = R.bike.root.rotation.y;
@@ -934,7 +939,8 @@ export function createRide(ctx) {
       // while an event card is docked at the bottom, pull up and back so the bike and the action sit above it
       R.evCamK = (R.evCamK || 0) + ((R.eventCam ? 1 : 0) - (R.evCamK || 0)) * Math.min(1, dt * 3);
       const ek = R.evCamK;
-      const back = (portrait ? 6.6 : 6.0) + ek * 2.4, up = (portrait ? 3.15 : 2.8) + ek * 2.6, aheadD = (portrait ? 10 : 9) - ek * 5;
+      const cc = portrait ? CAM.portrait : CAM.landscape;
+      const back = cc.back + ek * 1.8, up = cc.up + ek * 1.5, aheadD = cc.ahead - ek * 5;
       // the camera swings round behind the bike with a little lag instead of being bolted to it
       if (R.camYaw == null || R.snapCam) R.camYaw = hd;
       let dy = hd - R.camYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
@@ -945,8 +951,8 @@ export function createRide(ctx) {
       if (R.route && R.phase === 'ride') {
         sampleRoute(R.route, Math.min(R.route.length, R.s + aheadD), camAhead);
         const lx = b.x + fx * aheadD, lz = b.z + fz * aheadD;
-        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, 1.5 - ek * 1.6, lz * 0.45 + camAhead[1] * 0.55);
-      } else look = v3b.set(b.x + fx * aheadD, 1.5, b.z + fz * aheadD);
+        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, cc.lookY - ek * 1.2, lz * 0.45 + camAhead[1] * 0.55);
+      } else look = v3b.set(b.x + fx * aheadD, cc.lookY, b.z + fz * aheadD);
     }
     const k = 1 - Math.exp(-dt * (R.camMode === 'scene' ? 2.5 : 8));
     if (!camInit || R.snapCam) { camPos.copy(pos); camLook.copy(look); camInit = true; R.snapCam = false; }
@@ -955,7 +961,7 @@ export function createRide(ctx) {
     camera.position.copy(camPos);
     if (R.shake > 0) { camera.position.x += (Math.random() - 0.5) * R.shake * 0.35; camera.position.y += (Math.random() - 0.5) * R.shake * 0.35; R.shake = Math.max(0, R.shake - dt * 2.5); }
     camera.lookAt(camLook);
-    const fov0 = portrait ? 62 : 52;
+    const fov0 = (portrait ? CAM.portrait : CAM.landscape).fov;
     const fovT = fov0 + (R.boost ? 9 : 0) + Math.min(6, R.v * 0.25);
     camera.fov += (fovT - camera.fov) * Math.min(1, dt * 4);
     camera.updateProjectionMatrix();
@@ -963,9 +969,9 @@ export function createRide(ctx) {
   function chasePose() {
     const b = R.bike.root.position, hd = R.bike.root.rotation.y, fx = Math.sin(hd), fz = Math.cos(hd);
     const portrait = camera.aspect < 1;
-    const back = portrait ? 6.6 : 6.0, up = portrait ? 3.15 : 2.8, ahead = portrait ? 10 : 9;
-    const c = new THREE.PerspectiveCamera(); c.position.set(b.x - fx * back, up, b.z - fz * back); c.lookAt(b.x + fx * ahead, 1.5, b.z + fz * ahead);
-    return { pos: c.position.clone(), quat: c.quaternion.clone(), fov: portrait ? 62 : 52 };
+    const { back, up, ahead, lookY, fov } = portrait ? CAM.portrait : CAM.landscape;
+    const c = new THREE.PerspectiveCamera(); c.position.set(b.x - fx * back, up, b.z - fz * back); c.lookAt(b.x + fx * ahead, lookY, b.z + fz * ahead);
+    return { pos: c.position.clone(), quat: c.quaternion.clone(), fov };
   }
   // place the bike at the start of the first leg (used before the camera tween)
   async function stage(fromTile, fromDir) {
