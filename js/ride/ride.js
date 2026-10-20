@@ -18,6 +18,7 @@ import { mulberry32 } from '../rng.js';
 const A_LAT = 8.5, B_DEC = 7.5, ROAD_Y = 0.1; // asphalt top (kit 0.01 × 10 m)
 const v3 = new THREE.Vector3(), v3b = new THREE.Vector3();
 const ahead = [0, 0, 0, 0, 0], camAhead = [0, 0, 0, 0, 0];
+const look_ = new THREE.Vector3();
 const KAP_OFFS = [-3, -1.5, 0, 1.5, 3];
 
 export function createRide(ctx) {
@@ -928,6 +929,18 @@ export function createRide(ctx) {
     portrait: { back: 7.2, up: 4.3, ahead: 10, lookY: 1.1, fov: 62 },
     landscape: { back: 6.6, up: 3.8, ahead: 9, lookY: 1.1, fov: 52 },
   };
+  // player look-around: drag orbits the camera round the bike, pinch / wheel zooms; it eases back when left alone
+  const free = { yaw: 0, pitch: 0, zoom: 1, hold: false, idle: 9 };
+  function camDrag(dx, dy) {
+    free.yaw = THREE.MathUtils.clamp(free.yaw - dx * 0.009, -2.8, 2.8);
+    free.pitch = THREE.MathUtils.clamp(free.pitch + dy * 0.006, -0.35, 0.9);
+    free.idle = 0;
+  }
+  function camZoom(z) { free.zoom = THREE.MathUtils.clamp(z, 0.65, 1.8); free.idle = 0; }
+  function camHold(on) { free.hold = on; free.idle = 0; }
+  const camSnap = () => ({ yaw: free.yaw, pitch: free.pitch, zoom: free.zoom });
+  function camRestore(s) { if (s) Object.assign(free, s); }
+  function camReset() { free.yaw = 0; free.pitch = 0; free.zoom = 1; free.idle = 9; }
   function camUpdate(dt) {
     if (!R.bike) return;
     const b = R.bike.root.position, hd = R.bike.root.rotation.y;
@@ -945,14 +958,27 @@ export function createRide(ctx) {
       if (R.camYaw == null || R.snapCam) R.camYaw = hd;
       let dy = hd - R.camYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
       R.camYaw += dy * Math.min(1, dt * 3.8);
-      const cx = Math.sin(R.camYaw), cz = Math.cos(R.camYaw);
-      pos = v3.set(b.x - cx * back, up + b.y * 0.4, b.z - cz * back);
+      // free look drifts home a moment after the finger lifts
+      if (!free.hold) {
+        free.idle += dt;
+        if (free.idle > 1.3) { const kk = 1 - Math.exp(-dt * 2.4); free.yaw -= free.yaw * kk; free.pitch -= free.pitch * kk; free.zoom += (1 - free.zoom) * kk; }
+      }
+      const side = Math.abs(Math.sin(free.yaw)); // looking from the side: come closer and a bit higher so walls don't get in the way
+      const yaw = R.camYaw + free.yaw;
+      const horiz = back * free.zoom * (1 - 0.22 * side), height = Math.max(1.1, up * free.zoom + free.pitch * 6 + side * 2.2);
+      const cx = Math.sin(yaw), cz = Math.cos(yaw);
+      pos = v3.set(b.x - cx * horiz, height + b.y * 0.4, b.z - cz * horiz);
       // look at the road ahead (so the view turns into a corner before the bike does)
+      let lx2, ly2, lz2;
       if (R.route && R.phase === 'ride') {
         sampleRoute(R.route, Math.min(R.route.length, R.s + aheadD), camAhead);
         const lx = b.x + fx * aheadD, lz = b.z + fz * aheadD;
-        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, cc.lookY - ek * 1.2, lz * 0.45 + camAhead[1] * 0.55);
-      } else look = v3b.set(b.x + fx * aheadD, cc.lookY, b.z + fz * aheadD);
+        lx2 = lx * 0.45 + camAhead[0] * 0.55; ly2 = cc.lookY - ek * 1.2; lz2 = lz * 0.45 + camAhead[1] * 0.55;
+      } else { lx2 = b.x + fx * aheadD; ly2 = cc.lookY; lz2 = b.z + fz * aheadD; }
+      // the further you swing round, the more the camera looks at the bike instead of down the road
+      const w = Math.min(1, Math.abs(free.yaw) / 0.7 + Math.max(0, free.pitch) * 0.6);
+      look_.set(lx2 + (b.x - lx2) * w, ly2 + (1.1 - ly2) * w, lz2 + (b.z - lz2) * w);
+      look = look_;
     }
     const k = 1 - Math.exp(-dt * (R.camMode === 'scene' ? 2.5 : 8));
     if (!camInit || R.snapCam) { camPos.copy(pos); camLook.copy(look); camInit = true; R.snapCam = false; }
@@ -990,6 +1016,6 @@ export function createRide(ctx) {
 
   // test hook: schedule an event a little ahead (props placed like a real one)
   function testEvent(ev, lead = 2) { R.event = { ev, s: R.s + lead }; if (ev.pre) prePlace(R.event); }
-  return { R, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, get offer() { return R.offer; } };
+  return { R, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);

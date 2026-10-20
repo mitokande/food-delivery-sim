@@ -265,6 +265,7 @@ game.startJob = async () => {
   const first = city.lots[job.legs[0].lot].door;
   const p = findPath(city, from, first, { noBack: playerDir() >= 0 ? OPP(playerDir()) : -1 }) || findPath(city, from, first);
   const dir0 = p && p.length > 1 ? dirBetween(city, p[0], p[1]) : playerDir();
+  ride.camReset();
   const pose = await ride.stage(from, dir0);
   ride.R.bike.rider?.play('drive', 0.3);
   audio.loop('music', 'music-ride');
@@ -276,7 +277,7 @@ game.startJob = async () => {
   if (!S.seen.rideTip) {
     S.seen.rideTip = 1; St.save();
     ride.R.timeScale = 0;
-    await ui.tutorial(`Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> (or swipe up) to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.`, { at: 'top', btn: "Let's ride!" });
+    await ui.tutorial(`Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> (or swipe up) to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
     ride.R.timeScale = 1;
   }
 };
@@ -384,6 +385,38 @@ game.focusDistrict = (id) => {
   ui.setSheet('min');
 };
 game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } };
+
+// ---------------------------------------------------------------- ride free look: drag to orbit, pinch / wheel to zoom
+const rideLook = { ptrs: new Map(), last: null, start: null, t0: 0, snap: null, pinch: 0, zoom0: 1 };
+const lookAllowed = () => game.mode === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal');
+canvas.addEventListener('pointerdown', (e) => {
+  if (!lookAllowed()) return;
+  rideLook.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
+  if (rideLook.ptrs.size === 1) { rideLook.last = { x: e.clientX, y: e.clientY }; rideLook.start = { ...rideLook.last }; rideLook.t0 = performance.now(); rideLook.snap = ride.camSnap(); ride.camHold(true); }
+  if (rideLook.ptrs.size === 2) { const [a, b] = [...rideLook.ptrs.values()]; rideLook.pinch = Math.hypot(a.x - b.x, a.y - b.y); rideLook.zoom0 = ride.free.zoom; }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!rideLook.ptrs.has(e.pointerId) || game.mode !== 'ride') return;
+  rideLook.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (rideLook.ptrs.size >= 2) { const [a, b] = [...rideLook.ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (rideLook.pinch > 0) ride.camZoom(rideLook.zoom0 * rideLook.pinch / d); return; }
+  if (!rideLook.last) return;
+  ride.camDrag(e.clientX - rideLook.last.x, e.clientY - rideLook.last.y);
+  rideLook.last = { x: e.clientX, y: e.clientY };
+});
+const lookUp = (e) => {
+  if (!rideLook.ptrs.has(e.pointerId)) return;
+  rideLook.ptrs.delete(e.pointerId);
+  if (rideLook.ptrs.size === 1) { const p = [...rideLook.ptrs.values()][0]; rideLook.last = { x: p.x, y: p.y }; rideLook.pinch = 0; return; }
+  if (rideLook.ptrs.size > 0) return;
+  ride.camHold(false);
+  // a quick flick is a gesture (hop / overtake), not a look: undo what it did to the camera
+  const dx = e.clientX - (rideLook.start?.x ?? e.clientX), dy = e.clientY - (rideLook.start?.y ?? e.clientY);
+  if (performance.now() - rideLook.t0 < 450 && ((dy < -45 && Math.abs(dx) < Math.abs(dy)) || (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5))) ride.camRestore(rideLook.snap);
+  rideLook.last = null;
+};
+canvas.addEventListener('pointerup', lookUp); canvas.addEventListener('pointercancel', lookUp);
+canvas.addEventListener('wheel', (e) => { if (game.mode !== 'ride') return; e.preventDefault(); ride.camZoom(ride.free.zoom * Math.exp(e.deltaY * 0.0012)); ride.free.idle = 0; }, { passive: false });
 
 // ---------------------------------------------------------------- keyboard
 const KEYS = { Space: 'boost', KeyW: 'hop', ArrowUp: 'hop', KeyH: 'horn', KeyA: 'overtake', ArrowLeft: 'overtake', KeyG: 'go', KeyS: 'shortcut' };

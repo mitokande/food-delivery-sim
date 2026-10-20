@@ -60,7 +60,7 @@ export function createUI(game) {
     <button class="r-btn horn" data-ride="horn" aria-label="Horn">${ICON('ui-horn')}</button>
     <button class="r-btn hop" data-ride="hop" aria-label="Hop">${ICON('ui-jump')}<span>HOP</span></button>
     <button class="r-btn boost" data-ride="boost" aria-label="Turbo"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" class="bg"/><circle cx="50" cy="50" r="45" class="fg"/></svg>${ICON('ui-nitro')}<span>TURBO</span></button>
-    <div class="r-keys">Space turbo · W hop · E action · H horn</div>
+    <div class="r-keys">Space turbo · W hop · E action · H horn · drag to look</div>
   </div>
   <div id="modals"></div>
   <div id="toasts"></div>`;
@@ -492,7 +492,7 @@ export function createUI(game) {
     if (!sw || hud.hidden) return;
     const dy = e.clientY - sw.y, dx = e.clientX - sw.x;
     if (dy < -45 && Math.abs(dx) < Math.abs(dy) && performance.now() - sw.t < 450) game.rideInput('hop', true);
-    else if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) game.rideInput('overtake', true);
+    else if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5 && performance.now() - sw.t < 450) game.rideInput('overtake', true);
     sw = null;
   });
 

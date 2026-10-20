@@ -170,5 +170,8 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     (99 = bitti); eski kayıtlar onboarding'i atlar.
   - **Ayarlar:** "Replay tutorial", titreşim aç/kapa, "Reset progress" → neyin silineceğini listeleyen onay,
     1,6 sn basılı tutunca kayıt silinir ve sayfa yenilenir. Test: `node tools/onboard.mjs [WxH]`.
+- 2026-10-20: sürüşte serbest bakış. Ekranı sürüklemek kamerayı motorun etrafında döndürür (yatay) ve yükseltir (dikey);
+  iki parmak / tekerlek yakınlaştırır. Bırakınca ~1,3 sn sonra kamera arkaya döner. Yan açılarda kamera yükselir ve motora
+  bakar. Hızlı fiske (yukarı = zıpla, sola = sollama) kamerayı değiştirmez; sollama kaydırması da 450 ms sınırına alındı.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
