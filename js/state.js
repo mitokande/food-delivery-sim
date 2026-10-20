@@ -26,6 +26,8 @@ const fresh = () => ({
   look: { char: 'male-a', helmet: '#e8432f' },
   settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
   seen: {}, // one-time tips
+  onboard: { step: 0 }, // first-time guide; 99 = finished
+  name: '',
 });
 
 export let S = fresh();
@@ -37,7 +39,8 @@ export function load() {
       const d = JSON.parse(raw);
       const f = fresh();
       S = { ...f, ...d, fleet: { ...f.fleet, ...d.fleet }, stats: { ...f.stats, ...d.stats }, skills: { ...f.skills, ...d.skills },
-        settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, today: { ...f.today, ...d.today }, seen: { ...d.seen } };
+        settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, today: { ...f.today, ...d.today }, seen: { ...d.seen },
+        onboard: d.onboard ? { ...d.onboard } : { step: 99 } }; // saves from before onboarding existed skip it
       return true;
     }
   } catch (e) { console.warn('save load failed', e); }
@@ -49,7 +52,8 @@ export function save(now = false) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
   if (now) w(); else saveT = setTimeout(w, 400);
 }
-export function wipe() { S = fresh(); save(true); emit('reset'); }
+// erase everything on this device and start a brand-new career (the caller reloads the page)
+export function wipe() { clearTimeout(saveT); try { localStorage.removeItem(KEY); } catch {} S = fresh(); emit('reset'); }
 
 // ---------- derived ----------
 export const rating = () => S.ratings.reduce((a, b) => a + b, 0) / S.ratings.length;

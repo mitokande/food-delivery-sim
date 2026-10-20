@@ -162,5 +162,13 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     Önceden yerleştirilen aksesuarlar hep düz yola konur.
   - **Yağmur** (`weather.js`): güne göre tohumlanmış yağmur saatleri, shader yağmuru, ıslak şehir, gri gök, sis.
     Ödeme ×1,25, bahşiş ×1,2, ETA +%8; viraj tutuşu −%20, daha çok su birikintisi, tekerden su sıçraması.
+- 2026-10-20: onboarding + ilerleme sıfırlama (`ui/onboard.js`).
+  - **İlk açılış:** 3 tanıtım slaytı → kurye seçimi (karakter, kask rengi, isim; isim üst barda görünür).
+  - **İlk teslimat:** spot ışığı + el işaretiyle yönlendirme: sipariş al → Start → yemeği al → teslim et → fiş →
+    Garage → motor yükselt → City. "Skip tutorial" her adımda var.
+  - **Sonraki dürtmeler** (bir kez): başvurulabilir bölge çıkınca Jobs, ofis açılınca Fleet. Adım `S.onboard.step`
+    (99 = bitti); eski kayıtlar onboarding'i atlar.
+  - **Ayarlar:** "Replay tutorial", titreşim aç/kapa, "Reset progress" → neyin silineceğini listeleyen onay,
+    1,6 sn basılı tutunca kayıt silinir ve sayfa yenilenir. Test: `node tools/onboard.mjs [WxH]`.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

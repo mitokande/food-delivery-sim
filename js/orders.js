@@ -52,7 +52,7 @@ export function makeOrder(city, rng, { from, restId, type } = {}) {
   const eta = Math.round(((pickM + dropM) / REF_SPEED[R.district] + 14) * T.eta * fx.eta * (wet > 1 ? 1.08 : 1));
   return {
     id: nextId++, rest: R.id, restName: R.name, food: R.food, restLot: restLot.id, cust: cust.id, district: R.district,
-    custDistrict: cust.d, name: pick(rng, FIRST_NAMES), char: pick(rng, CHAR_IDS), type: tid, base, eta, dropM, pickM,
+    custDistrict: cust.d, name: pick(rng, FIRST_NAMES.filter((n) => n.toLowerCase() !== (S.name || '').trim().toLowerCase())), char: pick(rng, CHAR_IDS), type: tid, base, eta, dropM, pickM,
     size: T.size || 1, fragile: (FOODS[R.food].fragile || 1) * (T.fragile || 1), rush: rush.m > 1 ? rush.name : '', rain: wet > 1,
     born: performance.now(), life: 70 + rng() * 80,
   };

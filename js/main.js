@@ -13,6 +13,7 @@ import { buildRibbon, ribbonTime } from './ride/ribbon.js';
 import { EVENT } from './ride/events.js';
 import { makeBike } from './ride/vehicle.js';
 import { createUI, ICON } from './ui/ui.js';
+import { createOnboarding } from './ui/onboard.js';
 import { createAudio } from './audio.js';
 import { makeOrder, refreshOrder } from './orders.js';
 import * as St from './state.js';
@@ -77,6 +78,8 @@ const game = {
   canOvertake: () => ride.canOvertake(),
 };
 const ui = createUI(game);
+const ob = createOnboarding(game, ui);
+game.ob = ob;
 const ride = createRide({ scene, camera, renderer, city, traffic, sky, audio, ui, weather, onFinish: (s) => finishJob(s) });
 game.ride = ride;
 
@@ -109,6 +112,7 @@ game.toggleOrder = (id) => {
       if (cap === 1 && game.taken.length === 1) { game.taken = [o]; audio.play('ui-tap'); }
       else { ui.toast(cap === 1 ? 'Your bike carries one order' : `Box full (${cap})`, 'bad'); audio.play('ui-error'); return; }
     } else { game.taken.push(o); audio.play('ui-tap'); }
+    ob.event('taken');
   }
   game.selOrder = o.id;
   const r = city.lots[o.restLot];
@@ -249,6 +253,7 @@ game.startJob = async () => {
   if (!game.taken.length || game.mode !== 'hub') return;
   audio.init();
   const orders = game.taken.slice();
+  ob.event('start');
   for (const o of orders) refreshOrder(city, o, playerTile());
   const job = { orders, legs: planLegs(orders) };
   game.board = game.board.filter((o) => !orders.includes(o));
@@ -334,6 +339,7 @@ async function backToHub() {
   game.board.forEach((o) => refreshOrder(city, o, playerTile()));
   fillBoard(true);
   updateMarkers(); updatePreview();
+  ob.event('hub');
 }
 
 // ---------------------------------------------------------------- tabs → camera
@@ -366,6 +372,7 @@ async function leaveShowroom() {
 }
 game.onTab = async (t) => {
   if (game.mode !== 'hub') return;
+  ob.event('tab:' + t);
   if (t === 'garage') return enterShowroom();
   await leaveShowroom();
   if (t === 'fleet' && S.fleet.office) hubCam.lookAt(officeLot.cx * TILE, officeLot.cz * TILE + 20, 160);
@@ -405,9 +412,9 @@ document.getElementById('boot').classList.add('out');
 
 const off = St.tickFleet(Date.now(), true);
 if (off && off.gain >= 1) ui.offline(off);
-if (fresh && !q.has('noti')) {
-  ui.tutorial(`<b>Welcome to Saffron Bay!</b><br><br>You have <b>$25</b>, a free scooter held together by tape, and big dreams.<br><br>Pick an order below, deliver it, and work your way up to your own delivery empire.`, { btn: 'Show me the orders' });
-}
+// first launch: intro + guided first delivery (tests pass ?noti to skip it)
+if (q.has('noti')) { if (S.onboard.step < 99) S.onboard.step = 99; }
+else ob.start();
 
 // ---------------------------------------------------------------- hub view offset: centre the map in the area the sheet leaves free
 const vo = { x: 0, y: 0 };

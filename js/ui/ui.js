@@ -27,7 +27,7 @@ export function createUI(game) {
   <div id="hubui">
     <header class="topbar">
       <button class="who" data-act="tab" data-tab="courier"><span class="ava">${ICON('char-' + S.look.char)}</span>
-        <span class="lvlbox"><b class="lvl">Lv. 1</b><span class="xpbar"><i></i><em class="xptext"></em></span></span></button>
+        <span class="lvlbox"><small class="nm"></small><b class="lvl">Lv. 1</b><span class="xpbar"><i></i><em class="xptext"></em></span></span></button>
       <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
       <span class="res rate">${ICON('ui-star')}<b class="ratev">4.5</b></span>
       <button class="gear" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
@@ -94,6 +94,7 @@ export function createUI(game) {
   // ---------- top bar ----------
   function refreshTop() {
     $('.lvl', hub).textContent = `Lv. ${S.lvl}`;
+    const nm = $('.nm', hub); nm.textContent = S.name || ''; nm.hidden = !S.name;
     const need = St.xpNeed();
     $('.xpbar i', hub).style.width = `${Math.min(100, S.xp / need * 100)}%`;
     $('.xptext', hub).textContent = `${S.xp}/${need}`;
@@ -309,7 +310,7 @@ export function createUI(game) {
       case 'veh': state.selVeh = id; game.previewVehicle?.(id); render(); break;
       case 'buyveh': if (St.buyVehicle(id)) { game.audio?.play('ui-purchase'); toast(`${VEHICLE[id].name} is yours!`, 'good'); if (St.owned(id) === 1) { St.setActive(id); game.previewVehicle?.(id); } render(); } break;
       case 'ride': if (St.setActive(id)) { game.previewVehicle?.(id); render(); } break;
-      case 'part': if (St.upgradePart(id, b.dataset.p)) { game.audio?.play('ui-purchase'); render(); } break;
+      case 'part': if (St.upgradePart(id, b.dataset.p)) { game.audio?.play('ui-purchase'); render(); game.ob?.event('part'); } break;
       case 'paint': if (St.paintVehicle(id, b.dataset.w, b.dataset.c)) { game.previewVehicle?.(id); render(); } break;
       case 'skill': if (St.upgradeSkill(id)) { game.audio?.play('ui-unlock'); toast(`${SKILLS.find((k) => k.id === id).name} up!`, 'good'); render(); } break;
       case 'char': S.look.char = b.dataset.c; St.save(); St.emit('look'); render(); break;
@@ -410,14 +411,40 @@ export function createUI(game) {
       <label class="set">Music<input type="range" min="0" max="1" step="0.05" value="${S.settings.music}" data-k="music"></label>
       <label class="set">Sound<input type="range" min="0" max="1" step="0.05" value="${S.settings.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${S.settings.quality === q ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
+      <label class="set">Vibration<input type="checkbox" data-k="haptics" ${S.settings.haptics ? 'checked' : ''}></label>
       <p class="small">Progress is saved on this device.</p>
-      <div class="actions"><button class="btn ghost sm" data-x="reset">Reset progress</button><button class="btn green" data-x="close">Done</button></div>`, { dismiss: true, cls: 'settings' });
-    m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S.settings[k] = e.target.type === 'range' ? +e.target.value : e.target.value; St.save(); game.applySettings?.(); });
+      <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
+      <button class="btn green big" data-x="close">Done</button>`, { dismiss: true, cls: 'settings' });
+    m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S.settings[k] = e.target.type === 'range' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value; St.save(); game.applySettings?.(); });
     m.card.addEventListener('click', (e) => {
       const x = e.target.closest('[data-x]')?.dataset.x;
       if (x === 'close') m.close();
-      if (x === 'reset') { if (e.target.dataset.sure) { St.wipe(); location.reload(); } else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to erase everything'; } }
+      if (x === 'replay') { m.close(); game.ob?.replay(); }
+      if (x === 'reset') { m.close(); confirmReset(); }
     });
+  }
+  // erasing a career needs a deliberate hold, not a stray tap
+  function confirmReset() {
+    const st = S.stats;
+    const m = modal(`<div class="warn-ic">${ICON('ui-lock', 'big')}</div><h2>Start over?</h2>
+      <p>This erases <b>everything</b> on this device and can't be undone:</p>
+      <ul class="lose"><li>${money(S.cash)} cash · Level ${S.lvl}</li><li>${Object.values(S.vehicles).reduce((a, v) => a + (v.count || 0), 0)} vehicles and their upgrades</li>
+        <li>${Object.keys(S.districts).length} district job${Object.keys(S.districts).length > 1 ? 's' : ''} · ${S.fleet.couriers.length} courier${S.fleet.couriers.length === 1 ? '' : 's'}</li><li>${st.deliveries} deliveries of career stats</li></ul>
+      <button class="btn red big hold" data-x="hold"><i></i><span>Hold to erase</span></button>
+      <button class="btn ghost" data-x="cancel">Keep my progress</button>`, { dismiss: true, cls: 'reset' });
+    const btn = m.card.querySelector('.hold'), fill = btn.querySelector('i'), label = btn.querySelector('span');
+    let t0 = 0, raf = 0;
+    const HOLD = 1600;
+    const tick = () => {
+      const f = Math.min(1, (performance.now() - t0) / HOLD);
+      fill.style.width = f * 100 + '%';
+      if (f >= 1) { label.textContent = 'Erasing…'; game.audio?.play('ui-error'); St.wipe(); setTimeout(() => location.reload(), 250); return; }
+      raf = requestAnimationFrame(tick);
+    };
+    const down = (e) => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); t0 = performance.now(); label.textContent = 'Keep holding…'; cancelAnimationFrame(raf); tick(); };
+    const up = () => { if (fill.style.width === '100%') return; cancelAnimationFrame(raf); fill.style.width = '0%'; label.textContent = 'Hold to erase'; };
+    btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up);
+    m.card.querySelector('[data-x="cancel"]').addEventListener('click', () => { tap(); m.close(); });
   }
   function modalUnlock(id) {
     const d = DISTRICT[id];
@@ -695,7 +722,8 @@ export function createUI(game) {
       const m = modal(`<div class="sc-row">${ICON(FOODS[o.food].icon, 'scf')}<span><small>Pick up order${orders.length > 1 ? 's' : ''}</small><b>${esc(o.restName)}</b>
         <em>${orders.map((x) => `${FOODS[x.food].name} for ${esc(x.name)}`).join(' · ')}</em></span></div>
         <button class="btn green big" data-x="ok">Confirm Pickup</button>`, { cls: 'scene' });
-      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); resolve(); };
+      game.ob?.event('pickup');
+      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); game.ob?.event('picked'); resolve(); };
       const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') go(); };
       addEventListener('keydown', kh);
       m.card.querySelector('[data-x]').onclick = go;
@@ -705,7 +733,8 @@ export function createUI(game) {
     return new Promise((resolve) => {
       const m = modal(`<div class="sc-row">${ICON('char-' + o.char, 'scc')}<span><small>Deliver to</small><b>${esc(o.name)}</b><em>${FOODS[o.food].name} from ${esc(o.restName)}</em></span><span class="check">✓</span></div>
         <button class="btn green big" data-x="ok">Complete Delivery</button>`, { cls: 'scene' });
-      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); resolve(); };
+      game.ob?.event('drop');
+      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); game.ob?.event('dropped'); resolve(); };
       const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') go(); };
       addEventListener('keydown', kh);
       m.card.querySelector('[data-x]').onclick = go;
@@ -735,6 +764,7 @@ export function createUI(game) {
         <div class="rlines">${rows}</div><div class="rtotal"><span>Total</span><b>${money(sum.total, Math.abs(sum.total) < 100)}</b></div>
         <div class="rxp">${ICON('ui-xp')} +${sum.xp} XP${sum.goals ? ` · ${sum.goals}` : ''}</div>
         <button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`, { cls: 'receipt' });
+      game.ob?.event('receipt');
       const go = () => { game.audio?.play('ui-coins'); removeEventListener('keydown', kh); m.close(); resolve(); };
       const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter') go(); };
       addEventListener('keydown', kh);
