@@ -1,0 +1,12 @@
+{
+  "name": "fds-tools",
+  "private": true,
+  "type": "module",
+  "description": "Asset build tools for Food Delivery Simulator",
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "draco3dgltf": "^1.5.9"
+  }
+}

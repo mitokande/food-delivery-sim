@@ -1,0 +1,7 @@
+# dependencies for the asset-packing tools (npm install inside tools/)
+tools/node_modules/
+# headless screenshots from the test tools (regenerated on every run)
+tools/shots/
+__pycache__/
+*.log
+.DS_Store

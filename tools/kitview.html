@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>kit view</title>
+<style>body{margin:0;background:#333;font:11px sans-serif;color:#fff}#l{position:fixed;inset:0;pointer-events:none}#l span{position:absolute;transform:translate(-50%,0);background:#000a;padding:1px 3px;white-space:nowrap}</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
+</head><body><div id="l"></div>
+<script type="module">
+// ?kit=kenney_city-kit-roads&pieces=a,b,c&cols=6&view=top|iso
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const q = new URLSearchParams(location.search);
+const kit = q.get('kit') || 'kenney_city-kit-roads';
+const pieces = (q.get('pieces') || 'road-straight').split(',');
+const cols = +(q.get('cols') || 6), gap = +(q.get('gap') || 1.6);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.prepend(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x555566);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 2.2)); const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(3, 10, 6); scene.add(d);
+const rows = Math.ceil(pieces.length / cols);
+const W = cols * gap, H = rows * gap;
+const aspect = innerWidth / innerHeight;
+let cam;
+if (q.get('view') === 'iso') { const s = Math.max(W / aspect, H) * 0.62; cam = new THREE.OrthographicCamera(-s * aspect, s * aspect, s, -s, 0.1, 100); cam.position.set(W / 2 + 10, 12, H / 2 + 10); cam.lookAt(W / 2, 0, H / 2); }
+else { const s = Math.max(W / aspect, H) * 0.55; cam = new THREE.OrthographicCamera(-s * aspect, s * aspect, s, -s, 0.1, 100); cam.position.set(W / 2 - gap / 2, 20, H / 2 - gap / 2); cam.up.set(0, 0, -1); cam.lookAt(W / 2 - gap / 2, 0, H / 2 - gap / 2); }
+const loader = new GLTFLoader();
+const base = `../assets/src/kenney/${kit}/Models/GLB%20format/`;
+await Promise.all(pieces.map(async (p, i) => {
+  const g = await loader.loadAsync(base + p + '.glb');
+  const x = (i % cols) * gap, z = Math.floor(i / cols) * gap;
+  g.scene.position.set(x, 0, z); scene.add(g.scene);
+  // axis marker: red = +X, blue = +Z
+  const ax = new THREE.AxesHelper(0.35); ax.position.set(x - 0.6, 0.05, z - 0.6); scene.add(ax);
+  const el = document.createElement('span'); el.textContent = p; el.dataset.x = x; el.dataset.z = z + 0.62; document.getElementById('l').append(el);
+}));
+r.render(scene, cam);
+for (const el of document.querySelectorAll('#l span')) { const v = new THREE.Vector3(+el.dataset.x, 0, +el.dataset.z).project(cam); el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px'; }
+window.ready = true;
+</script></body></html>

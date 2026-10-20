@@ -1,0 +1,7 @@
+# Code changes must reach phones on the next load. Without this, browsers cache
+# js/css heuristically for hours and a phone keeps running the old build.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

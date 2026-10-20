@@ -1,0 +1,149 @@
+# Food Delivery Simulator — tasarım dokümanı
+
+Yaşayan doküman. Web, mobil öncelikli (dikey ekran), three.js 0.186 (importmap, build yok), kayıt localStorage.
+Adres: `mithatck.com/food-delivery-sim/`. Konsept görseller: `design/concept-1.webp`, `design/concept-2.webp`.
+
+## 1. Özet
+
+Beş parasız bir kurye olarak, külüstür bir motorla **Saffron Bay** şehrinde yemek dağıtıyoruz. Motor kendi gider
+(otomatik pilot); biz **hareket güçleri** (Turbo, Zıpla, Sollama, Kestirme, Korna, Işıkta Geç) ile zamanı kazanırız,
+bazı teslimatlarda **rastgele olaylar** (QTE / seçim kartı) çıkar. Kazandıkça motoru değiştirir, parçalarını geliştirir,
+kendimizi geliştirir (beceriler), daha kârlı bölgelerde işe gireriz. Sonra **kendi kurye filomuzu** kurarız: freelance
+kuryeler pasif gelir getirir, şehirde gerçekten dolaşırlar.
+
+Tek teslimat ≈ 40–90 sn. Mobil oturum: 3–5 teslimat + yükseltme.
+
+## 2. Çekirdek döngü
+
+```
+Şehir (hub, izometrik)  →  sipariş seç (1..kapasite)  →  sürüş: restorana git  →  teslim al
+     ↑                                                           ↓
+yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←  sürüş: müşteriye git → kapı sahnesi
+```
+
+- **Şehir** tek ve gerçek: hub'da yukarıdan gördüğümüz sokaklar, sürüşte içinden geçtiğimiz sokaklarla aynı.
+  Sürüş başlarken kamera izometrikten motorun arkasına iner, bitince geri kalkar.
+- Konum önemli: teslimattan sonra müşterinin sokağındayız; yakın restoranların siparişleri daha verimli.
+- **Gün** 08:00'de başlar, 24:00'te biter. Saat sadece sürerken ilerler (1 gerçek sn ≈ 20 oyun sn). Öğle (11:30–13:30)
+  ve akşam (18:30–21:00) yoğunluğu: daha çok sipariş, ücret çarpanı. Işık sabah → öğle → gün batımı → gece (sokak
+  lambaları, neon). Gün sonu: rapor (kazanç, gider, filo geliri, günlük hedefler).
+
+## 3. Sürüş (teslimat)
+
+Motor rotayı A* ile bulur ve kendi sürer: virajda yavaşlar, öndeki arabanın arkasında yavaşlar, kırmızıda durur,
+yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanacağına karar verir.
+
+| Güç | Tetik | Etki | Risk |
+|---|---|---|---|
+| **Turbo** | basılı tut (her zaman) | hız +%45; enerji barı harcar | virajda/çukurda daha çok sarsıntı |
+| **Zıpla** | yukarı kaydır / buton | çukur, koni, su birikintisi, kaldırım üstünden geç | yanlış zaman → sert iniş |
+| **Sollama** | öndeki araç yavaşlatınca parlar | karşı şeride çıkıp geçer | karşıdan araç varsa çarpışma |
+| **Işıkta geç** | kırmızıda durunca parlar | beklemeden geçer | çapraz trafik, ceza olayı |
+| **Korna** | yaya / yavaş araç | yol açar | kaba → küçük puan kaybı (bazı olaylarda) |
+| **Kestirme** | bazı kavşaklarda belirir | ara sokak / park içinden kısa yol | sarsıntılı, yiyecek hasarı |
+
+- **Yiyecek durumu**: *Sıcaklık* (zamanla düşer, kutu yalıtımı yavaşlatır; dondurma tersine erir) ve *Bütünlük*
+  (sarsıntı, çarpışma, sert fren). İçecek/çorba/pasta daha hassas.
+- **Süre**: ETA rotadan hesaplanır. Erken → bonus, geç → bahşiş düşer, çok geç → puan düşer.
+- **Fiş**: taban ücret × bölge × yoğunluk + bahşiş (puan, Cazibe becerisi) − yakıt (araç verimi × mesafe).
+- **Puan**: 5 yıldız ortalaması; yeni bölgelerin kapısı.
+
+### Rastgele olaylar
+
+Teslimatların bir kısmında olay çıkar; zaman yavaşlar, kart veya QTE gelir. Tepki penceresi Refleks becerisiyle uzar.
+
+- *Seçim kartı*: sarı ışık (bas / dur), yol çalışması (dolambaç / kaldırımdan), müşteri mesajı ("ketçap alır mısın?"),
+  yaşlı teyze karşıya geçiyor (bekle / korna), rakip kurye yarışa davet ediyor, yağmur başladı, polis çevirmesi,
+  hayranın selfie isteği, sipariş hazır değil (bekle / mutfağa yardım et).
+- *Refleks QTE*: köpek kovalıyor (hızlı tıkla), açılan araba kapısı (yöne kaydır), yola top kaçtı (zıpla),
+  güvercin sürüsü (korna).
+- *Ritim QTE*: külüstür motor stop etti (yeşil bölgede bas, marş), lastik patladı (pompala).
+- Külüstüre özel arızalar; araç iyileştikçe arıza olayları azalır.
+
+## 4. İlerleme
+
+**Araçlar** (her biri kendi parça yükseltmeleri: Motor / Süspansiyon / Kutu / Lastik, 5'er seviye; boya ve kutu rengi):
+
+| Araç | Fiyat | Hız | Kapasite | Not |
+|---|---|---|---|---|
+| Külüstür (Rust Bucket) | başlangıç | 32 km/s | 1 | arızalı, yakıt yer, sarsar |
+| Zippy 50 (ikinci el scooter) | $350 | 40 | 1 | güvenilir |
+| Vespetta 125 | $1.500 | 52 | 2 | konseptteki kırmızı scooter |
+| Volt E-Scooter | $4.000 | 58 | 2 | elektrik: yakıt ucuz, arıza yok |
+| Mule kargo üç teker | $9.000 | 48 | 4 | sarsıntıya dayanıklı |
+| Viper 600 (spor) | $12.000 | 75 | 2 | güçlü turbo |
+
+**Kurye becerileri** (seviye atladıkça puan + nakit): Sürüş (turbo süresi/şarjı), Navigasyon (kestirmeler, ETA payı),
+Cazibe (bahşiş), Refleks (QTE penceresi), Dayanıklılık (enerji barı).
+
+**Bölgeler** (işe girme: seviye + puan + araç şartı + başvuru ücreti):
+
+| Bölge | Şart | Ücret çarpanı | Karakter |
+|---|---|---|---|
+| Old Town | başlangıç | ×1 | dar sokak, küçük dükkanlar, kafeler |
+| Downtown | Sv 3, ★4.0, scooter, $200 | ×1.8 | gökdelenler, yoğun trafik, sıkı süre |
+| Harbor | Sv 6, ★4.2, $1.000 | ×2.6 | liman, sanayi, deniz ürünleri, geniş yol |
+| Green Hills | Sv 10, ★4.5, ≥50 km/s, $4.000 | ×3.6 | banliyö, uzun yol, büyük bahşiş, köpekler |
+
+**Filo** (Sv 5'te "Dispatch Office" kiralanır): freelance kurye işe al (işe alma ücreti + komisyon), bölgeye ata,
+araç ver. Dakika başı gelir; kapalıyken de kazanır (ofis seviyesine göre 2–12 saat tavan). Hub'da kendi
+kuryelerimiz şehirde dolaşır. "Your drivers kept working!" ekranı.
+
+## 5. Arayüz
+
+Dikey, tek elle. Üst bar: seviye/XP, nakit, puan, saat. Alt sekmeler: **City · Garage · Courier · Jobs · Fleet**.
+Görsel dil konseptten: lacivert yarı saydam paneller, yeşil "oyun" butonları, krem menü zemini, kalın yuvarlak yazı
+(Lilita One + Fredoka), kırmızı kask/kutu marka rengi. Masaüstünde de çalışır (Space turbo, W/↑ zıpla, E eylem,
+H korna, 1–3 olay seçimi).
+
+## 6. Teknik
+
+- `index.html` + `css/` + `js/` (ES modülleri, build yok). three 0.186.1 jsdelivr importmap, GLTFLoader + Draco.
+- Şehir: ızgara (1 karo = 8 m), bölgeler, A* yol grafiği; görünüm Kenney karolarından parça parça (chunk) birleştirilir,
+  her chunk ≈ kit başına 1 draw call. Gölge sadece oyuncu çevresinde.
+- Trafik: yol grafiği üzerinde rastgele rotalı araçlar, takip mesafesi, trafik ışıkları; kaldırımda yayalar.
+- Kayıt: `localStorage` `fds_save_v1`. Kapalıyken geçen süre filo gelirine.
+- Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
+
+## 7. Varlıklar
+
+Hepsi CC0 veya burada yapıldı (CREDITS.md). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
+Mini Characters (animasyonlu: idle, walk, drive, sit, emote…). Oyuncu araçları, kask ve restoran binaları Blender'da
+script ile (`tools/blender/`). Arama: 3d.shep.bot (24 kaynak, lisans bilgisiyle).
+
+Dünya ölçeği: kit 1 birim = 8 m karo; Kenney arabaları ×1.5, mini karakterler ×2.2 (≈1.5 m, chibi).
+Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `seat`, `box`, `wheel_front`, `wheel_rear`,
+`handlebar` düğümleri; boyanabilir malzemeler `paint` ve `box`.
+
+## 8. Kod haritası
+
+| Dosya | Ne yapar |
+|---|---|
+| `js/main.js` | açılış, ana döngü, hub ⇄ sürüş geçişi (kamera tween), sipariş panosu, harita işaretçileri, garaj vitrini, iş sonu fiş/XP/gün |
+| `js/data.js` | tüm içerik tabloları: bölgeler, araçlar, parçalar, beceriler, yemekler, restoranlar, sipariş tipleri, filo, hedefler |
+| `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, gün saati |
+| `js/orders.js` | sipariş üretimi, ücret + ETA, yıldız/bahşiş hesabı |
+| `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
+| `js/city/graph.js` | A* (U dönüşü yok), şerit eğrileri (sağdan trafik), rota örnekleme |
+| `js/city/view.js` | Kenney parçalarını chunk × malzeme birleştirme, bölge paletleri, gece pencere ışığı, lamba ışık havuzları, deniz |
+| `js/city/traffic.js` | instanced arabalar, trafik ışıkları, yayalar, filo kuryeleri (rider ajanları) |
+| `js/ride/ride.js` | otomatik pilot sürüş, güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
+| `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
+| `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
+| `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi |
+
+Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
+`node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
+`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`. URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
+
+## 9. Durum
+
+- 2026-10-19/20: v0.1 oynanabilir dikey dilim. Tam döngü çalışıyor (sipariş → restoran → teslim al → müşteri → yıldız → fiş → hub).
+  Garaj (6 araç, 4 parça × 5 seviye, boya), beceriler, 4 bölge + işe girme, filo (ofis, işe alma, bölge/araç atama, eğitim,
+  çevrimdışı kazanç), günlük hedefler, gün döngüsü + yoğun saatler, gece ışıkları, 17 olay (kart + 4 QTE türü).
+  Varlıklar ajanlarla: Kenney kitleri paketlendi + bölge paletleri, 10 restoran + garaj + ofis (Blender), 6 araç + kask (Blender),
+  59 ikon + 6 araç ikonu (Blender render), 49 ses + 2 müzik döngüsü (CC0, `assets/audio/manifest.json`). Krediler: `CREDITS.md`.
+- Ses notu: döngüler boşluksuz MP3 etiketiyle kodlandı; Safari etiketi yok sayarsa `audio.js` manifest süresine göre
+  döngüyü kırpıyor. Sesleri ajan dinleyemedi (spektrogram/ölçümle seçti) — bir kez kulakla kontrol etmek iyi olur.
+- Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
+  karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
