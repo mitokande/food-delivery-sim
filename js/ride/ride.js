@@ -77,10 +77,11 @@ export function createRide(ctx) {
     }
     R.route = buildRoute(city, path, { startDir: R.curDir });
     R.arcs = routeArcs(R.route);
-    if (R.leg > 0) startBlend();
     setRibbon();
     R.s = 0; R.v = R.leg === 0 ? 0 : R.v; R.ot = null; R.hop = null; R.runLight = -1; R.wait = 0; R.crash = 0; R.offer = null; R.lat = 0;
-    R.sampled[3] = 0;
+    R.sampled[3] = 0; R.prevLat = 0; R.yawOff = 0;
+    // after resetting s: ease the bike from where it stands onto the start of the new route
+    if (R.leg > 0) startBlend();
     // hazards
     for (const h of R.hazards) freeHazard(h);
     const tutorial = St.S.stats.deliveries < 2;
@@ -112,7 +113,8 @@ export function createRide(ctx) {
     if (!R.bike) return;
     const o = sampleRoute(R.route, R.s, [0, 0, 0, 0, 0]), b = R.bike.root;
     let dh = b.rotation.y - o[2]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
-    R.blend = { dx: b.position.x - o[0], dz: b.position.z - o[1], dh, t: 1 };
+    const dx = b.position.x - o[0], dz = b.position.z - o[1];
+    R.blend = Math.hypot(dx, dz) < 8 ? { dx, dz, dh, t: 1 } : null;
   }
   let ribbon = null;
   function setRibbon() {

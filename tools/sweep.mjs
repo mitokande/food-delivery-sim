@@ -15,7 +15,8 @@ const { server, base } = await serve();
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const screens = {
-  city: () => game.ui.setTab('city'),
+  city: () => { game.ui.setTab('city'); document.querySelectorAll('.ocard')[1]?.click(); },
+  scrolled: () => { const b = document.querySelector('.sheet-body'); b.scrollTop = 99999; document.querySelector('.ocard:not(.taken)')?.click(); return b.scrollTop; },
   garage: () => game.ui.setTab('garage'),
   courier: () => game.ui.setTab('courier'),
   jobs: () => game.ui.setTab('jobs'),
@@ -42,7 +43,7 @@ for (const [w, h] of sizes) {
       const W = innerWidth, H = innerHeight;
       const vis = (el) => { const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0 && !el.closest('[hidden]'); };
       const nm = (el) => el.id ? '#' + el.id : '.' + String(el.className).split(' ').filter(Boolean).join('.');
-      for (const el of document.querySelectorAll('.topbar > *, .tabs button, .sheet, .r-top > *, .r-btn, .r-map, .r-speed, .ctx, .modal .card, .modal .btn, .clockbar > *')) {
+      for (const el of document.querySelectorAll('#startbar, .sb-go, .topbar > *, .tabs button, .sheet, .r-top > *, .r-btn, .r-map, .r-speed, .ctx, .modal .card, .modal .btn, .clockbar > *')) {
         if (!vis(el)) continue;
         const r = el.getBoundingClientRect();
         if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.push(`${nm(el)} off screen [${r.left | 0},${r.top | 0},${r.right | 0},${r.bottom | 0}]`);

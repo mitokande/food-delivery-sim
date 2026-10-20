@@ -25,7 +25,7 @@ await sleep(800);
 await clickSel('.ocard');
 await sleep(500);
 await shot('0-taken');
-await clickSel('.start');
+await clickSel('#startbar .sb-go');
 await sleep(2200);
 await clickSel('.modal.tip [data-x]');
 const t0 = Date.now();

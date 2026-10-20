@@ -33,6 +33,7 @@ export function createUI(game) {
     </header>
     <div class="clockbar"><span class="day">Day 1</span><b class="clock">08:00</b><span class="rush" hidden></span><button class="fleetbank" data-act="collect" hidden>${ICON('ui-cash')}<b></b></button></div>
     <section id="sheet" class="sheet"><div class="grab" data-act="grab"><i></i></div><div class="sheet-body"></div></section>
+    <div id="startbar" hidden></div>
     <nav class="tabs">
       <button data-act="tab" data-tab="city">${ICON('ui-pin')}<span>City</span></button>
       <button data-act="tab" data-tab="garage">${ICON('ui-wrench')}<span>Garage</span></button>
@@ -60,7 +61,7 @@ export function createUI(game) {
   <div id="modals"></div>
   <div id="toasts"></div>`;
 
-  const hub = $('#hubui'), hud = $('#ridehud'), sheet = $('#sheet'), body = $('.sheet-body'), modals = $('#modals'), toasts = $('#toasts');
+  const hub = $('#hubui'), hud = $('#ridehud'), sheet = $('#sheet'), body = $('.sheet-body'), modals = $('#modals'), toasts = $('#toasts'), startbar = $('#startbar');
   let tab = 'city';
   let sheetState = 'mid'; // min | mid | max
   const state = { selVeh: S.active };
@@ -116,10 +117,32 @@ export function createUI(game) {
     render();
     game.onTab?.(t);
   }
+  let renderedTab = null;
   function render() {
     const fn = { city: renderCity, garage: renderGarage, courier: renderCourier, jobs: renderJobs, fleet: renderFleet }[tab];
+    const keep = renderedTab === tab ? body.scrollTop : 0;
     body.innerHTML = fn();
-    body.scrollTop = 0;
+    body.scrollTop = keep;
+    renderedTab = tab;
+    refreshStartbar();
+  }
+  // taken orders + Start button, always on screen just above the tab bar
+  let startKey = '';
+  function refreshStartbar() {
+    const show = tab === 'city' && game.taken.length > 0 && !hub.hidden;
+    startbar.hidden = !show;
+    sheet.classList.toggle('has-start', show);
+    if (!show) { startKey = ''; return; }
+    const cap = St.vehStats().cap, used = game.taken.reduce((a, o) => a + o.size, 0);
+    const pay = game.taken.reduce((a, o) => a + o.base, 0);
+    const key = game.taken.map((o) => o.id).join(',') + '|' + cap;
+    if (key === startKey) return;
+    const grew = startKey && key.split('|')[0].split(',').length > startKey.split('|')[0].split(',').length;
+    startKey = key;
+    startbar.innerHTML = `<span class="sb-foods">${game.taken.map((o) => ICON(FOODS[o.food].icon)).join('')}</span>
+      <span class="sb-info"><b>${game.taken.length === 1 ? esc(game.taken[0].restName) : `${game.taken.length} orders`}</b><small>${money(pay)} + tips · box ${used}/${cap}</small></span>
+      <button class="btn green sb-go" data-act="start">Start ${ICON('ui-nitro')}</button>`;
+    if (grew) { startbar.classList.remove('bump'); void startbar.offsetWidth; startbar.classList.add('bump'); }
   }
 
   // ---------- City: order board ----------
@@ -141,7 +164,7 @@ export function createUI(game) {
     const used = game.taken.reduce((a, o) => a + o.size, 0);
     const list = game.board;
     const start = game.taken.length
-      ? `<button class="btn green big start" data-act="start">${ICON('ui-nitro')} Start delivery <small>${used}/${cap}</small></button>`
+      ? ''
       : `<div class="hint">${list.length ? `Tap an order to take it. Your ${VEHICLE[S.active].name} carries <b>${cap}</b>.` : 'No orders right now — new ones pop up every few seconds.'}</div>`;
     const goals = St.ensureGoals().list.map((g, i) => `<div class="goal ${g.p >= g.n ? 'done' : ''}">${ICON(g.p >= g.n ? 'ui-gift' : 'ui-trophy')}<span>${goalText(g)}<i><u style="width:${g.p / g.n * 100}%"></u></i></span>
       ${g.claimed ? '<em>✓</em>' : g.p >= g.n ? `<button class="btn gold sm" data-act="claim" data-i="${i}">${money(g.reward)}</button>` : `<small>${g.p}/${g.n}</small>`}</div>`).join('');
@@ -265,8 +288,15 @@ export function createUI(game) {
     const a = b.dataset.act, id = b.dataset.id;
     if (a !== 'order') tap();
     switch (a) {
-      case 'tab': setTab(b.dataset.tab); game.audio?.play('ui-open', { vol: 0.6 }); break;
-      case 'grab': sheetState = sheetState === 'min' ? 'mid' : sheetState === 'mid' ? (tab === 'city' ? 'min' : 'big') : 'min'; sheet.dataset.state = sheetState; break;
+      case 'tab':
+        if (b.dataset.tab === tab && !hub.hidden) {
+          // tapping the tab you're already on opens / closes its sheet
+          sheetState = sheetState === 'min' ? (tab === 'city' ? 'mid' : 'big') : 'min';
+          sheet.style.height = ''; sheet.dataset.state = sheetState;
+        } else setTab(b.dataset.tab);
+        game.audio?.play('ui-open', { vol: 0.6 });
+        break;
+      case 'grab': if (performance.now() - drag.endT < 350) break; sheetState = sheetState === 'min' ? 'mid' : sheetState === 'mid' ? (tab === 'city' ? 'min' : 'big') : 'min'; sheet.dataset.state = sheetState; break;
       case 'settings': settings(); break;
       case 'order': game.toggleOrder(+id); render(); break;
       case 'start': game.startJob(); break;
@@ -296,6 +326,78 @@ export function createUI(game) {
     if (s.dataset.act === 'cveh') { if (!St.assign(s.dataset.id, { veh: s.value })) toast('No free vehicle of that type', 'bad'); }
     render();
   });
+
+  // ---------- bottom sheet: drag to resize ----------
+  // Grab the handle or the first heading (or pull the list down when it is scrolled to the top) and the sheet follows
+  // the finger; on release it snaps to min / mid / big, with a quick flick counting toward its direction.
+  const drag = { on: false, endT: 0, y0: 0, h0: 0, hs: null, samples: [], live: true };
+  const STATES = ['min', 'mid', 'big'];
+  function measureStates() {
+    const keep = sheet.dataset.state, out = {};
+    sheet.classList.add('dragging'); sheet.style.height = '';
+    for (const st of STATES) { sheet.dataset.state = st; out[st] = sheet.getBoundingClientRect().height; }
+    sheet.dataset.state = keep;
+    return out;
+  }
+  function dragStart(y) {
+    drag.on = true; drag.y0 = y; drag.samples = [[performance.now(), y]];
+    drag.live = sheet.getBoundingClientRect().width > innerWidth * 0.8; // side panel (landscape) only snaps
+    drag.hs = measureStates();
+    drag.h0 = sheet.getBoundingClientRect().height;
+    if (drag.live) sheet.style.height = drag.h0 + 'px';
+  }
+  function dragMove(y) {
+    if (!drag.on) return;
+    drag.samples.push([performance.now(), y]); if (drag.samples.length > 6) drag.samples.shift();
+    if (!drag.live) return;
+    const h = Math.max(drag.hs.min, Math.min(drag.hs.big, drag.h0 - (y - drag.y0)));
+    sheet.style.height = h + 'px';
+  }
+  function dragEnd() {
+    if (!drag.on) return;
+    drag.on = false; drag.endT = performance.now();
+    const a = drag.samples[0], b = drag.samples[drag.samples.length - 1];
+    const vel = (b[1] - a[1]) / Math.max(1, b[0] - a[0]); // px/ms, + = downward
+    const moved = b[1] - drag.y0;
+    let next = sheetState;
+    if (drag.live) {
+      const h = sheet.getBoundingClientRect().height - vel * 220; // where a flick would carry it
+      next = STATES.reduce((best, st) => (Math.abs(drag.hs[st] - h) < Math.abs(drag.hs[best] - h) ? st : best), 'mid');
+    } else if (moved > 40 || vel > 0.5) next = 'min';
+    else if (moved < -40 || vel < -0.5) next = sheetState === 'min' ? 'mid' : 'big';
+    if (Math.abs(moved) < 6 && Math.abs(vel) < 0.3) { sheet.classList.remove('dragging'); sheet.style.height = ''; drag.endT = 0; return; } // a tap
+    sheetState = next;
+    sheet.classList.remove('dragging');
+    void sheet.offsetHeight; // let the height transition run from the dragged height
+    sheet.dataset.state = next;
+    sheet.style.height = '';
+  }
+  sheet.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest('.grab, .sheet-body > .sec-head:first-child');
+    if (!h || e.target.closest('button, a, select, input')) return;
+    e.preventDefault();
+    sheet.setPointerCapture?.(e.pointerId);
+    dragStart(e.clientY);
+  });
+  sheet.addEventListener('pointermove', (e) => { if (drag.on && !drag.touch) dragMove(e.clientY); });
+  sheet.addEventListener('pointerup', () => { if (!drag.touch) dragEnd(); });
+  sheet.addEventListener('pointercancel', () => { if (!drag.touch) dragEnd(); });
+  // pulling the list down while it is already at the top collapses the sheet
+  let pull = null;
+  body.addEventListener('touchstart', (e) => { const t = e.touches[0]; pull = body.scrollTop <= 0 && e.touches.length === 1 ? { x: t.clientX, y: t.clientY, on: false } : null; }, { passive: true });
+  body.addEventListener('touchmove', (e) => {
+    if (!pull) return;
+    const t = e.touches[0], dy = t.clientY - pull.y, dx = t.clientX - pull.x;
+    if (!pull.on) {
+      if (dy < -4 || Math.abs(dx) > Math.abs(dy) * 1.3 + 4) { pull = null; return; }
+      if (dy > 0 && body.scrollTop <= 0) e.preventDefault(); // at the top a downward move can't scroll anyway: keep it for the sheet
+      if (dy > 8 && body.scrollTop <= 0) { pull.on = true; drag.touch = true; dragStart(pull.y); } else return;
+    }
+    e.preventDefault();
+    dragMove(t.clientY);
+  }, { passive: false });
+  const pullEnd = () => { if (pull?.on) { dragEnd(); drag.touch = false; } pull = null; };
+  body.addEventListener('touchend', pullEnd); body.addEventListener('touchcancel', pullEnd);
 
   // ---------- settings ----------
   function settings() {
@@ -639,6 +741,7 @@ export function createUI(game) {
     hud.hidden = mode !== 'ride';
     document.body.dataset.mode = mode;
     if (mode === 'hub') { refreshTop(); render(); }
+    refreshStartbar();
   }
   St.on((what) => {
     if (['cash', 'xp', 'rating', 'clock', 'fleetbank', 'look', 'vehicles', 'skills', 'districts', 'fleet'].includes(what)) refreshTop();
