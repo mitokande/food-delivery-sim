@@ -34,11 +34,11 @@ export function planHazards(route, city, rng, { density = 1, startS = 0, tutoria
     const st = route.steps[k];
     const t = city.tiles[st.tile];
     if (st.alley) {
-      if (rng() < 0.45 * density) out.push({ type: 'crates', s: st.s0 + st.c.len * 0.5, lane: 0, tile: st.tile });
+      if (rng() < 0.45 * density) out.push({ type: 'crates', s: st.s0 + st.len * 0.5, lane: 0, tile: st.tile });
       continue;
     }
     if (st.din !== st.dout || t.junction) continue;
-    const s = st.s0 + st.c.len * (0.3 + rng() * 0.4);
+    const s = st.s0 + st.len * (0.3 + rng() * 0.4);
     if (s - lastS < 24 || route.length - s < 26) continue;
     if (rng() > 0.42 * density) continue;
     let type = pickW(rng, MIX[t.d] || MIX.oldtown);

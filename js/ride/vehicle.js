@@ -85,7 +85,7 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
     st.spin += speed * dt / 0.27;
     for (const w of wheels) w.rotation.x = st.spin;
     if (steer) steer.rotation.y += (steerAng - steer.rotation.y) * Math.min(1, dt * 10);
-    st.lean += (leanTarget - st.lean) * Math.min(1, dt * 6);
+    st.lean += (leanTarget - st.lean) * Math.min(1, dt * 4.5);
     lean.rotation.z = -st.lean;
     st.bob += dt * (6 + speed * 0.6);
     model.position.y = Math.sin(st.bob) * 0.012 * Math.min(1, speed / 3);

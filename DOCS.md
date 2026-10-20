@@ -145,5 +145,10 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   59 ikon + 6 araç ikonu (Blender render), 49 ses + 2 müzik döngüsü (CC0, `assets/audio/manifest.json`). Krediler: `CREDITS.md`.
 - Ses notu: döngüler boşluksuz MP3 etiketiyle kodlandı; Safari etiketi yok sayarsa `audio.js` manifest süresine göre
   döngüyü kırpıyor. Sesleri ajan dinleyemedi (spektrogram/ölçümle seçti) — bir kez kulakla kontrol etmek iyi olur.
+- 2026-10-20: dönüşler yeniden yazıldı (kullanıcı: "virajlarda açı adım adım değişiyor"). Rota artık şerit çizgilerinin
+  köşeleri çember yaylarıyla yuvarlanmış tek parça bir yol (`graph.js` `buildGeo`, sağa 6,2 m / sola 8,6 m / ara sokak 4,6 m;
+  dönüş kavşaktan önce başlıyor). Yön yolun teğeti, yatma `atan(v²κ/g)` (κ birkaç metrede ortalanıyor, en fazla ~29°),
+  şerit değiştirirken burun döner, ayak geçişlerinde poz yumuşak harmanlanır, kamera gecikmeli döner ve yolun ilerisine bakar.
+  Kırmızıda durma çizgisi yayın başına alındı. Arabaların karo içi dönüşleri de çeyrek çember.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

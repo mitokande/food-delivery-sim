@@ -94,16 +94,20 @@ export function laneCurve(din, dout, kind, off = LANE) {
   } else if (din === dout) {
     pts.push(entry); pts.push([(entry[0] + exit[0]) / 2, (entry[1] + exit[1]) / 2]); pts.push(exit);
   } else {
-    // control point = where the entry line meets the exit line
+    // a quarter circle from the entry point to the exit point (both are the same distance from the lane corner)
     const t = (exit[0] - entry[0]) * di[0] + (exit[1] - entry[1]) * di[1];
     const ctrl = [entry[0] + di[0] * t, entry[1] + di[1] * t];
     pts.push(entry); bez(entry, ctrl, exit, 8, pts);
+    const r = Math.abs(t);
+    const cx = entry[0] + dq[0] * r, cz = entry[1] + dq[1] * r;
+    const sgn = Math.sign(di[0] * dq[1] - di[1] * dq[0]);
+    var arc = { cx, cz, r, a0: Math.atan2(entry[1] - cz, entry[0] - cx), sgn };
   }
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   const turn = din === dout ? 0 : dout === RIGHT(din) ? 1 : -1;
   const radius = turn === 0 ? Infinity : turn === 1 ? HALF - off : HALF + off;
-  c = { pts, cum, len: cum[cum.length - 1], turn, radius };
+  c = { pts, cum, len: arc ? arc.r * Math.PI / 2 : cum[cum.length - 1], turn, radius, arc: arc || null };
   curveCache.set(key, c);
   return c;
 }
@@ -112,6 +116,13 @@ export function laneCurve(din, dout, kind, off = LANE) {
 export function sampleCurve(c, s, cx, cz, out) {
   const { pts, cum } = c;
   if (s <= 0) s = 0; if (s >= c.len) s = c.len - 1e-6;
+  if (c.arc) {
+    const A = c.arc, a = A.a0 + A.sgn * s / A.r;
+    out[0] = cx + A.cx + A.r * Math.cos(a);
+    out[1] = cz + A.cz + A.r * Math.sin(a);
+    out[2] = Math.atan2(-Math.sin(a) * A.sgn, Math.cos(a) * A.sgn);
+    return out;
+  }
   let k = 1; while (k < cum.length - 1 && cum[k] < s) k++;
   const a = pts[k - 1], b = pts[k], seg = cum[k] - cum[k - 1] || 1, t = (s - cum[k - 1]) / seg;
   out[0] = cx + a[0] + (b[0] - a[0]) * t;
@@ -120,8 +131,85 @@ export function sampleCurve(c, s, cx, cz, out) {
   return out;
 }
 
+// ---- smooth route geometry ----
+// The lane lines of a tile path form a polyline whose corners are the lane intersections. Each corner is rounded
+// with a circular arc (radius chosen per turn, clipped so neighbouring arcs never overlap), giving a path with a
+// continuous heading. Right turns hug the near corner, left turns sweep across the junction — like a real rider.
+export const TURN_R = { right: 6.2, left: 8.6, alley: 4.6 };
+const sub2 = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const len2 = (a) => Math.hypot(a[0], a[1]);
+const norm2 = (a) => { const l = len2(a) || 1; return [a[0] / l, a[1] / l]; };
+function buildGeo(city, steps, firstFull) {
+  const off = (st) => (st.alley ? 0 : LANE);
+  const n = steps.length;
+  const V = []; // {p:[x,z], kind:'end'|'corner', r}
+  const s0 = steps[0], d0 = DIRS[s0.dout], r0 = DIRS[RIGHT(s0.dout)];
+  if (firstFull) {
+    const di = DIRS[s0.din], ri = DIRS[RIGHT(s0.din)];
+    V.push({ p: [s0.cx - di[0] * HALF + ri[0] * off(s0), s0.cz - di[1] * HALF + ri[1] * off(s0)] });
+  } else V.push({ p: [s0.cx + r0[0] * off(s0) - d0[0] * 0.5, s0.cz + r0[1] * off(s0) - d0[1] * 0.5] });
+  for (let k = firstFull ? 0 : 1; k < n - 1; k++) {
+    const st = steps[k];
+    if (st.din === st.dout) continue;
+    const prev = steps[Math.max(0, k - 1)], next = steps[k + 1];
+    const di = DIRS[st.din], dq = DIRS[st.dout], ri = DIRS[RIGHT(st.din)], ro = DIRS[RIGHT(st.dout)];
+    const pin = [st.cx + ri[0] * off(prev), st.cz + ri[1] * off(prev)];
+    const pout = [st.cx + ro[0] * off(next), st.cz + ro[1] * off(next)];
+    const t = (pout[0] - pin[0]) * di[0] + (pout[1] - pin[1]) * di[1];
+    const right = st.dout === RIGHT(st.din);
+    V.push({ p: [pin[0] + di[0] * t, pin[1] + di[1] * t], corner: true, r: (st.alley || prev.alley || next.alley) ? TURN_R.alley : right ? TURN_R.right : TURN_R.left });
+  }
+  const sl = steps[n - 1], dl = DIRS[sl.din], rl = DIRS[RIGHT(sl.din)];
+  V.push({ p: [sl.cx + dl[0] * 0.5 + rl[0] * off(sl), sl.cz + dl[1] * 0.5 + rl[1] * off(sl)] });
+  // fillets
+  const pieces = [];
+  let cur = V[0].p, s = 0;
+  const line = (a, b) => { const d = sub2(b, a), l = len2(d); if (l < 1e-4) return; const u = [d[0] / l, d[1] / l]; pieces.push({ arc: false, s0: s, len: l, x0: a[0], z0: a[1], ux: u[0], uz: u[1], hd: Math.atan2(u[0], u[1]) }); s += l; };
+  for (let i = 1; i < V.length; i++) {
+    const v = V[i];
+    if (!v.corner) { line(cur, v.p); cur = v.p; continue; }
+    const u = norm2(sub2(v.p, V[i - 1].p)), w = norm2(sub2(V[i + 1].p, v.p));
+    const dot = Math.max(-1, Math.min(1, u[0] * w[0] + u[1] * w[1]));
+    const theta = Math.acos(dot);
+    if (theta < 1e-3) { line(cur, v.p); cur = v.p; continue; }
+    const th = Math.tan(theta / 2);
+    const lp = len2(sub2(v.p, V[i - 1].p)), ln = len2(sub2(V[i + 1].p, v.p));
+    const availP = V[i - 1].corner ? lp / 2 : lp - 0.4, availN = V[i + 1].corner ? ln / 2 : ln - 0.4;
+    const tl = Math.max(0.05, Math.min(v.r * th, availP, availN));
+    const R = tl / th;
+    const T1 = [v.p[0] - u[0] * tl, v.p[1] - u[1] * tl];
+    line(cur, T1);
+    const pw = norm2([w[0] - u[0] * dot, w[1] - u[1] * dot]);
+    const C = [T1[0] + pw[0] * R, T1[1] + pw[1] * R];
+    const sgn = Math.sign(u[0] * w[1] - u[1] * w[0]);
+    pieces.push({ arc: true, s0: s, len: R * theta, cx: C[0], cz: C[1], r: R, a0: Math.atan2(T1[1] - C[1], T1[0] - C[0]), sgn });
+    s += R * theta;
+    cur = [v.p[0] + w[0] * tl, v.p[1] + w[1] * tl];
+  }
+  return { pieces, length: s };
+}
+// sample the smooth path → out = [x, z, heading, (step), curvature (signed: + = right turn)]
+export function sampleGeo(geo, s, out, hint = 0) {
+  const P = geo.pieces;
+  if (s < 0) s = 0; if (s > geo.length) s = geo.length;
+  let k = Math.min(hint, P.length - 1);
+  if (P[k].s0 > s) k = 0;
+  while (k < P.length - 1 && P[k + 1].s0 <= s) k++;
+  const p = P[k], d = s - p.s0;
+  if (p.arc) {
+    const a = p.a0 + p.sgn * d / p.r;
+    out[0] = p.cx + p.r * Math.cos(a); out[1] = p.cz + p.r * Math.sin(a);
+    out[2] = Math.atan2(-Math.sin(a) * p.sgn, Math.cos(a) * p.sgn);
+    out[4] = p.sgn / p.r;
+  } else {
+    out[0] = p.x0 + p.ux * d; out[1] = p.z0 + p.uz * d; out[2] = p.hd; out[4] = 0;
+  }
+  out[5] = k;
+  return out;
+}
+
 // Build a route (list of steps with lane curves) from a tile path.
-export function buildRoute(city, path, { startDir = -1 } = {}) {
+export function buildRoute(city, path, { startDir = -1, firstFull = false } = {}) {
   const steps = [];
   const n = path.length;
   for (let k = 0; k < n; k++) {
@@ -133,22 +221,48 @@ export function buildRoute(city, path, { startDir = -1 } = {}) {
     const c = laneCurve(din, dout < 0 ? din : dout, kind, off);
     steps.push({ tile: i, din, dout: dout < 0 ? din : dout, kind, c, cx: t.x * TILE, cz: t.z * TILE, s0: 0, alley: t.k === K.ALLEY });
   }
+  if (firstFull && steps.length) { steps[0].kind = 'full'; steps[0].c = laneCurve(steps[0].din, steps[0].dout, 'full', steps[0].alley ? 0 : LANE); }
   let s = 0;
-  for (const st of steps) { st.s0 = s; s += st.c.len; }
-  return { steps, length: s, path };
+  for (const st of steps) { st.s0 = s; s += st.c.len; st.len = st.c.len; }
+  const route = { steps, length: s, path };
+  if (steps.length < 2) return route;
+  // smooth geometry; step boundaries move to where the smooth path crosses from one tile into the next
+  const geo = buildGeo(city, steps, firstFull);
+  route.geo = geo; route.length = geo.length;
+  const o = [0, 0, 0, 0, 0, 0];
+  let k = 0; steps[0].s0 = 0;
+  for (let d = 0; d <= geo.length && k < steps.length - 1; d += 0.2) {
+    sampleGeo(geo, d, o, o[5]);
+    const tx = Math.round(o[0] / TILE), tz = Math.round(o[1] / TILE);
+    const nt = city.tiles[steps[k + 1].tile];
+    if (tx === nt.x && tz === nt.z) { k++; steps[k].s0 = d; }
+  }
+  for (let j = k + 1; j < steps.length; j++) steps[j].s0 = steps[j - 1].s0; // (never expected)
+  for (let j = 0; j < steps.length; j++) steps[j].len = (j < steps.length - 1 ? steps[j + 1].s0 : geo.length) - steps[j].s0;
+  return route;
 }
 
 const tmp = [0, 0, 0];
-export function sampleRoute(route, s, out = [0, 0, 0, 0]) {
+const gtmp = [0, 0, 0, 0, 0, 0];
+// out = [x, z, heading, stepIndex, curvature]
+export function sampleRoute(route, s, out = [0, 0, 0, 0, 0]) {
   const st = route.steps;
   let k = out[3] | 0;
   if (k >= st.length || st[k].s0 > s) k = 0;
   while (k < st.length - 1 && st[k + 1].s0 <= s) k++;
   const step = st[k];
-  sampleCurve(step.c, s - step.s0, step.cx, step.cz, tmp);
-  out[0] = tmp[0]; out[1] = tmp[1]; out[2] = tmp[2]; out[3] = k;
+  if (route.geo) {
+    sampleGeo(route.geo, s, gtmp, route._hint || 0); route._hint = gtmp[5];
+    out[0] = gtmp[0]; out[1] = gtmp[1]; out[2] = gtmp[2]; out[4] = gtmp[4];
+  } else {
+    sampleCurve(step.c, s - step.s0, step.cx, step.cz, tmp);
+    out[0] = tmp[0]; out[1] = tmp[1]; out[2] = tmp[2]; out[4] = 0;
+  }
+  out[3] = k;
   return out;
 }
+// arcs of a route (for speed planning): [{s0, s1, r}]
+export const routeArcs = (route) => (route.geo ? route.geo.pieces.filter((p) => p.arc).map((p) => ({ s0: p.s0, s1: p.s0 + p.len, r: p.r, sgn: p.sgn })) : []);
 
 export const tileCenter = (city, i) => [city.tiles[i].x * TILE, city.tiles[i].z * TILE];
 export const manhattan = (city, a, b) => Math.abs(city.tiles[a].x - city.tiles[b].x) + Math.abs(city.tiles[a].z - city.tiles[b].z);

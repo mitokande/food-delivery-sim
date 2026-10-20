@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT } from '../data.js';
 import { DIRS, OPP, RIGHT, K } from '../city/gen.js';
-import { findPath, buildRoute, sampleRoute, LANE, laneCurve, dirBetween } from '../city/graph.js';
+import { findPath, buildRoute, sampleRoute, LANE, laneCurve, dirBetween, routeArcs } from '../city/graph.js';
 import { planHazards, makeHazardMesh, freeHazard, HZ, warmPeds } from './hazards.js';
 import { pickEvent } from './events.js';
 import { makeBike } from './vehicle.js';
@@ -14,6 +14,8 @@ import { mulberry32 } from '../rng.js';
 
 const A_LAT = 8.5, B_DEC = 7.5, ROAD_Y = 0.1; // asphalt top (kit 0.01 × 10 m)
 const v3 = new THREE.Vector3(), v3b = new THREE.Vector3();
+const ahead = [0, 0, 0, 0, 0], camAhead = [0, 0, 0, 0, 0];
+const KAP_OFFS = [-3, -1.5, 0, 1.5, 3];
 
 export function createRide(ctx) {
   const { scene, camera, city, traffic } = ctx;
@@ -22,7 +24,7 @@ export function createRide(ctx) {
     active: false, phase: 'idle', timeScale: 1, job: null, leg: 0, route: null, s: 0, v: 0, energy: 100, energyMax: 100,
     boost: false, hop: null, ot: null, runLight: -1, wait: 0, crash: 0, hazards: [], event: null, eventDone: false,
     orders: [], legMeters: 0, meters: 0, stats: null, shake: 0, camFov: 60, bike: null, agent: null, offer: null, hornCd: 0,
-    lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0], recentEvents: [], fines: 0, rideTime: 0,
+    lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0, 0], recentEvents: [], arcs: [], blend: null, yawOff: 0, camYaw: null, fines: 0, rideTime: 0,
   };
   const agent = { kind: 'player', tile: 0, din: 0, dout: 0, s: 0, v: 0, len: 2.2, off: LANE, pos: [0, 0, 0], curve: null, cx: 0, cz: 0 };
   R.agent = agent;
@@ -74,6 +76,8 @@ export function createRide(ctx) {
       path = [R.curTile, n]; leg.lotDoorOverride = n;
     }
     R.route = buildRoute(city, path, { startDir: R.curDir });
+    R.arcs = routeArcs(R.route);
+    if (R.leg > 0) startBlend();
     setRibbon();
     R.s = 0; R.v = R.leg === 0 ? 0 : R.v; R.ot = null; R.hop = null; R.runLight = -1; R.wait = 0; R.crash = 0; R.offer = null; R.lat = 0;
     R.sampled[3] = 0;
@@ -103,6 +107,13 @@ export function createRide(ctx) {
     ctx.audio?.engine(true, St.S.active);
   }
 
+  // ease the bike from its current pose onto the start of a new route (leg changes, shortcuts)
+  function startBlend() {
+    if (!R.bike) return;
+    const o = sampleRoute(R.route, R.s, [0, 0, 0, 0, 0]), b = R.bike.root;
+    let dh = b.rotation.y - o[2]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+    R.blend = { dx: b.position.x - o[0], dz: b.position.z - o[1], dh, t: 1 };
+  }
   let ribbon = null;
   function setRibbon() {
     if (ribbon) { ribbon.removeFromParent(); ribbon.geometry.dispose(); }
@@ -147,7 +158,7 @@ export function createRide(ctx) {
       const list = traffic.byTile.get(st.tile); if (!list) continue;
       for (const a of list) {
         if (a.kind !== 'car' || a.din !== OPP(st.dout)) continue;
-        const d = st.s0 + (st.c.len - a.s) - R.s - (a.len + agent.len) / 2;
+        const d = st.s0 + (st.len - a.s) - R.s - (a.len + agent.len) / 2;
         if (d > -2 && d < best) { best = d; who = a; }
       }
     }
@@ -169,7 +180,10 @@ export function createRide(ctx) {
     for (let k = k0; k < Math.min(R.route.steps.length, k0 + 3); k++) {
       const st = R.route.steps[k + 1]; if (!st) break;
       if (!traffic.lightAt.has(st.tile)) continue;
-      const d = st.s0 - R.s - 0.8;
+      // stop before the turn starts: a corner arc can begin a few metres before the junction tile
+      let line = st.s0;
+      for (const a of R.arcs) if (a.s0 < line && a.s1 > line - 0.1) line = a.s0;
+      const d = line - R.s - 0.8;
       if (d < -0.5) continue;
       return { tile: st.tile, d, state: traffic.light(st.tile, st.din) };
     }
@@ -301,11 +315,10 @@ export function createRide(ctx) {
     path.push(...o.tiles, ...o.rest);
     const cur = steps[k0];
     const into = R.s - cur.s0;
-    const route = buildRoute(city, path, { startDir: cur.din });
-    // keep the first step's full curve so the bike doesn't jump
-    route.steps[0].c = cur.c; route.steps[0].kind = cur.kind;
-    let s = 0; for (const st of route.steps) { st.s0 = s; s += st.c.len; } route.length = s;
-    R.route = route; R.s = into; R.sampled[3] = 0;
+    const route = buildRoute(city, path, { startDir: cur.din, firstFull: true });
+    R.route = route; R.s = Math.max(0, Math.min(into, route.steps[1] ? route.steps[1].s0 - 0.5 : into)); R.sampled[3] = 0;
+    R.arcs = routeArcs(route);
+    startBlend();
     R.offer = null; R.stats.shortcuts++; St.goalProgress('shortcut');
     // hazards: drop ones from the old route, plan for the new tail
     for (const h of R.hazards) freeHazard(h);
@@ -503,12 +516,12 @@ export function createRide(ctx) {
     let top = R.vs.top * (R.boost ? 1.45 * R.vs.boost : 1) * (st.alley ? 0.72 : 1);
     let target = top;
     const corner = R.vs.corner * (R.boost ? 1.22 : 1);
-    for (let k = R.sampled[3]; k < Math.min(route.steps.length, R.sampled[3] + 4); k++) {
-      const s2 = route.steps[k];
-      if (!s2.c.turn) continue;
-      const vt = Math.sqrt(A_LAT * corner * s2.c.radius);
-      const d = Math.max(0, s2.s0 - R.s);
-      target = Math.min(target, Math.sqrt(vt * vt + 2 * B_DEC * d));
+    for (const a of R.arcs) {
+      if (a.s1 < R.s) continue;
+      if (a.s0 > R.s + 80) break;
+      const vt = Math.sqrt(A_LAT * corner * a.r);
+      const d = Math.max(0, a.s0 - R.s);
+      target = Math.min(target, Math.sqrt(vt * vt + 2 * B_DEC * 0.75 * d));
     }
     const toEnd = route.length - R.s;
     target = Math.min(target, Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4)));
@@ -613,16 +626,32 @@ export function createRide(ctx) {
     // ---- event ----
     if (R.event && !R.event.fired && R.s > R.event.s && R.crash <= 0) runEvent(R.event.ev);
     // ---- pose ----
+    // the path is a smooth chain of lines and circular arcs: heading is its tangent, lean follows the physics
+    // of a turning bike (tan lean = v² κ / g), started a little early so the rider leans into the corner.
     const hd = R.sampled[2];
     const rx = -Math.cos(hd), rz = Math.sin(hd);
     const b = R.bike.root;
-    b.position.set(R.sampled[0] + rx * R.lat, y + ROAD_Y, R.sampled[1] + rz * R.lat);
-    // heading smoothing
-    let dh = hd - b.rotation.y; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
-    b.rotation.y += dh * Math.min(1, dt * 14);
-    const turnRate = dh / Math.max(dt, 1e-3);
-    R.lean = THREE.MathUtils.clamp(turnRate * R.v * 0.012, -0.45, 0.45) + (R.ot ? (R.ot.dir > 0 && R.ot.t < 1 ? -0.18 : R.ot.dir < 0 && R.ot.t > 0 ? 0.18 : 0) : 0);
-    R.steer = THREE.MathUtils.clamp(dh * 3, -0.5, 0.5);
+    // curvature averaged over a few metres around (and a bit ahead of) the bike: the lean rolls in and out
+    // gradually instead of switching on at the start of the arc
+    let kap = 0;
+    const lead = Math.max(1, R.v * 0.2);
+    for (const o of KAP_OFFS) { sampleRoute(route, R.s + lead + o, ahead); kap += ahead[4]; }
+    kap /= KAP_OFFS.length;
+    // lane changes (overtaking) turn the nose toward the new lane
+    const dLat = R.lat - (R.prevLat ?? R.lat); R.prevLat = R.lat;
+    const yawT = ds > 1e-4 ? -Math.atan2(dLat, ds) : 0;
+    R.yawOff += (yawT - R.yawOff) * Math.min(1, dt * 10);
+    let px = R.sampled[0] + rx * R.lat, pz = R.sampled[1] + rz * R.lat, ph = hd + R.yawOff;
+    if (R.blend && R.blend.t > 0) {
+      R.blend.t = Math.max(0, R.blend.t - dt / 0.8);
+      const e = smooth(R.blend.t);
+      px += R.blend.dx * e; pz += R.blend.dz * e; ph += R.blend.dh * e;
+    }
+    b.position.set(px, y + ROAD_Y, pz);
+    b.rotation.y = ph;
+    const leanAngle = Math.atan(R.v * R.v * kap / 9.81) * 0.85 - R.yawOff * 1.4;
+    R.lean = -THREE.MathUtils.clamp(leanAngle, -0.5, 0.5);
+    R.steer = THREE.MathUtils.clamp(-Math.atan(1.4 * kap) * 1.3 + R.yawOff * 1.2, -0.45, 0.45);
     if (R.crash > 0) { b.rotation.z = Math.sin(R.crash * 20) * 0.1 * R.crash; }
     else b.rotation.z = 0;
     // ---- arrival ----
@@ -658,11 +687,21 @@ export function createRide(ctx) {
     let pos, look;
     if (R.camMode === 'scene' && R.sceneCam) { pos = R.sceneCam.pos; look = R.sceneCam.look; }
     else {
-      const back = portrait ? 6.6 : 6.0, up = portrait ? 3.15 : 2.8, ahead = portrait ? 10 : 9;
-      pos = v3.set(b.x - fx * back, up + b.y * 0.4, b.z - fz * back);
-      look = v3b.set(b.x + fx * ahead, 1.5, b.z + fz * ahead);
+      const back = portrait ? 6.6 : 6.0, up = portrait ? 3.15 : 2.8, aheadD = portrait ? 10 : 9;
+      // the camera swings round behind the bike with a little lag instead of being bolted to it
+      if (R.camYaw == null || R.snapCam) R.camYaw = hd;
+      let dy = hd - R.camYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      R.camYaw += dy * Math.min(1, dt * 3.8);
+      const cx = Math.sin(R.camYaw), cz = Math.cos(R.camYaw);
+      pos = v3.set(b.x - cx * back, up + b.y * 0.4, b.z - cz * back);
+      // look at the road ahead (so the view turns into a corner before the bike does)
+      if (R.route && R.phase === 'ride') {
+        sampleRoute(R.route, Math.min(R.route.length, R.s + aheadD), camAhead);
+        const lx = b.x + fx * aheadD, lz = b.z + fz * aheadD;
+        look = v3b.set(lx * 0.45 + camAhead[0] * 0.55, 1.5, lz * 0.45 + camAhead[1] * 0.55);
+      } else look = v3b.set(b.x + fx * aheadD, 1.5, b.z + fz * aheadD);
     }
-    const k = 1 - Math.exp(-dt * (R.camMode === 'scene' ? 2.5 : 6));
+    const k = 1 - Math.exp(-dt * (R.camMode === 'scene' ? 2.5 : 8));
     if (!camInit || R.snapCam) { camPos.copy(pos); camLook.copy(look); camInit = true; R.snapCam = false; }
     else { camPos.lerp(pos, k); camLook.lerp(look, 1 - Math.exp(-dt * 9)); }
     if (R.takeCamera === false) return;
