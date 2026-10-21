@@ -61,7 +61,7 @@ export async function createBackdrop(scene, city, sky) {
   }
 
   // ---------------- east hillside: green slope rising from the edge of town, dotted with houses and trees ----------------
-  const hx0 = E1 + 58, hx1 = E1 + 520, hz0 = -260, hz1 = E1 - 6;
+  const hx0 = E1 + 170, hx1 = E1 + 600, hz0 = -260, hz1 = E1 - 6; // begins behind the outskirts (arch.js OUT_DEPTH)
   const height = (x, z) => {
     const t = THREE.MathUtils.smoothstep(x, hx0, hx0 + 260);
     const sea = THREE.MathUtils.smoothstep(z, hz1 - 80, hz1); // dips to the shore in the south

@@ -656,9 +656,12 @@ function roadSigns(city, out) {
 }
 
 // ---------------------------------------------------------------- outskirts: more city past the edge roads
-// Rows of buildings face the city across its outer roads (north, west, east; the south is the sea), a taller
-// row stands behind them, and a far skyline of towers rises beyond downtown. Purely scenery.
-function outskirts(city, put, far, ground) {
+// Seven rows of buildings around the city's outer roads (north, west, east; the south is the sea), with streets between
+// them, ~160 m deep: from the street they fill the skyline, from the hub camera the city simply carries on. Downtown's
+// back rows grow into towers; the hills stay villas and gardens. Purely scenery.
+const OUT_ROWS = [[0, 12], [12, 26], [34, 50], [58, 76], [84, 104], [112, 132], [140, 162]]; // depth bands (m) out from the edge road
+const OUT_DEPTH = 166;
+function outskirts(city, put, ground, street) {
   const rng = mulberry32(31337);
   const E0 = -0.5 * T, E1 = (city.W - 0.5) * T;
   const dOf = (x, z) => districtOfBlock(Math.max(0, Math.min(10, Math.floor((x / T + 0.5) / 4))), Math.max(0, Math.min(10, Math.floor((z / T + 0.5) / 4))));
@@ -666,26 +669,28 @@ function outskirts(city, put, far, ground) {
   const make = (x0, z0, x1, z1, front, d, row) => {
     const r = mulberry32(9001 + seed++);
     if (z1 > RAIL.z0 - 3 && z0 < RAIL.z1 + 3) return; // the railway passes here
-    let type = d === 'hills' ? 'villa' : d === 'downtown' ? (row === 2 && r() < 0.6 ? 'tower' : 'block') : d === 'harbor' && row > 0 && r() < 0.4 ? 'warehouse' : 'house';
-    if (type === 'villa' && row > 0) return;
+    if (d === 'hills' && row > 0) return; // villas front the road; gardens and the hillside behind
+    const towerP = row >= 2 ? [0, 0, 0.45, 0.6, 0.75, 0.8, 0.85][row] : 0;
+    let type = d === 'hills' ? 'villa' : d === 'downtown' ? (r() < towerP ? 'tower' : 'block') : d === 'harbor' && row > 0 && r() < 0.4 ? 'warehouse' : 'house';
     const spec = { lot: { id: -1 }, d, rng: r, seed: r(), front, type, road: row === 0 ? [front] : [], sides: ['lot', 'lot', 'lot', 'lot'] };
     const inset = [0, 0, 0, 0];
-    inset[front] = row === 0 ? SET[d] : row === 2 ? 1.5 : 0;
+    inset[front] = row === 0 ? SET[d] : row >= 2 ? 1.5 : 0;
     if (type === 'villa') for (let k = 0; k < 4; k++) if (k !== front) inset[k] = 2;
     if (type === 'tower') for (let k = 0; k < 4; k++) inset[k] = Math.max(inset[k], 1.5);
     spec.x0 = x0 + inset[3]; spec.x1 = x1 - inset[1]; spec.z0 = z0 + inset[0]; spec.z1 = z1 - inset[2];
     dress(spec, { big: x1 - x0 > 15 && z1 - z0 > 15, wide: x1 - x0 > 15 || z1 - z0 > 15 });
-    if (row === 1 && type !== 'warehouse') { spec.floors += 1 + Math.floor(r() * 2); spec.H = spec.gh + (spec.floors - 1) * spec.fh; }
+    // further out, taller: the skyline rises away from the edge
+    if (type === 'tower') spec.floors += 2 * Math.min(row, 4);
+    else if (row > 0 && type !== 'warehouse') { spec.floors += Math.min(3, row) + Math.floor(r() * 2); spec.H = spec.gh + (spec.floors - 1) * spec.fh; }
     put(spec, (x0 + x1) / 2, (z0 + z1) / 2);
   };
   // rows along one side. axis: lots run along `a` (x for N, z for W/E); depth goes outward from `edge`
-  const ROWS = [[0, 12], [12, 26], [36, 52]];
   const side = (front, edge, outward, a0, a1) => {
-    for (let ri = 0; ri < ROWS.length; ri++) {
-      const [dn, df] = ROWS[ri];
+    for (let ri = 0; ri < OUT_ROWS.length; ri++) {
+      const [dn, df] = OUT_ROWS[ri];
       let a = a0;
       while (a < a1) {
-        const w = ri === 2 ? 18 + Math.floor(rng() * 2) * 6 : rng() < 0.25 ? 20 : 10;
+        const w = ri >= 2 ? 18 + Math.floor(rng() * 2) * 6 : rng() < 0.25 ? 20 : 10;
         const b = Math.min(a1, a + w);
         const n0 = edge + outward * dn, n1 = edge + outward * df;
         const lo = Math.min(n0, n1), hi = Math.max(n0, n1);
@@ -694,22 +699,15 @@ function outskirts(city, put, far, ground) {
         else make(lo, a, hi, b, front, dOf(front === 1 ? E0 : E1, mid), ri);
         a = b;
       }
+      // the street behind this row (not behind the last one)
+      const nx = OUT_ROWS[ri + 1];
+      if (nx) street(front, edge + outward * OUT_ROWS[ri][1], edge + outward * nx[0], a0, a1);
     }
     ground(front, edge, outward);
   };
-  side(2, E0, -1, E0 - 52, E1 + 52); // north, facing south
-  side(1, E0, -1, E0, E1);           // west, facing east
-  side(3, E1, 1, E0, E1);            // east, facing west
-  // far skyline beyond downtown (north-west): towers, always drawn
-  for (let i = 0; i < 16; i++) {
-    const x = -140 + rng() * 380, z = -95 - rng() * 230;
-    const w = 14 + rng() * 10, d2 = 14 + rng() * 10;
-    const r = mulberry32(555 + i);
-    const spec = { lot: { id: -1 }, d: 'downtown', rng: r, seed: r(), front: 2, type: 'tower', road: [], sides: ['lot', 'lot', 'lot', 'lot'], x0: x - w / 2, x1: x + w / 2, z0: z - d2 / 2, z1: z + d2 / 2 };
-    dress(spec, { big: true });
-    spec.floors = 14 + Math.floor(r() * 18);
-    far(spec);
-  }
+  side(2, E0, -1, E0 - OUT_DEPTH, E1 + OUT_DEPTH); // north (corners included), facing south
+  side(1, E0, -1, E0, E1);                         // west, facing east
+  side(3, E1, 1, E0, E1);                          // east, facing west
 }
 
 // ---------------------------------------------------------------- entry point
@@ -734,17 +732,26 @@ export function buildArchitecture(city) {
   }
   const farGB = new GB();
   const pave = st(KIND.PAVE, lin('#d9cdb8'));
+  const E0o = -0.5 * T, E1o = (city.W - 0.5) * T;
+  const flatQ = (x0, z0, x1, z1, y, S) => farGB.quad([[x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0]], [[0, 0], [1, 0], [1, 1], [0, 1]], S, [0, 1, 0]);
+  const asphalt = st(KIND.FLAT, lin('#5a5c63'));
+  // the hills (north of x 240 m, east of z 200 m) stay green
+  const hillsN = 24 * T, hillsE = 20 * T;
   outskirts(city,
     (spec, x, z) => { const c = gbs({ cx: x / T, cz: z / T }); emit(spec, c.base, c.detail, out); },
-    (spec) => emit(spec, farGB, farGB, out),
-    (front, edge, outward) => {
+    (front) => {
       // paving under the outskirts (not the hills: those are lawns)
-      const E0 = -0.5 * T, E1 = (city.W - 0.5) * T, y = 0.19, d = 60;
-      const qd = (x0, z0, x1, z1) => farGB.quad([[x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0]], [[0, 0], [1, 0], [1, 1], [0, 1]], pave, [0, 1, 0]);
-      if (front === 2) qd(E0 - d, E0 - d, 24 * T, E0);
-      else if (front === 1) qd(E0 - d, E0, E0, E1);
-      else qd(E1, 20 * T, E1 + d, E1);
-      void outward; void edge;
+      const d = OUT_DEPTH, y = 0.19;
+      if (front === 2) flatQ(E0o - d, E0o - d, hillsN, E0o, y, pave);
+      else if (front === 1) flatQ(E0o - d, E0o, E0o, E1o, y, pave);
+      else flatQ(E1o, hillsE, E1o + d, E1o, y, pave);
+    },
+    (front, n0, n1, a0, a1) => {
+      // a street between two rows, just above the paving
+      const lo = Math.min(n0, n1), hi = Math.max(n0, n1), y = 0.2;
+      if (front === 2) flatQ(a0, lo, Math.min(a1, hillsN), hi, y, asphalt);
+      else if (front === 1) flatQ(lo, a0, hi, a1, y, asphalt);
+      else flatQ(lo, Math.max(a0, hillsE), hi, a1, y, asphalt);
     });
   // the clock tower stands on a mid-side tile of an Old Town park, next to its path
   {
