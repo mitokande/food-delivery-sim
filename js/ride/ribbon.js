@@ -15,18 +15,23 @@ function makeMat(color, chevrons) {
       void main(){
         if (vS < uFrom || vS > uTo) discard;
         float a;
+        vec3 col = uColor;
         if (uChev > 0.5) {
-          float p = fract((vS - uTime * 6.0) / 3.2);
+          // chunky arcade chevrons: dark-blue rim, bright body, pale core
+          float p = fract((vS - uTime * 6.0) / 2.7);
           float x = abs(vV - 0.5) * 2.0;
-          float chev = smoothstep(0.10, 0.0, abs(p - 0.63 + x * 0.28) - 0.07);
-          a = chev * 0.95;
+          float ad = abs(p - 0.56 + x * 0.34);
+          float edge = smoothstep(1.0, 0.82, x);
+          a = smoothstep(0.205, 0.175, ad) * edge * 0.95;
+          col = mix(uColor * vec3(0.32, 0.55, 0.85), uColor, smoothstep(0.18, 0.15, ad));
+          col = mix(col, vec3(0.86, 0.98, 1.0), smoothstep(0.075, 0.0, ad - 0.01 * x) * 0.6);
         } else {
           float edge = smoothstep(0.0, 0.18, vV) * smoothstep(1.0, 0.82, vV);
           float dash = 0.55 + 0.45 * step(0.5, fract((vS - uTime * 8.0) / 5.0));
           a = edge * dash * 0.9;
         }
         float fadeNear = uFade > 0.0 ? smoothstep(uFrom, uFrom + 3.0, vS) * (1.0 - smoothstep(uFrom + uFade * 0.6, uFrom + uFade, vS)) : 1.0;
-        gl_FragColor = vec4(uColor, a * fadeNear);
+        gl_FragColor = vec4(col, a * fadeNear);
         #include <colorspace_fragment>
       }`,
   });

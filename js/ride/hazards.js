@@ -2,9 +2,8 @@
 // jaywalkers, cash and energy pickups. Spawning (pure-ish) + simple visuals.
 import * as THREE from 'three';
 import { pieceParts, makeChar } from '../assets.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TILE } from '../data.js';
-import { CAR_SCALE } from '../city/traffic.js';
+import { carObject } from '../city/cars.js';
 import { pick } from '../rng.js';
 
 export const HZ = {
@@ -73,17 +72,6 @@ const geo = {
   crate: new THREE.BoxGeometry(0.8, 0.8, 0.8),
   light: new THREE.BoxGeometry(0.18, 0.1, 0.06),
 };
-let carGeo = null;
-function parkedGeo(type) {
-  carGeo ||= {};
-  if (carGeo[type]) return carGeo[type];
-  const parts = pieceParts('cars', type);
-  if (!parts.length) return null;
-  const g = mergeGeometries(parts.map((p) => p.geometry.clone()));
-  g.scale(CAR_SCALE, CAR_SCALE, CAR_SCALE); g.computeBoundingBox(); g.translate(0, -g.boundingBox.min.y, 0);
-  carGeo[type] = { g, mat: new THREE.MeshStandardMaterial({ map: parts[0].material.map, roughness: 0.55 }) };
-  return carGeo[type];
-}
 const pedPool = [];
 export async function warmPeds() {
   if (pedPool.length) return;
@@ -109,8 +97,8 @@ export function makeHazardMesh(h) {
     case 'crates': for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(geo.crate, M.crate); m.position.set((i - 1) * 0.6, 0.4 + (i === 1 ? 0.75 : 0), (i % 2) * 0.3); m.rotation.y = i * 0.4; m.castShadow = true; g.add(m); } break;
     case 'parked': {
       const t = pick(Math.random, ['van', 'delivery', 'sedan', 'taxi']);
-      const c = parkedGeo(t);
-      if (c) { const m = new THREE.Mesh(c.g, c.mat); m.castShadow = true; g.add(m); }
+      const car = carObject(t);
+      if (car) g.add(car);
       h.blink = [];
       for (const [x, z] of [[-0.8, 2.2], [0.8, 2.2], [-0.8, -2.2], [0.8, -2.2]]) { const l = new THREE.Mesh(geo.light, M.hazard); l.position.set(x, 1.0, z); g.add(l); h.blink.push(l); }
       break;

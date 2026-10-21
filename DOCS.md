@@ -125,7 +125,11 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/orders.js` | sipariş üretimi, ücret + ETA, yıldız/bahşiş hesabı |
 | `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
 | `js/city/graph.js` | A* (U dönüşü yok), şerit eğrileri (sağdan trafik), rota örnekleme |
-| `js/city/view.js` | Kenney parçalarını chunk × malzeme birleştirme, bölge paletleri, gece pencere ışığı, lamba ışık havuzları, deniz |
+| `js/city/view.js` | Kenney yol parçalarını chunk × malzeme birleştirme, asfalt/kaldırım shader'ı, binaları chunk'lara ekleme, çatı tabelaları, lamba ışık havuzları, deniz |
+| `js/city/arch.js` · `archmat.js` | prosedürel mimari: her parsel bölgesine göre bina (Old Town cepheleri + dükkân, Downtown blok/kule, Harbor pastel ev/depo, Hills villa), tente, balkon, saksı, tabela atlası, şehir dışı sıraları + uzak gökdelenler, raylı viyadük, yön tabelaları; tek shader pencereleri/camı/kepengi/çatı kiremidini/tenteyi/gece ışıklarını çizer |
+| `js/city/props.js` · `people.js` · `cars.js` | props.glb sokak eşyaları (tür başına InstancedMesh, kameraya göre doldurulur, uzak ağaçlar düşük poli), kafe müşterileri (Kenney karakterleri sabit poza pişirilir), oyuncak arabalar (instance boya rengi, gece farlar) |
+| `js/city/backdrop.js` · `train.js` | ufuk dağları (sis renginde), doğu tepesindeki evler, körfez (mendirek + deniz feneri, iskele + dönme dolap), saat kulesi; viyadükte giden metro |
+| `js/look.js` | renk derecelendirme (özel tone mapping: doygunluk, sıcak ışık/serin gölge, kontrast) ve parlak malzemeler için ortam haritası |
 | `js/city/traffic.js` | instanced arabalar, trafik ışıkları, yayalar, filo kuryeleri (rider ajanları) |
 | `js/ride/ride.js` | otomatik pilot sürüş, güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
@@ -134,7 +138,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
-`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`. URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
+`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
 
 ## 9. Durum
 
@@ -173,5 +177,17 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
 - 2026-10-20: sürüşte serbest bakış. Ekranı sürüklemek kamerayı motorun etrafında döndürür (yatay) ve yükseltir (dikey);
   iki parmak / tekerlek yakınlaştırır. Bırakınca ~1,3 sn sonra kamera arkaya döner. Yan açılarda kamera yükselir ve motora
   bakar. Hızlı fiske (yukarı = zıpla, sola = sollama) kamerayı değiştirmez; sollama kaydırması da 450 ms sınırına alındı.
+- 2026-10-20: görsel elden geçirme (kullanıcının referans görseli `design/style-target.webp`: parlak, sıcak, "oyuncak şehir").
+  - **Işık/renk:** özel tone mapping (doygunluk ×1.24, sıcak ışık + serin gölge, yumuşak S eğrisi), daha mavi gökyüzü + shader bulutları,
+    güçlü hemisfer dolgu (gölgeler mavi-gri, siyah değil), mesafede mavi pus, araç/kask boyasına gökyüzü yansıması.
+  - **Binalar:** Kenney binaları yerine kodla üretilen Avrupa cepheleri. Dükkân katı (vitrin, kapı, tabela bandı), çizgili fistolu
+    tenteler, panjurlar, balkonlar, çiçek kutuları, kiremit çatı/korniş, bacalar; Downtown'da cam kuleler, Harbor'da pastel evler ve depolar,
+    Hills'te villalar. Restoranlar aynı sistemle: marka renkli tente + isim tabelası + çatıda dev yiyecek. Binalar parselin arkasına
+    çekildi, önde ~3,5 m kaldırım: ağaçlar, fenerler, kafe masaları, saksılar, oturan/duran insanlar (props.glb + pişmiş pozlar).
+  - **Çevre:** şehir kenar yollarının dışında bina sıraları, uzak gökdelenler, dağlar, doğuda evlerle dolu tepe, körfezde deniz feneri
+    ve dönme dolap, Old Town parkında saat kulesi, Downtown bulvarı boyunca viyadük + metro, kavşaklarda yeşil yön tabelaları,
+    rıhtım korkuluğu. Klasik siyah trafik lambaları (3 lamba), kalın parlak chevron rota şeridi, HUD panelleri referansa göre.
+  - **Performans:** binalar tüm şehir için ~210k üçgen (Kenney ~1M); sokak eşyaları kamera önündeki yarıçapla doldurulur,
+    70 m ötesindeki ağaçlar ~100 üçgenlik kopyalar. Sürüşte gölgeler dahil ~0,75–0,85M üçgen, ~230 çizim çağrısı.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

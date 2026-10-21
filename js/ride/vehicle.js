@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { loadKit, getNode, makeChar } from '../assets.js';
 import { VEHICLE } from '../data.js';
+import { useEnv } from '../look.js';
 
 let vehKit = null;
 export async function loadVehicles() {
@@ -31,6 +32,13 @@ function placeholder(id) {
   return g;
 }
 
+// toy-like shine: painted parts and glass pick up the sky in reflections
+function glossy(m) {
+  const paint = /paint|box|helmet|glass|chrome|metal/i.test(m.name);
+  if (paint) m.roughness = Math.min(m.roughness ?? 0.5, 0.38);
+  useEnv(m, paint ? 0.9 : 0.45);
+}
+
 // Build a ridable vehicle object. Returns { root, model, rider, wheels, steer, box, setColors(), update(dt, speed, lean) }
 export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e8432f', rider = true } = {}) {
   await loadVehicles();
@@ -41,6 +49,7 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
     if (!o.isMesh) return;
     o.castShadow = true; o.receiveShadow = true;
     if (Array.isArray(o.material)) o.material = o.material.map((m) => m.clone()); else o.material = o.material.clone();
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m.isMeshStandardMaterial) glossy(m);
   });
   const root = new THREE.Group();
   const lean = new THREE.Group(); // rolls around the contact line
@@ -74,7 +83,7 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
       // long hair / caps poke through on some characters — give them a roomier helmet
       const roomy = { 'female-f': 1.17, 'male-c': 1.15, 'female-a': 1.12, 'female-c': 1.12, 'female-d': 1.12, 'female-e': 1.12, 'male-b': 1.04, 'male-d': 1.04 }[char];
       if (roomy) helm.scale.setScalar(roomy);
-      helm.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); if (o.material.name === 'helmet_paint') o.material.color.set(helmet); } });
+      helm.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); if (o.material.name === 'helmet_paint') { o.material.color.set(helmet); o.material.roughness = 0.28; } if (o.material.isMeshStandardMaterial) glossy(o.material); } });
       helm.position.set(0, 0, 0); helm.rotation.set(0, 0, 0);
       if (roomy) helm.position.y = -0.01;
       ch.head.add(helm);

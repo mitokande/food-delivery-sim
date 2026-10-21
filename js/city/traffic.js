@@ -5,13 +5,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TILE, DISTRICT } from '../data.js';
 import { DIRS, OPP, RIGHT, LEFT, K } from './gen.js';
 import { laneCurve, sampleCurve, LANE } from './graph.js';
-import { loadKit, pieceParts, makeChar } from '../assets.js';
+import { makeChar } from '../assets.js';
+import { loadCars, carModel, PAINTS } from './cars.js';
 import { mulberry32, pick } from '../rng.js';
 
-export const CAR_TYPES = ['sedan', 'taxi', 'hatchback-sports', 'suv', 'van', 'sedan-sports', 'suv-luxury', 'police', 'delivery', 'truck', 'garbage-truck', 'ambulance'];
-const CAR_W = { sedan: 10, taxi: 6, 'hatchback-sports': 6, suv: 6, van: 4, 'sedan-sports': 3, 'suv-luxury': 3, police: 1.5, delivery: 2, truck: 1.5, 'garbage-truck': 0.7, ambulance: 0.6 };
-export const CAR_SCALE = 1.6;
-const CAR_LEN = { truck: 6.2, 'garbage-truck': 6.6, delivery: 5.4, ambulance: 5.4, van: 4.8 };
+export const CAR_TYPES = ['sedan', 'taxi', 'hatchback-sports', 'compact', 'suv', 'van', 'sedan-sports', 'suv-luxury', 'police', 'delivery', 'truck', 'garbage-truck', 'ambulance'];
+const CAR_W = { sedan: 9, taxi: 6, 'hatchback-sports': 6, compact: 6, suv: 5, van: 4, 'sedan-sports': 3, 'suv-luxury': 3, police: 1.5, delivery: 2, truck: 1.5, 'garbage-truck': 0.7, ambulance: 0.6 };
+export { CAR_SCALE } from './cars.js';
 
 // light cycle (s): NS green, NS yellow, EW green, EW yellow
 const CYCLE = 17, G = 7, Y = 1.5;
@@ -24,52 +24,50 @@ export function lightState(light, t, dir) {
 
 export async function createTraffic(city, scene, { seed = 99 } = {}) {
   const rng = mulberry32(seed);
-  await loadKit('cars', CAR_TYPES);
+  await loadCars(CAR_TYPES);
   const lightAt = new Map(); for (const l of city.lights) lightAt.set(l.tile, l);
 
-  // ---- instanced car meshes ----
+  // ---- instanced car meshes (paint per instance) ----
   const meshes = {};
   const MAX = 40;
   for (const type of CAR_TYPES) {
-    const parts = pieceParts('cars', type);
-    if (!parts.length) continue;
-    const geo = mergeGeometries(parts.map((p) => p.geometry.clone()));
-    geo.scale(CAR_SCALE, CAR_SCALE, CAR_SCALE);
-    // Kenney cars sit with wheels below y=0 in some models; lift to ground
-    geo.computeBoundingBox(); geo.translate(0, -geo.boundingBox.min.y, 0);
-    const src = parts[0].material;
-    const mat = new THREE.MeshStandardMaterial({ map: src.map, color: 0xffffff, roughness: 0.55, metalness: 0.05 });
-    const im = new THREE.InstancedMesh(geo, mat, MAX);
+    const cm = carModel(type);
+    if (!cm) continue;
+    const im = new THREE.InstancedMesh(cm.geo, cm.mat, MAX);
     im.count = 0; im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false;
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < MAX; i++) im.setColorAt(i, PAINTS[0]);
     scene.add(im);
-    meshes[type] = { im, len: CAR_LEN[type] || 4.2 };
+    meshes[type] = { im, len: Math.max(3.2, cm.len) };
   }
 
-  // ---- signal bulbs: one per junction approach ----
-  const bulbGeo = new THREE.SphereGeometry(0.22, 10, 8);
-  const bulbs = new THREE.InstancedMesh(bulbGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), city.lights.length * 4);
+  // ---- signal lamps: red / yellow / green per junction approach, in front of the lenses of props.glb's traffic_light ----
+  const LENS = [3.61, 3.30, 2.99]; // r, y, g centre heights (m); lenses at local x -0.92, z 0.15 (facing +Z)
+  const bulbGeo = new THREE.CircleGeometry(0.11, 12); // a disc in front of each lens, seen only from the front
+  const bulbs = new THREE.InstancedMesh(bulbGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), Math.max(1, city.lights.length * 12));
   const bulbInfo = [];
   {
-    const m = new THREE.Matrix4();
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
     let n = 0;
     for (const l of city.lights) {
       const t = city.tiles[l.tile];
       for (let d = 0; d < 4; d++) {
-        // approach heading d enters from the OPP(d) side; bulb on the far-right corner of the junction
+        // approach heading d enters from the OPP(d) side; the signal stands on the far-right corner, facing the driver
         const f = DIRS[d], r = DIRS[RIGHT(d)];
         if (!(t.mask & (1 << OPP(d)))) continue;
-        // the lamp housing sits on the pole's local -X side; put the glow just in front of it
-        const rot = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][OPP(d)], lx = -0.35, lz = 0.42;
+        const rot = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][OPP(d)], lx = -0.92, lz = 0.2;
         const x = (t.x + (f[0] + r[0]) * 0.46) * TILE + lx * Math.cos(rot) + lz * Math.sin(rot);
         const z = (t.z + (f[1] + r[1]) * 0.46) * TILE - lx * Math.sin(rot) + lz * Math.cos(rot);
-        m.makeTranslation(x, 4.25, z); bulbs.setMatrixAt(n, m); bulbInfo.push({ light: l, d }); n++;
+        q.setFromAxisAngle(up, rot);
+        for (let k = 0; k < 3; k++) { m.compose(p.set(x, LENS[k] + 0.2, z), q, one); bulbs.setMatrixAt(n, m); bulbInfo.push({ light: l, d, k }); n++; }
       }
     }
     bulbs.count = n; bulbs.frustumCulled = false; bulbs.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, n) * 3), 3);
     scene.add(bulbs);
   }
   const COL = { g: new THREE.Color(0x46ff6a), y: new THREE.Color(0xffc23a), r: new THREE.Color(0xff3b30) };
+  const OFF = [new THREE.Color(0x3a0d0b), new THREE.Color(0x3a2a08), new THREE.Color(0x0b3312)];
+  const KEY = ['r', 'y', 'g'];
 
   // ---- agents ----
   const agents = [];
@@ -92,7 +90,7 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
     const t = pick(rng, cand);
     const dirs = [0, 1, 2, 3].filter((d) => t.mask & (1 << d));
     const din = pick(rng, dirs);
-    const a = { kind: 'car', type, v: 0, vmax: 8 + rng() * 3.5, len: meshes[type]?.len || 4.2, pos: [0, 0, 0], off: LANE, id: agents.length };
+    const a = { kind: 'car', type, v: 0, vmax: 8 + rng() * 3.5, len: meshes[type]?.len || 4.2, pos: [0, 0, 0], off: LANE, id: agents.length, paint: PAINTS[Math.floor(rng() * PAINTS.length)] };
     placeAgent(a, t.i, din, din, rng() * 8);
     agents.push(a);
     return a;
@@ -199,10 +197,11 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
       q.setFromAxisAngle(up, tmp[2]);
       v3.set(tmp[0], 0.1, tmp[1]);
       m4.compose(v3, q, one);
+      M.im.setColorAt(M.im.count, a.paint);
       M.im.setMatrixAt(M.im.count++, m4);
     }
-    for (const k in meshes) meshes[k].im.instanceMatrix.needsUpdate = true;
-    for (let i = 0; i < bulbInfo.length; i++) bulbs.setColorAt(i, COL[lightState(bulbInfo[i].light, time, bulbInfo[i].d)]);
+    for (const k in meshes) { const im = meshes[k].im; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.visible = im.count > 0; }
+    for (let i = 0; i < bulbInfo.length; i++) { const b = bulbInfo[i], st = lightState(b.light, time, b.d); bulbs.setColorAt(i, st === KEY[b.k] ? COL[st] : OFF[b.k]); }
     bulbs.instanceColor.needsUpdate = true;
   }
 

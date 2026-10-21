@@ -2,9 +2,8 @@
 // a parked car whose door swings open, pigeons, a rival courier, a police stop, road works.
 // Blocky procedural models in the Kenney style (no extra downloads). Pure three.js; the ride drives them.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { pieceParts, makeChar } from '../assets.js';
-import { CAR_SCALE } from '../city/traffic.js';
+import { makeChar } from '../assets.js';
+import { carObject, carModel } from '../city/cars.js';
 
 const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
 const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
@@ -78,15 +77,13 @@ export function makeBall() {
 
 // ---------------- parked car with an opening door ----------------
 export function makeDoorCar(type = 'sedan') {
-  const parts = pieceParts('cars', type);
   const g = new THREE.Group();
-  if (parts.length) {
-    const geo = mergeGeometries(parts.map((p) => p.geometry.clone()));
-    geo.scale(CAR_SCALE, CAR_SCALE, CAR_SCALE); geo.computeBoundingBox(); geo.translate(0, -geo.boundingBox.min.y, 0);
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: parts[0].material.map })); m.castShadow = true; g.add(m);
-  }
+  const car = carObject(type, type === 'police' ? '#f4f4f4' : undefined);
+  const cm = carModel(type);
+  if (car) g.add(car);
+  const hw = cm ? cm.width / 2 : 1.1, hl = cm ? cm.len / 2 : 2.1;
   // driver's door on the car's left (+X in its local frame faces the road when parked on the right curb)
-  const hinge = new THREE.Group(); hinge.position.set(1.12, 0.35, 0.55); g.add(hinge);
+  const hinge = new THREE.Group(); hinge.position.set(hw + 0.02, 0.35, Math.min(0.55, hl * 0.3)); g.add(hinge);
   const door = box(0.08, 0.95, 1.15, lam(0xd8e2ef), 0.04, 0.48, -0.58); hinge.add(door);
   hinge.add(box(0.06, 0.4, 0.9, new THREE.MeshLambertMaterial({ color: 0x9cc8ea, emissive: 0x223344 }), 0.06, 0.95, -0.6));
   let open = 0, target = 0;
@@ -97,7 +94,8 @@ export function makeDoorCar(type = 'sedan') {
 export function makePoliceCar() {
   const c = makeDoorCar('police');
   const red = new THREE.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false }), blue = new THREE.MeshBasicMaterial({ color: 0x2a6bff, toneMapped: false });
-  const lr = box(0.32, 0.12, 0.18, red, -0.3, 2.05, 0), lb = box(0.32, 0.12, 0.18, blue, 0.3, 2.05, 0);
+  const top = (carModel('police')?.geo.boundingBox?.max.y ?? 1.95) + 0.06;
+  const lr = box(0.32, 0.12, 0.18, red, -0.3, top, 0), lb = box(0.32, 0.12, 0.18, blue, 0.3, top, 0);
   c.obj.add(lr, lb);
   let t = 0;
   const base = c.animate;

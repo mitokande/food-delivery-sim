@@ -17,10 +17,13 @@ No real brands, restaurants or delivery apps appear in the game (Sunny Burger, Z
 
 | Area | Source | Licence | Details |
 |---|---|---|---|
-| City: roads, commercial, suburban, industrial buildings, props | Kenney — City Kit (Roads, Commercial 2.1, Suburban 2.0, Industrial 2.0) | CC0 1.0 | [assets/models/CREDITS-city.md](assets/models/CREDITS-city.md) |
-| Traffic cars, cones | Kenney — Car Kit | CC0 1.0 | same |
+| Buildings (townhouses, shopfronts, towers, warehouses, villas, outskirts, viaduct) | generated in code at load time (`js/city/arch.js`, shader `js/city/archmat.js`) | own work | — |
+| Street props: trees, palms, lanterns, traffic lights, café sets, planters, benches, signs, clock tower, lighthouse, Ferris wheel, hill houses | modelled in Blender for this project from code (`tools/blender/props.py`) | own work | [assets/models/CREDITS-props.md](assets/models/CREDITS-props.md) |
+| Traffic cars, metro train, boats | modelled in Blender for this project from code (`tools/blender/cars.py`); Kenney Car Kit is the fallback | own work | [assets/models/CREDITS-cars.md](assets/models/CREDITS-cars.md) |
+| City: roads, ground tiles, some yard props | Kenney — City Kit (Roads, Commercial 2.1, Suburban 2.0, Industrial 2.0) | CC0 1.0 | [assets/models/CREDITS-city.md](assets/models/CREDITS-city.md) |
+| Cones, fallback cars | Kenney — Car Kit | CC0 1.0 | same |
 | Food items (signs, bags, icons) | Kenney — Food Kit | CC0 1.0 | same |
-| Characters (riders, customers, pedestrians, portraits) | Kenney — Mini Characters (with animations) | CC0 1.0 | same |
+| Characters (riders, customers, pedestrians, café guests baked into static poses, portraits) | Kenney — Mini Characters (with animations) | CC0 1.0 | same |
 | District colour palettes | recoloured Kenney colormaps (`tools/palettes.py`) | CC0 1.0 | [assets/models/tex/README.md](assets/models/tex/README.md) |
 | Restaurants, garage, dispatch office | modelled in Blender for this project (`tools/blender/restaurants.py`); rooftop food signs from the Kenney Food Kit | CC0 1.0 | [assets/models/CREDITS-city.md](assets/models/CREDITS-city.md) |
 | Player vehicles (6) and helmet | modelled in Blender for this project from code (`tools/blender/vehicles.py`) | own work | [assets/models/CREDITS-vehicles.md](assets/models/CREDITS-vehicles.md) |

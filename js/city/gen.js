@@ -29,25 +29,6 @@ export function fitRoad(mask) {
   return { kind, q: 0 };
 }
 
-// Building footprints in kit units (w along X = frontage, d along Z = depth, cx/cz = bbox centre, h = height)
-const B = (name, w, d, h, cx = 0, cz = 0) => ({ name, w, d, h, cx, cz });
-const COMMERCIAL_1 = [B('building-a', .88, .94, 1.29), B('building-b', .98, .94, 1.29), B('building-c', .88, 1.1, .89), B('building-d', .84, .9, 1.29),
-  B('building-f', .84, 1.03, 1.69), B('building-g', .98, .92, 1.69), B('building-h', .88, 1.0, 1.29)];
-const COMMERCIAL_2x1 = [B('building-e', 1.64, 1.0, .89), B('building-k', 2.08, .94, 1.47)];
-const COMMERCIAL_BIG = [B('building-i', 1.24, 1.3, 1.68), B('building-j', 2.08, 1.34, 1.69), B('building-l', 1.38, 1.4, 2.27), B('building-m', 1.24, 1.24, 3.15), B('building-n', 2.32, 1.82, 2.48)];
-const SKYSCRAPERS = [B('building-skyscraper-a', 1.36, 1.36, 2.88), B('building-skyscraper-b', 1.36, 1.36, 4.48), B('building-skyscraper-c', 1.28, 1.38, 4.08),
-  B('building-skyscraper-d', 1.28, 1.38, 5.47), B('building-skyscraper-e', 1.3, 1.24, 4.08)];
-const SUBURBAN = 'abcdefghijklmnopqrstu'.split('').map((c) => c); // sizes filled below
-const SUB_SIZE = { a: [1.3, 1.02], b: [1.82, 1.14], c: [1.28, 1.02], d: [1.76, 1.02], e: [1.3, 1.02], f: [1.42, 1.4], g: [1.46, 1.18], h: [1.3, .92], i: [1.28, 1.02],
-  j: [1.38, .92], k: [.92, 1.02], l: [1.04, 1.02], m: [1.42, 1.42], n: [1.78, 1.38], o: [1.27, 1.02], p: [1.24, 1.0], q: [1.24, .88, 0, .02], r: [1.02, 1.02], s: [1.4, 1.08], t: [1.31, 1.4, -.005], u: [1.42, 1.08] };
-const HOUSES = SUBURBAN.map((c) => { const s = SUB_SIZE[c]; return B('building-type-' + c, s[0], s[1], 1, s[2] || 0, s[3] || 0); });
-const IND = (n, x0, z0, x1, z1, h) => B('building-' + n, x1 - x0, z1 - z0, h, (x0 + x1) / 2, (z0 + z1) / 2);
-const INDUSTRIAL_1 = [IND('d', -.44, -.8, .44, .62, 1.41), IND('i', -.95, -.38, .08, .92, .73), IND('j', -.95, -.38, .08, .92, .86), IND('k', -.65, -.46, .65, .45, .77),
-  IND('o', -.88, 0, 0, 1.24, .92)];
-const INDUSTRIAL_2x1 = [IND('p', -.84, -.5, .84, .5, .71), IND('s', -1.07, -.46, 1.05, .46, .84), IND('r', -1.24, -.64, 1.24, .64, 1.39), IND('g', -.84, -.64, .84, .64, 1.28)];
-const INDUSTRIAL_BIG = [IND('a', -1.04, -.62, 1.04, .62, 1.47), IND('b', -1.04, -.64, 1.04, .62, 1.47), IND('c', -.84, -.91, 1.03, 1.2, 1.25), IND('e', -.84, -.4, .84, .89, 1.65),
-  IND('f', -1.35, -.39, .44, .89, 1.92), IND('l', -1.46, -.71, .62, 1.16, 1.92), IND('m', -.66, -.85, .66, .85, 1.52), IND('q', -1.3, -.87, .84, .9, .88), IND('t', -.86, -.7, .86, .7, 1.01)];
-
 export function districtOfBlock(bx, bz) {
   if (bz <= 4) return bx <= 5 ? 'downtown' : 'hills';
   return bx <= 4 ? 'oldtown' : 'harbor';
@@ -197,6 +178,7 @@ export function generateCity(seed = 20261019) {
 
   // ---- placements (what to draw) ----
   const P = []; // {kit, name, x, y, z, rot, s, sy, cat, tile}
+  const PR = []; // street props from props.glb, tile coords: {type, x, z, rot, s, tile}
   const put = (kit, name, x, z, rot = 0, s = 1, cat = 'prop', extra) => P.push({ kit, name, x, y: 0, z, rot, s, sy: 1, cat, ...extra });
 
   // roads
@@ -217,61 +199,17 @@ export function generateCity(seed = 20261019) {
     }
   }
   // buildings
-  const choose = (lot) => {
-    const d = lot.d, big = lot.w === 2 && lot.dep === 2, wide = lot.w === 2 && lot.dep === 1;
-    if (d === 'hills') return ['suburban', pick(rng, HOUSES)];
-    if (d === 'harbor') {
-      if (big) return ['industrial', pick(rng, INDUSTRIAL_BIG)];
-      if (wide) return ['industrial', pick(rng, INDUSTRIAL_2x1)];
-      return rng() < 0.6 ? ['industrial', pick(rng, INDUSTRIAL_1)] : ['commercial', pick(rng, COMMERCIAL_1)];
-    }
-    if (d === 'downtown') {
-      if (big) return rng() < 0.7 ? ['commercial', pick(rng, SKYSCRAPERS)] : ['commercial', pick(rng, COMMERCIAL_BIG)];
-      if (wide) return ['commercial', pick(rng, COMMERCIAL_2x1)];
-      return ['commercial', pick(rng, COMMERCIAL_1.filter((b) => b.h > 1.2))];
-    }
-    if (wide) return ['commercial', pick(rng, COMMERCIAL_2x1)];
-    return ['commercial', pick(rng, COMMERCIAL_1)];
-  };
-  for (const lot of lots) {
-    const rot = FRONT_ROT[lot.front]; // landmarks face +Z
-    if (lot.special) {
-      const name = lot.special === 'restaurant' ? RESTAURANTS.find((r) => r.id === lot.rest).model : lot.special;
-      put('restaurants', name, lot.cx, lot.cz, rot, 1, 'building', { lot: lot.id });
-      continue;
-    }
-    const [kit, b] = choose(lot);
-    const rotK = rot + Math.PI; // Kenney buildings have their front door on -Z
-    const fw = lot.w * 0.93, fd = lot.dep * 0.93;
-    let s = Math.min(fw / b.w, fd / b.d);
-    if (kit === 'commercial' && b.name.includes('skyscraper')) s = Math.min(s, 1.4);
-    s = Math.min(s, 1.45);
-    // piece centre offset (cx,cz) is in local space → rotate into world
-    const c = Math.cos(rotK), sn = Math.sin(rotK);
-    const ox = (b.cx * c + b.cz * sn) * s, oz = (-b.cx * sn + b.cz * c) * s;
-    // push the building towards its front edge so the shop front meets the sidewalk
-    const slack = (lot.dep - b.d * s) / 2 * 0.9;
-    const fx = DIRS[lot.front][0] * slack, fz = DIRS[lot.front][1] * slack;
-    put(kit, b.name, lot.cx - ox + fx, lot.cz - oz + fz, rotK, s, 'building', { lot: lot.id, h: b.h * s });
-    lot.h = b.h * s;
-  }
+  // buildings: procedural (city/arch.js builds every lot, restaurants included)
   // props: street lights, traffic lights, trees, alley clutter
   const lights = [];
   for (const t of tiles) if (t.k === K.ROAD) {
-    if (t.piece === 'straight' && (t.x + t.z) % 3 === 0) {
-      // on a sidewalk edge, arm reaching over the road. light-curved arm points -Z.
-      const horiz = (t.mask & 0b1010) === 0b1010; // E-W road → sidewalks on N/S edges
-      const side = ((t.x * 7 + t.z * 3) % 2) ? 1 : -1;
-      if (horiz) put('roads', 'light-curved', t.x, t.z + side * 0.47, side > 0 ? 0 : Math.PI, 1, 'prop', { lamp: true });
-      else put('roads', 'light-curved', t.x + side * 0.47, t.z, side > 0 ? Math.PI / 2 : -Math.PI / 2, 1, 'prop', { lamp: true });
-    }
     if (t.junction && t.d !== 'hills') {
       lights.push({ tile: t.i, phase: rng() * 17 });
       // one signal per approach, on the far-right corner, facing the oncoming driver (lamp faces +Z at rot 0)
       for (let d = 0; d < 4; d++) {
         if (!(t.mask & (1 << OPP(d)))) continue;
         const f = DIRS[d], r = DIRS[RIGHT(d)];
-        put('roads', 'traffic-light', t.x + (f[0] + r[0]) * 0.46, t.z + (f[1] + r[1]) * 0.46, FRONT_ROT[OPP(d)], 1, 'prop');
+        PR.push({ type: 'traffic_light', x: t.x + (f[0] + r[0]) * 0.46, z: t.z + (f[1] + r[1]) * 0.46, rot: FRONT_ROT[OPP(d)], s: 1, tile: t.i });
       }
     }
   }
@@ -279,7 +217,7 @@ export function generateCity(seed = 20261019) {
     if (t.k === K.PARK || (t.k === K.ALLEY && t.style === 'park')) {
       if (t.k === K.PARK) {
         const n = 1 + Math.floor(rng() * 3);
-        for (let k = 0; k < n; k++) put('suburban', rng() < 0.5 ? 'tree-large' : 'tree-small', t.x + (rng() - 0.5) * 0.7, t.z + (rng() - 0.5) * 0.7, rng() * 6.28, 1.3 + rng() * 0.6);
+        for (let k = 0; k < n; k++) PR.push({ type: rng() < 0.5 ? 'tree_round_a' : 'tree_round_b', x: t.x + (rng() - 0.5) * 0.7, z: t.z + (rng() - 0.5) * 0.7, rot: rng() * 6.28, s: 0.95 + rng() * 0.4, tile: t.i });
       } else put('suburban', 'path-long', t.x, t.z, t.vertical ? 0 : Math.PI / 2, 2.4, 'ground');
     }
     if (t.k === K.ALLEY && t.style === 'alley') {
@@ -287,18 +225,18 @@ export function generateCity(seed = 20261019) {
     }
     if (t.k === K.YARD) {
       if (t.d === 'harbor') { if (rng() < 0.6) put('industrial', pick(rng, ['shipping-container-a', 'shipping-container-b', 'shipping-container-c']), t.x, t.z, rng() < 0.5 ? 0 : Math.PI / 2, 0.55); else if (rng() < 0.5) put('industrial', 'detail-tank', t.x, t.z, 0, 1); }
-      else { put('suburban', 'tree-large', t.x + (rng() - 0.5) * 0.4, t.z + (rng() - 0.5) * 0.4, rng() * 6, 1.4); if (rng() < 0.6) put('suburban', 'planter', t.x + 0.3, t.z - 0.3, 0, 1.2); }
+      else { PR.push({ type: 'tree_round_a', x: t.x + (rng() - 0.5) * 0.4, z: t.z + (rng() - 0.5) * 0.4, rot: rng() * 6, s: 1.1, tile: t.i }); if (rng() < 0.6) PR.push({ type: 'bench', x: t.x + 0.25, z: t.z - 0.3, rot: 0, s: 1, tile: t.i }); }
     }
   }
   // hills: trees in front yards, driveways
   for (const lot of lots) if (lot.d === 'hills' && !lot.special) {
     const t = tiles[lot.doorFrom];
     const f = DIRS[lot.front], r = DIRS[RIGHT(lot.front)];
-    if (rng() < 0.7) put('suburban', rng() < 0.5 ? 'tree-large' : 'tree-small', t.x + f[0] * 0.4 + r[0] * 0.38, t.z + f[1] * 0.4 + r[1] * 0.38, rng() * 6, 1.2 + rng() * 0.5);
-    put('suburban', 'fence-low', t.x - f[0] * 0.05, t.z - f[1] * 0.05, FRONT_ROT[lot.front], 0.72);
+    if (rng() < 0.7) PR.push({ type: rng() < 0.5 ? 'tree_round_a' : 'tree_round_c', x: t.x + f[0] * 0.36 + r[0] * 0.34, z: t.z + f[1] * 0.36 + r[1] * 0.34, rot: rng() * 6, s: 0.9 + rng() * 0.3, tile: t.i });
+    if (rng() < 0.6) PR.push({ type: 'bush_a', x: t.x + f[0] * 0.4 - r[0] * 0.3, z: t.z + f[1] * 0.4 - r[1] * 0.3, rot: rng() * 6, s: 1.2, tile: t.i });
   }
 
   // customers = ordinary lots (not restaurants/garage/office)
   const customers = lots.filter((l) => !l.special).map((l) => l.id);
-  return { W, H, tiles, lots, restaurants, specials, customers, shortcuts, lights, placements: P, segs: segs.filter((s) => s.on).length };
+  return { W, H, tiles, lots, restaurants, specials, customers, shortcuts, lights, placements: P, props: PR, segs: segs.filter((s) => s.on).length };
 }

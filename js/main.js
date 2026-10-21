@@ -5,7 +5,13 @@ import { buildCityView, waterTime, cullChunks, setCityNight, lampUni, cityMateri
 import { createWeather, W as WEATHER } from './weather.js';
 import { findPath, buildRoute, sampleRoute, dirBetween } from './city/graph.js';
 import { createTraffic, createPeds } from './city/traffic.js';
+import { createProps, toyUni } from './city/props.js';
+import { bakePeople, peopleSpots } from './city/people.js';
+import { createBackdrop } from './city/backdrop.js';
+import { createTrain } from './city/train.js';
+import { carUni } from './city/cars.js';
 import { createSky } from './sky.js';
+import { installGrade, makeEnvironment, setEnvNight } from './look.js';
 import { createHubCamera, createMarkers } from './hub.js';
 import { setProgress } from './assets.js';
 import { createRide } from './ride/ride.js';
@@ -28,9 +34,9 @@ const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.05;
+installGrade(renderer);
 const scene = new THREE.Scene();
+makeEnvironment(renderer); // reflections for glossy toy materials only (scene.environment would also light Lambert)
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
 
 const fresh = !St.load();
@@ -57,6 +63,10 @@ const sky = createSky(scene);
 sky.sun.shadow.mapSize.set(QV === 'high' ? 2048 : 1024, QV === 'high' ? 2048 : 1024);
 const city = generateCity();
 const view = await buildCityView(city, scene);
+const people = await bakePeople(peopleSpots(view.arch.props));
+const props = await createProps(scene, [...view.arch.props, ...people.list], { extra: people.extra });
+const backdrop = await createBackdrop(scene, city, sky);
+const train = await createTrain(scene);
 say('Starting the traffic…');
 const traffic = await createTraffic(city, scene);
 const peds = await createPeds(city, scene, { count: isTouch ? 8 : 12, ids: isTouch ? ['female-c', 'male-e', 'female-d', 'male-c', 'female-a'] : undefined });
@@ -437,7 +447,8 @@ fillBoard(true);
 await parkBike();
 const startT = city.tiles[playerTile()];
 hubCam.snap(startT.x * TILE, startT.z * TILE, q.get('dist') ? +q.get('dist') : 230);
-sky.set(q.get('clock') ? +q.get('clock') : S.clock);
+if (q.get('clock')) S.clock = +q.get('clock'); // test hook: start the day at this minute
+sky.set(S.clock);
 ui.setMode('hub'); ui.setTab('city');
 updateMarkers(); syncFleetRiders();
 fill.style.width = '100%';
@@ -488,7 +499,7 @@ let boardT = 0, fleetT = 0, lastNight = -1, lifeT = 0, topT = 0;
 function frame() {
   timer.update();
   const dt = Math.min(0.05, timer.getDelta());
-  waterTime.value += dt;
+  waterTime.value += dt; toyUni.uTime.value += dt; backdrop.update(dt); train.update(dt * (game.mode === 'ride' ? ride.R.timeScale : 1));
   ribbonTime.value += dt;
   const ts = game.mode === 'ride' ? ride.R.timeScale : 1;
   traffic.update(dt * ts);
@@ -505,15 +516,27 @@ function frame() {
     ride.update(dt);
     const b = ride.R.bike.root.position;
     peds.update(dt * ts, b.x, b.z, 110);
-    cullChunks(view, b.x, b.z, QV === 'low' ? 200 : 300);
+    cullChunks(view, b.x, b.z, QV === 'low' ? 220 : 380);
+    props.update(b.x, b.z, QV === 'low' ? 120 : 180, camera);
     sky.focus(b.x, b.z, 90, camera);
     const clk = Math.min(DAY_END - 1, S.clock + ride.R.rideTime * GAME_MIN_PER_SEC);
     weather.update(dt * ts, clk, S.day, camera);
     const wr = weather.rain;
-    scene.fog.near = (QV === 'low' ? 50 : 80) * (1 - 0.45 * wr); scene.fog.far = (QV === 'low' ? 190 : 290) * (1 - 0.4 * wr);
+    scene.fog.near = (QV === 'low' ? 45 : 60) * (1 - 0.45 * wr); scene.fog.far = (QV === 'low' ? 230 : 420) * (1 - 0.45 * wr);
     sky.state.rain = wr;
     sky.set(clk);
     audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost);
+  } else if (game.mode === 'peek') {
+    // test camera: a fixed rider's-eye view of one street (tools/look.mjs)
+    const b = ride.R.bike?.root.position || camera.position;
+    peds.update(dt, b.x, b.z, 110);
+    cullChunks(view, b.x, b.z, QV === 'low' ? 220 : 380);
+    props.update(b.x, b.z, QV === 'low' ? 120 : 180, camera);
+    sky.focus(b.x, b.z, 90, camera);
+    weather.update(dt, S.clock, S.day, camera);
+    sky.state.rain = weather.rain; sky.set(S.clock);
+    scene.fog.near = (QV === 'low' ? 45 : 60); scene.fog.far = (QV === 'low' ? 230 : 420);
+    if (ride.R.bike) ride.R.bike.update(dt, 0);
   } else {
     if (game.mode === 'hub') hubCam.update(dt);
     if (game.mode === 'hub' && showroom.on && !tween && ride.R.bike) {
@@ -523,6 +546,7 @@ function frame() {
     if (ride.R.bike) ride.R.bike.update(dt, 0);
     const fx = hubCam.st.x, fz = hubCam.st.z;
     peds.update(dt, fx, fz, 160);
+    props.update(fx, fz, Math.min(260, Math.max(120, hubCam.st.dist * 0.95)));
     sky.focus(fx, fz, Math.min(900, hubCam.st.dist * 1.7), camera);
     weather.update(dt, S.clock, S.day, camera);
     sky.state.rain = weather.rain; sky.set(S.clock);
@@ -537,7 +561,7 @@ function frame() {
     }
   }
   fleetT += dt; if (fleetT > 1) { fleetT = 0; St.tickFleet(); }
-  if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); lampUni.uNight.value = lastNight; ride.setNight?.(lastNight); renderer.toneMappingExposure = 1.05 + lastNight * 0.25; }
+  if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); props.setNight(lastNight); carUni.uNight.value = lastNight; lampUni.uNight.value = lastNight; ride.setNight?.(lastNight); renderer.toneMappingExposure = 1.0 + lastNight * 0.25; setEnvNight(lastNight); }
   // rain sound follows the weather (ride: city / night ambience otherwise)
   const ambWant = weather.rain > 0.3 ? 'amb-rain' : game.mode === 'ride' ? (sky.state.night > 0.5 ? 'amb-night' : 'amb-city') : null;
   if (ambWant !== game.amb) { game.amb = ambWant; audio.loop('amb', ambWant); }
@@ -550,5 +574,18 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) St.sa
 game.skipTween = () => { if (tween) tween.t = 1; };
 game.testEvent = (id, lead) => { if (ride.R.active) ride.testEvent(EVENT[id], lead); };
 game.sim = (sec, step = 1 / 30) => { for (let t = 0; t < sec; t += step) { traffic.update(step * (game.mode === 'ride' ? ride.R.timeScale : 1)); if (ride.R.active) ride.update(step); } };
-window.game = Object.assign(game, { scene, camera, renderer, view, sky, hubCam, St, traffic, peds, ui, markers });
+// test hook: look down the street at road tile (tx,tz) heading d (0 N, 1 E, 2 S, 3 W) from the ride camera's spot
+game.peek = async (tx, tz, d = 1, { back = 8, up = 4.3, ahead = 10, fov = 62, bike = true } = {}) => {
+  const b = await ride.ensureBike(); scene.add(b.root);
+  const f = DIRS[d], r = DIRS[(d + 1) & 3];
+  const x = tx * TILE + r[0] * 1.6, z = tz * TILE + r[1] * 1.6;
+  b.root.position.set(x, 0.1, z); b.root.rotation.set(0, Math.atan2(f[0], f[1]), 0); b.root.visible = bike;
+  b.rider?.play('drive', 0);
+  game.mode = 'peek'; ui.setMode('ride'); document.getElementById('ui').hidden = true; document.getElementById('markers').hidden = true;
+  if (camera.view) camera.clearViewOffset();
+  camera.position.set(x - f[0] * back, up, z - f[1] * back);
+  camera.lookAt(x + f[0] * ahead, 1.1, z + f[1] * ahead);
+  camera.fov = fov; camera.updateProjectionMatrix();
+};
+window.game = Object.assign(game, { scene, camera, renderer, view, sky, hubCam, St, traffic, peds, ui, markers, props, train, backdrop });
 window.ready = true;

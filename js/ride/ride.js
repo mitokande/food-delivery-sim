@@ -145,7 +145,7 @@ export function createRide(ctx) {
   let ribbon = null;
   function setRibbon() {
     if (ribbon) { ribbon.removeFromParent(); ribbon.geometry.dispose(); }
-    ribbon = buildRibbon(R.route, { width: 2.0, y: 0.16, step: 1, color: '#46c8ff', chevrons: true });
+    ribbon = buildRibbon(R.route, { width: 2.5, y: 0.16, step: 1, color: '#4cc9ff', chevrons: true });
     scene.add(ribbon);
   }
   function placeHazard(h) {
@@ -566,7 +566,8 @@ export function createRide(ctx) {
     // where the NPC comes from: the lot's front tile edge
     const door = city.tiles[lot.doorFrom];
     const f = DIRS[lot.front];
-    const dx = (door.x + f[0] * 0.42) * TILE, dz = (door.z + f[1] * 0.42) * TILE;
+    let dx = (door.x + f[0] * 0.42) * TILE, dz = (door.z + f[1] * 0.42) * TILE;
+    if (lot.doorPos) { dx = lot.doorPos[0]; dz = lot.doorPos[1]; } // the building's real front door
     const bx = R.bike.root.position.x, bz = R.bike.root.position.z;
     if (leg.kind === 'pickup') {
       const orders = R.orders.filter((x) => leg.orders.includes(x.o.id));
