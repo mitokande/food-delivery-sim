@@ -218,5 +218,14 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   - **Geç oyun:** 22 başarım (Courier sekmesi; ödül nakit ya da özel boya; eski kariyerler ilk açılışta toplu alır),
     5 oyun günü süren haftalık sözleşme (3 büyük hedef + üçü bitince premium boya), 7 premium boya (metalik/parlayan; Garage'da
     satın alınır ya da kazanılır; motor, kutu ve kaskta), kayıt kodu (Ayarlar → Copy / Load save code: cihazlar arası taşıma).
+- 2026-10-21: parçacık efektleri yeniden yazıldı (`ride/fx.js`). Kodla çizilen tek sprite sayfası (çizgi film duman bulutları,
+  alev dili, kıvılcım çizgisi, parıltı, yıldız, $'lı altın para, banknot, su damlası, halka, konfeti, moloz, rüzgâr çizgisi,
+  "POW" patlaması, kalp) + iki instanced çizim (normal + toplamalı). Parçacıklar kameraya döner, döner/para gibi takla atar,
+  hız yönünde uzar (kıvılcım, damla) ya da yere yatar (su halkası, toz halkası); duman gece kararır.
+  Efektler: egzoz (külüstürde siyah duman + ara sıra geri tepme), katmanlı turbo alevi + kor (elektrikte mavi plazma),
+  turbo başlangıç halkası, zıplama kalkış/iniş tozu (mükemmelde yıldız + parıltı), su birikintisi (halka + damla + sis),
+  çukur (toz + moloz), kaza (POW + kıvılcım + moloz + başın etrafında dönen yıldızlar), para/enerji alma, motor arızası,
+  kıl payı rüzgâr çizgileri, kapıda 4–5 yıldızda konfeti/kalp/bahşiş paraları, fren izinde lastik dumanı, yağmurda teker spreyi.
+  Test: `node tools/fxshots.mjs` (her efektin ekran görüntüsü).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

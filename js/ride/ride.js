@@ -57,7 +57,7 @@ export function createRide(ctx) {
   const head = new THREE.SpotLight(0xfff0d0, 0, 38, 0.55, 0.6, 1.2);
   head.position.set(0, 1.1, 0.6); head.target.position.set(0, 0, 9);
   let nightLvl = 0;
-  function setNight(n) { nightLvl = n; head.intensity = n * 60; head.visible = n > 0.05; }
+  function setNight(n) { nightLvl = n; head.intensity = n * 60; head.visible = n > 0.05; pfx.setNight(n); }
   async function ensureBike() {
     const vs = St.vehStats();
     const want = `${St.S.active}|${vs.paint}|${vs.boxColor}|${St.S.look.char}|${St.S.look.helmet}`;
@@ -224,7 +224,14 @@ export function createRide(ctx) {
   // ---------- input ----------
   function input(what, down = true) {
     if (!R.active || R.phase !== 'ride') return;
-    if (what === 'boost') { const was = R.boost; R.boost = down && R.energy > 4; if (R.boost && !was) ctx.audio?.play('boost', { vol: 0.7 }); return; }
+    if (what === 'boost') {
+      const was = R.boost; R.boost = down && R.energy > 4;
+      if (R.boost && !was) {
+        ctx.audio?.play('boost', { vol: 0.7 });
+        if (R.bike && R.phase === 'ride') { const b = R.bike.root, hd = b.rotation.y; if (R.bike.exhaust) R.bike.exhaust.getWorldPosition(wp); else wp.set(b.position.x - Math.sin(hd) * 0.9, 0.45, b.position.z - Math.cos(hd) * 0.9); pfx.boostStart(wp.x, wp.y, wp.z, Math.sin(hd), Math.cos(hd), R.vs.v.engine === 'engine-electric'); }
+      }
+      return;
+    }
     if (!down) return;
     if (what === 'hop') return doHop();
     if (what === 'horn') return doHorn();
@@ -237,6 +244,7 @@ export function createRide(ctx) {
     const T = 0.62 * (1 + 0.04 * (St.S.vehicles[St.S.active].parts.tires || 0));
     R.hop = { t: 0, T, s0: R.s };
     ctx.audio?.play('hop');
+    { const p = R.bike.root.position; pfx.hopTakeoff(p.x, p.z); }
     // judge against the nearest hoppable hazard
     let best = null, bd = Infinity;
     for (const h of R.hazards) { if (h.done || !HZ[h.type].hop || h.lane < 0 && !R.ot) continue; const d = h.s - R.s; if (d > -0.5 && d < bd) { bd = d; best = h; } }
@@ -376,7 +384,7 @@ export function createRide(ctx) {
     hurtFood(20, why);
     R.shake = 1;
     ctx.audio?.play('crash');
-    if (R.bike) { const p = R.bike.root.position; pfx.spawn('spark', p.x, 0.6, p.z, { n: 26, spread: 0.6, up: 1.5 }); pfx.spawn('dust', p.x, 0.3, p.z, { n: 10, spread: 0.8 }); for (let i = 0; i < 4; i++) pfx.skidMark(p.x + Math.sin(R.bike.root.rotation.y) * i * 0.4, p.z + Math.cos(R.bike.root.rotation.y) * i * 0.4, R.bike.root.rotation.y + 0.4); }
+    if (R.bike) { const p = R.bike.root.position; pfx.crash(p.x, p.z, Math.sin(R.bike.root.rotation.y), Math.cos(R.bike.root.rotation.y)); for (let i = 0; i < 4; i++) pfx.skidMark(p.x + Math.sin(R.bike.root.rotation.y) * i * 0.4, p.z + Math.cos(R.bike.root.rotation.y) * i * 0.4, R.bike.root.rotation.y + 0.4); }
     buzz([80, 40, 120]);
     ctx.ui.toast(why || 'Crash!', 'bad');
     if (R.ot) R.ot.dir = -1;
@@ -537,7 +545,7 @@ export function createRide(ctx) {
         return { resolve(r) { a.mode = r.__act === 'race' && r.__good ? 'lose' : 'win'; if (a.mode === 'win') ctx.audio?.play('boost', { vol: 0.5 }); } };
       }
       case 'rain': ctx.weather?.startRain?.(); return null;
-      case 'stall': R.stall = true; R.wobble = 1; return { resolve(r) { R.stall = false; if (r.__good) { const b = R.bike.root.position; pfx.spawn('smokeBlack', b.x, 0.6, b.z, { n: 12, spread: 0.6, size: 1.4 }); } } };
+      case 'stall': R.stall = true; R.wobble = 1; return { resolve(r) { R.stall = false; if (r.__good) { const b = R.bike.root.position; pfx.restart(b.x, 0.7, b.z); } } };
       case 'flat': R.wobble = 2.6; return null;
     }
     return null;
@@ -594,6 +602,7 @@ export function createRide(ctx) {
       x.result = scoreOrder(x.o, { elapsed: x.elapsed, heat: x.heat, integrity: x.integrity, tipMult: x.tipMult * R.flow.mult, ratingAdj: x.ratingAdj });
       x.result.flow = R.flow.mult;
       if (npc) npc.c.play(x.result.stars >= 4 ? 'emote-yes' : 'emote-no', 0.2, { once: true });
+      if (x.result.stars >= 4) { const at = npc ? npc.c.obj.position : R.bike.root.position; pfx.celebrate(at.x, at.z, { stars: x.result.stars, tip: x.result.tip }); }
       ctx.audio?.play(x.result.stars >= 3 ? 'order-complete' : 'order-late');
       await ctx.ui.rated(x.o, x.result, R);
       R.bike.openLid(false);
@@ -783,8 +792,8 @@ export function createRide(ctx) {
       if (f >= 1) {
         y = 0; if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land);
         ctx.audio?.play('land'); R.shake = Math.max(R.shake, 0.25); buzz(15);
-        const p = R.bike.root.position; pfx.spawn('dust', p.x, 0.2, p.z, { n: 9, spread: 0.7, up: 0.3 });
-        if (R.hop.perfect) { pfx.spawn('star', p.x, 1.2, p.z, { n: 16, spread: 0.9, up: 1 }); flow('PERFECT HOP!'); }
+        const p = R.bike.root.position; pfx.hopLand(p.x, p.z, R.hop.perfect);
+        if (R.hop.perfect) flow('PERFECT HOP!');
         R.hop = null;
       }
     }
@@ -802,8 +811,8 @@ export function createRide(ctx) {
           if (inMyLane) {
             h.done = true; h.obj.visible = false;
             const bp = R.bike.root.position;
-            if (h.type === 'cash') { const n = Math.max(1, Math.round((1 + rng() * 2) * (St.S.lvl > 4 ? 2 : 1))); R.stats.cash += n; ctx.audio?.play('pickup-bonus'); ctx.ui.toast(`+$${n}`, 'cash'); pfx.spawn('cash', bp.x, 1.2, bp.z, { n: 14, spread: 0.8, up: 1 }); buzz(12); if (R.flow.n > 0) { R.flow.n += 0.5; R.flow.t = FLOW_TIME; } }
-            else { R.energy = Math.min(R.energyMax, R.energy + 40); ctx.audio?.play('pickup-bonus', { rate: 1.3 }); ctx.ui.toast('+Energy', 'good'); pfx.spawn('star', bp.x, 1.2, bp.z, { n: 14, spread: 0.8, up: 1, color: [0.45, 0.85, 1] }); buzz(12); }
+            if (h.type === 'cash') { const n = Math.max(1, Math.round((1 + rng() * 2) * (St.S.lvl > 4 ? 2 : 1))); R.stats.cash += n; ctx.audio?.play('pickup-bonus'); ctx.ui.toast(`+$${n}`, 'cash'); pfx.cash(bp.x, 1.2, bp.z); buzz(12); if (R.flow.n > 0) { R.flow.n += 0.5; R.flow.t = FLOW_TIME; } }
+            else { R.energy = Math.min(R.energyMax, R.energy + 40); ctx.audio?.play('pickup-bonus', { rate: 1.3 }); ctx.ui.toast('+Energy', 'good'); pfx.energy(bp.x, 1.2, bp.z); buzz(12); }
           }
         } else if (h.type !== 'ped' && h.type !== 'parked') {
           if (!inMyLane) { h.done = true; continue; }
@@ -814,8 +823,8 @@ export function createRide(ctx) {
           R.v *= H.slow || 0.6;
           ctx.audio?.play(H.sfx || 'bump');
           if (h.type !== 'puddle') flowBreak();
-          if (h.type === 'puddle') pfx.spawn('splash', h.x, 0.3, h.z, { n: 22, spread: 0.9, up: 1.4 });
-          else pfx.spawn('dust', h.x, 0.25, h.z, { n: 10, spread: 0.8, up: 0.5 });
+          if (h.type === 'puddle') pfx.splash(h.x, h.z, true);
+          else pfx.bump(h.x, h.z);
           if (h.type === 'cones' || h.type === 'barrier' || h.type === 'crates') { for (const c of h.obj.children) { c.rotation.z = (rng() - 0.5) * 2; c.position.x += (rng() - 0.5) * 2; } }
         }
       }
@@ -881,12 +890,13 @@ export function createRide(ctx) {
       if (Math.abs(lon) < 1.8 && lat < 2.5 && lat > 0.9 && rel > 5 && !(a.nm > now - 4)) {
         a.nm = now; R.stats.nearMisses++;
         flow('CLOSE CALL!', 2);
+        pfx.whoosh(b.x, b.z, fx, fz, (rx * fz - rz * fx) > 0 ? 1 : -1);
         if (R.timeScale === 1) { R.timeScale = 0.35; R.slowmo = 0.35; }
       }
     }
   }
   // exhaust smoke / turbo flame / skid marks / rain spray
-  let smokeT = 0, skidAcc = 0, sprayT = 0;
+  let smokeT = 0, skidAcc = 0, sprayT = 0, turboT = 0, stallT = 0;
   function emit(dt, ds, decel) {
     const b = R.bike.root, hd = b.rotation.y, fx = Math.sin(hd), fz = Math.cos(hd);
     const electric = R.vs.v.engine === 'engine-electric', junk = St.S.active === 'rustbucket';
@@ -894,12 +904,12 @@ export function createRide(ctx) {
     if (!electric) {
       smokeT -= dt;
       if (smokeT <= 0) {
-        smokeT = (junk ? 0.05 : 0.11) / (0.7 + R.v / 10 + (R.boost ? 1.2 : 0));
-        pfx.spawn(junk ? 'smokeBlack' : 'smoke', wp.x, wp.y, wp.z, { vx: -fx * 1.3, vz: -fz * 1.3, vy: 0.25, spread: 0.08, size: junk ? 1.15 : 0.8, up: 0.2 });
+        smokeT = (junk ? 0.085 : 0.13) / (0.7 + R.v / 12 + (R.boost ? 0.8 : 0));
+        pfx.exhaust(wp.x, wp.y, wp.z, fx, fz, { dirty: junk, speed: R.v, boost: R.boost });
       }
     }
-    if (R.stall && Math.random() < 0.5) pfx.spawn('smokeBlack', wp.x, wp.y + 0.2, wp.z, { n: 2, spread: 0.3, size: 1.5, up: 0.6 });
-    if (R.boost) pfx.spawn('flame', wp.x, wp.y, wp.z, { vx: -fx * 6, vz: -fz * 6, spread: 0.05, n: 2, up: 0, color: electric ? [0.35, 0.9, 1] : undefined });
+    if (R.stall) { stallT -= dt; if (stallT <= 0) { stallT = 0.07; pfx.stall(wp.x, wp.y, wp.z); } }
+    if (R.boost) { turboT -= dt; while (turboT <= 0) { turboT += 1 / 45; pfx.turbo(wp.x, wp.y, wp.z, fx, fz, R.v, electric); } }
     // rubber on the road: hard braking, or turbo through a corner
     if ((decel > 8.5 && R.v > 2) || (R.boost && Math.abs(R.sampled[4]) > 0.06 && R.v > 9)) {
       skidAcc += ds;
@@ -908,7 +918,7 @@ export function createRide(ctx) {
     const rain = ctx.weather?.rain || 0;
     if (rain > 0.25 && R.v > 3) {
       sprayT -= dt;
-      if (sprayT <= 0) { sprayT = 0.05 / rain; pfx.spawn('splash', b.position.x - fx * 0.8, 0.25, b.position.z - fz * 0.8, { vx: -fx * R.v * 0.25, vz: -fz * R.v * 0.25, n: 2, spread: 0.3, up: 0.9, size: 1.3 }); }
+      if (sprayT <= 0) { sprayT = 0.035 / rain; pfx.spray(b.position.x - fx * 0.8, b.position.z - fz * 0.8, -fx * R.v * 0.3, -fz * R.v * 0.3); }
     }
   }
   function updatePed(h, d, dt) {
@@ -1025,6 +1035,6 @@ export function createRide(ctx) {
 
   // test hook: schedule an event a little ahead (props placed like a real one)
   function testEvent(ev, lead = 2) { R.event = { ev, s: R.s + lead }; if (ev.pre) prePlace(R.event); }
-  return { R, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
+  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);
