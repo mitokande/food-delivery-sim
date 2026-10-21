@@ -3,6 +3,7 @@
 // heat (+/- food temperature), cash (+/-), tip (multiplier on this order's tip), rating (+/- stars on this order),
 // energy (+/-), xp, crash (bool → crash animation), say (toast text), sfx.
 // qte: { kind: 'mash' | 'timing' | 'swipe' | 'hold', n / zone / dir, time } — success/fail effects.
+import { DPROFILE } from '../data.js';
 
 export const EVENTS = [
   {
@@ -144,7 +145,10 @@ export function pickEvent(rng, ctx) {
     return true;
   });
   if (!c.length) return null;
-  let t = 0; for (const e of c) t += e.w; let r = rng() * t;
-  for (const e of c) { r -= e.w; if (r <= 0) return e; }
+  // each district has its usual suspects (dogs in the hills, police downtown…)
+  const mult = DPROFILE[ctx.district]?.evW || {};
+  const w = (e) => e.w * (mult[e.id] ?? 1);
+  let t = 0; for (const e of c) t += w(e); let r = rng() * t;
+  for (const e of c) { r -= w(e); if (r <= 0) return e; }
   return c[c.length - 1];
 }

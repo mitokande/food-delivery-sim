@@ -1,10 +1,11 @@
 // DOM UI: hub (top bar, tabs, sheets), ride HUD, modals, toasts.
 import * as St from '../state.js';
 import { S } from '../state.js';
-import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, FOODS, ORDER_TYPES, RESTAURANT,
+import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT,
   FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END } from '../data.js';
 import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
+import { autoSpeed } from '../orders.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 export const money = (n, dec = false) => {
@@ -156,7 +157,7 @@ export function createUI(game) {
     const T = ORDER_TYPES[o.type];
     const d = DISTRICT[o.district];
     const left = Math.max(0, o.life - (performance.now() - o.born) / 1000);
-    const est = Math.round((o.pickM + o.dropM) / (St.vehStats().top * 0.66) + 10);
+    const est = Math.round((o.pickM + o.dropM) / autoSpeed(o.district) + 5); // autopilot alone, no turbo
     return `<div class="ocard ${taken ? 'taken' : ''} ${game.selOrder === o.id ? 'sel' : ''}" data-act="order" data-id="${o.id}">
       <span class="ofood">${ICON(FOODS[o.food].icon)}</span>
       <span class="oinfo"><b>${esc(o.restName)}</b><small>to ${esc(o.name)} · <i style="color:${d.color}">${d.name}</i></small>
@@ -174,7 +175,12 @@ export function createUI(game) {
       : `<div class="hint">${list.length ? `Tap an order to take it. Your ${VEHICLE[S.active].name} carries <b>${cap}</b>.` : 'No orders right now — new ones pop up every few seconds.'}</div>`;
     const goals = St.ensureGoals().list.map((g, i) => `<div class="goal ${g.p >= g.n ? 'done' : ''}">${ICON(g.p >= g.n ? 'ui-gift' : 'ui-trophy')}<span>${goalText(g)}<i><u style="width:${g.p / g.n * 100}%"></u></i></span>
       ${g.claimed ? '<em>✓</em>' : g.p >= g.n ? `<button class="btn gold sm" data-act="claim" data-i="${i}">${money(g.reward)}</button>` : `<small>${g.p}/${g.n}</small>`}</div>`).join('');
+    // work one district only, or all of them
+    const open = DISTRICTS.filter((d) => S.districts[d.id]);
+    const focus = S.focus && S.districts[S.focus] ? S.focus : '';
+    const filter = open.length > 1 ? `<div class="dfilter"><button class="${focus ? '' : 'on'}" data-act="focus" data-d="">All</button>${open.map((d) => `<button class="${focus === d.id ? 'on' : ''}" style="--dc:${d.color}" data-act="focus" data-d="${d.id}">${d.name}<small>×${d.pay}</small></button>`).join('')}</div>` : '';
     return `<div class="sec-head"><h2>Orders</h2><span class="sub">${St.rushMult().m > 1 ? `🔥 ${St.rushMult().name}` : `${list.length} nearby`}</span></div>
+      ${filter}
       <div class="orders">${list.map((o) => orderCard(o, game.taken.includes(o))).join('')}</div>
       ${start}
       <div class="sec-head"><h2>Today</h2><span class="sub">Day ${S.day} goals</span></div><div class="goals">${goals}</div>`;
@@ -251,6 +257,7 @@ export function createUI(game) {
       return `<div class="dcard ${s.open ? 'open' : ''}" style="--dc:${d.color}" data-act="district" data-id="${d.id}">
         <div class="dh"><b>${d.name}</b><span class="mult">×${d.pay} pay</span></div>
         <small class="emp">${d.employer}</small><p>${d.desc}</p>
+        <div class="traits">${(DPROFILE[d.id]?.traits || []).map((t) => `<span>${t}</span>`).join('')}</div>
         ${s.open ? `<div class="hired">${ICON('ui-star')} You work here</div>` : `<ul class="reqs">${req.map(([t, ok]) => `<li class="${ok ? 'ok' : ''}">${ok ? '✓' : '✗'} ${t}</li>`).join('')}</ul>
         <button class="btn ${s.canApply ? 'green' : 'locked'}" data-act="apply" data-id="${d.id}" ${s.canApply && S.cash >= d.fee ? '' : 'disabled'}>${s.canApply ? `Apply · ${money(d.fee)}` : `${ICON('ui-lock')} Locked`}</button>`}
       </div>`;
@@ -307,6 +314,7 @@ export function createUI(game) {
       case 'order': game.toggleOrder(+id); render(); break;
       case 'start': game.startJob(); break;
       case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); render(); } break;
+      case 'focus': S.focus = b.dataset.d || null; St.save(); game.refocus?.(); render(); break;
       case 'veh': state.selVeh = id; game.previewVehicle?.(id); render(); break;
       case 'buyveh': if (St.buyVehicle(id)) { game.audio?.play('ui-purchase'); toast(`${VEHICLE[id].name} is yours!`, 'good'); if (St.owned(id) === 1) { St.setActive(id); game.previewVehicle?.(id); } render(); } break;
       case 'ride': if (St.setActive(id)) { game.previewVehicle?.(id); render(); } break;
@@ -449,7 +457,7 @@ export function createUI(game) {
   function modalUnlock(id) {
     const d = DISTRICT[id];
     game.audio?.play('crowd-cheer', { vol: 0.7 });
-    const m = modal(`<div class="burst" style="--dc:${d.color}"></div><h2>Hired!</h2><p><b>${d.employer}</b> took you on in <b style="color:${d.color}">${d.name}</b>.</p><p class="small">Orders there pay ×${d.pay}.</p>
+    const m = modal(`<div class="burst" style="--dc:${d.color}"></div><h2>Hired!</h2><p><b>${d.employer}</b> took you on in <b style="color:${d.color}">${d.name}</b>.</p><p class="small">Orders there pay ×${d.pay}. ${(DPROFILE[d.id]?.traits || []).join(' · ')}</p>
       <button class="btn green big" data-x="ok">Let's ride</button>`, { cls: 'pop' });
     m.card.querySelector('[data-x]').onclick = () => { tap(); m.close(); };
     game.focusDistrict?.(id);
@@ -761,7 +769,7 @@ export function createUI(game) {
     return new Promise((resolve) => {
       const rows = sum.lines.map((l) => `<div class="rl ${l.cls || ''}"><span>${l.label}</span><b>${l.amount >= 0 ? '+' : ''}${money(l.amount, Math.abs(l.amount) < 10 && l.amount % 1 !== 0)}</b></div>`).join('');
       const m = modal(`<h2>Delivery complete!</h2><div class="stars">${stars(Math.round(sum.avgStars))}</div>
-        <div class="rlines">${rows}</div><div class="rtotal"><span>Total</span><b>${money(sum.total, Math.abs(sum.total) < 100)}</b></div>
+        <div class="rlines">${rows}</div><div class="rtotal"><span>Total</span><b class="${sum.total < 0 ? 'neg' : ''}">${money(sum.total, Math.abs(sum.total) < 100)}</b></div>
         <div class="rxp">${ICON('ui-xp')} +${sum.xp} XP${sum.goals ? ` · ${sum.goals}` : ''}</div>
         <button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`, { cls: 'receipt' });
       game.ob?.event('receipt');

@@ -122,7 +122,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/main.js` | açılış, ana döngü, hub ⇄ sürüş geçişi (kamera tween), sipariş panosu, harita işaretçileri, garaj vitrini, iş sonu fiş/XP/gün |
 | `js/data.js` | tüm içerik tabloları: bölgeler, araçlar, parçalar, beceriler, yemekler, restoranlar, sipariş tipleri, filo, hedefler |
 | `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, gün saati |
-| `js/orders.js` | sipariş üretimi, ücret + ETA, yıldız/bahşiş hesabı |
+| `js/orders.js` | sipariş üretimi (bölge profiline göre mesafe ve tip karışımı, pano bölge filtresi), ücret, süre (`etaFor`: ölçülmüş otomatik pilot hızı × seviye payı), yıldız/bahşiş hesabı |
 | `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
 | `js/city/graph.js` | A* (U dönüşü yok), şerit eğrileri (sağdan trafik), rota örnekleme |
 | `js/city/view.js` | Kenney yol parçalarını chunk × malzeme birleştirme, asfalt/kaldırım shader'ı, binaları chunk'lara ekleme, çatı tabelaları, lamba ışık havuzları, deniz |
@@ -138,7 +138,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
-`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
+`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (otomatik pilotun gerçek ortalama hızı; `BOOST=1` turbo ile — süre kalibrasyonu için). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
 
 ## 9. Durum
 
@@ -189,5 +189,20 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     rıhtım korkuluğu. Klasik siyah trafik lambaları (3 lamba), kalın parlak chevron rota şeridi, HUD panelleri referansa göre.
   - **Performans:** binalar tüm şehir için ~210k üçgen (Kenney ~1M); sokak eşyaları kamera önündeki yarıçapla doldurulur,
     70 m ötesindeki ağaçlar ~100 üçgenlik kopyalar. Sürüşte gölgeler dahil ~0,75–0,85M üçgen, ~230 çizim çağrısı.
+- 2026-10-21: oyun dengesi paket 1–2 (erken/orta/geç oyun incelemesinden).
+  - **Bölge kimlikleri** (`data.js` `DPROFILE`): mesafe bandı (Old Town kısa, Harbor uzun, Green Hills uzun + şehir dışına
+    giden müşteriler), bahşiş çarpanı (Downtown ×0,85, Hills ×1,6), engel yoğunluğu, olay sıklığı ve olay türü ağırlıkları
+    (Hills'te köpek, Downtown'da polis/rakip, Harbor'da yol çalışması), sipariş tipi karışımı (Downtown acil/VIP/Express,
+    Harbor grup siparişi, Hills VIP/hassas). Jobs kartlarında özellik etiketleri, pano üstünde bölge filtresi (`S.focus`).
+  - **Zorluk eğrisi:** süre artık ölçülmüş otomatik pilot hızına göre (`orders.js` `etaFor`): bölge tabanı
+    (Old Town 4,8 · Downtown 5,0 · Harbor 4,6 · Hills 6,9 m/s) × araç kazancı (en hız/8,9)^0,45 (gerçek kazanç ^0,6, yani daha
+    iyi motor saatten hızlı kalır) × seviye payı (Sv 1–2: 1,3 → Sv 14+: 0,94). Sonuç: başta otomatik pilotla erken bonusu,
+    Sv 10+ turbo/kestirme olmadan sadece zamanında; Express (Sv 8+, ×2,2 ücret, süre ×0,7) ve Acil siparişler turbo ister.
+    Engel yoğunluğu ve olay şansı seviyeyle artar (en fazla ×1,5 / ×1,35). XP bölge ücretiyle ölçeklenir. Birden fazla siparişli
+    işlerde her siparişin süresi kendi kapısına kadar olan yolun tamamını kapsar.
+  - **Hata düzeltmesi:** yol çalışması bariyeri otomatik pilotu sonsuza kadar durduruyordu (zıplamayan oyuncu takılı kalıyordu;
+    ölçümde 6 dakikalık duruşlar). Artık ~5 sn sonra karşı şerit boşalınca yavaşça yanından geçiyor.
+  - Ölçüm: `tools/speed.mjs` (Old Town otomatik pilot: Külüstür 4,8 · Vespetta 6,3 · Viper 8,0 m/s; turbo ≈ ×1,35).
+    Tahmini gelir: Old Town ~$10/dk → Downtown ~$27 → Harbor ~$44 → Hills (Viper) ~$99/dk.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

@@ -2,7 +2,7 @@
 // jaywalkers, cash and energy pickups. Spawning (pure-ish) + simple visuals.
 import * as THREE from 'three';
 import { pieceParts, makeChar } from '../assets.js';
-import { TILE } from '../data.js';
+import { TILE, DPROFILE } from '../data.js';
 import { carObject } from '../city/cars.js';
 import { pick } from '../rng.js';
 
@@ -39,7 +39,7 @@ export function planHazards(route, city, rng, { density = 1, startS = 0, tutoria
     if (st.din !== st.dout || t.junction) continue;
     const s = st.s0 + st.len * (0.3 + rng() * 0.4);
     if (s - lastS < 24 || route.length - s < 26) continue;
-    if (rng() > 0.42 * density) continue;
+    if (rng() > 0.42 * density * (DPROFILE[t.d]?.haz ?? 1)) continue;
     let type = rain > 0.35 && rng() < 0.4 ? 'puddle' : pickW(rng, MIX[t.d] || MIX.oldtown);
     if (tutorial && !['pothole', 'cash', 'parked'].includes(type)) type = 'pothole';
     const lane = (type === 'cash' || type === 'energy') && rng() < 0.35 ? -1 : 1;

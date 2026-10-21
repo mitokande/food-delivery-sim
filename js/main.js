@@ -21,10 +21,10 @@ import { makeBike } from './ride/vehicle.js';
 import { createUI, ICON } from './ui/ui.js';
 import { createOnboarding } from './ui/onboard.js';
 import { createAudio } from './audio.js';
-import { makeOrder, refreshOrder } from './orders.js';
+import { makeOrder, refreshOrder, etaFor, pathMeters } from './orders.js';
 import * as St from './state.js';
 import { S } from './state.js';
-import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET } from './data.js';
+import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES } from './data.js';
 import { mulberry32 } from './rng.js';
 
 window.__started = true;
@@ -266,6 +266,16 @@ game.startJob = async () => {
   ob.event('start');
   for (const o of orders) refreshOrder(city, o, playerTile());
   const job = { orders, legs: planLegs(orders) };
+  // batched orders: each one's timer covers the whole trip up to its own door (never shorter than promised)
+  if (orders.length > 1) {
+    let at = playerTile(), cum = 0, stops = 0;
+    for (const leg of job.legs) {
+      const to = city.lots[leg.lot].door;
+      cum += at === to ? 0 : pathMeters(city, at, to); at = to;
+      if (leg.kind === 'drop') { const o = orders.find((x) => x.id === leg.order); o.eta = Math.max(o.eta, etaFor(cum, o.district, ORDER_TYPES[o.type].eta) + stops * 6); }
+      stops++;
+    }
+  }
   game.board = game.board.filter((o) => !orders.includes(o));
   game.taken = []; game.selOrder = null; updatePreview();
   showroom.on = false;
@@ -294,7 +304,7 @@ game.startJob = async () => {
 
 const LEVEL_UNLOCKS = {
   2: ['Skill upgrades'], 3: ['Downtown job application', 'Rival couriers'], 4: ['VIP orders', 'Skills up to level 2'],
-  5: ['Fleet: rent a dispatch office and hire couriers'], 6: ['Harbor job application', 'Skills up to level 3'], 8: ['Skills up to level 4'], 10: ['Green Hills job application', 'Skills up to level 5'],
+  5: ['Fleet: rent a dispatch office and hire couriers'], 6: ['Harbor job application', 'Skills up to level 3'], 8: ['Skills up to level 4', 'EXPRESS orders: double pay, very tight timers'], 10: ['Green Hills job application', 'Skills up to level 5'],
 };
 async function finishJob(sum) {
   const lines = [];
@@ -307,7 +317,7 @@ async function finishJob(sum) {
     lines.push({ label: `${ICON(FOODS[o.food].icon)} ${o.restName} → ${o.name} <span class="rs">${'★'.repeat(r.stars)}</span>`, amount: r.pay + r.bonus });
     if (r.tip) lines.push({ label: `${ICON('ui-coin')} Tip from ${o.name}`, amount: r.tip, cls: 'pos' });
     total += r.pay + r.bonus + r.tip; tipsT += r.tip; starsSum += r.stars;
-    xp += Math.round(14 + o.dropM / 35 + r.stars * 3 + (r.early ? 6 : 0));
+    xp += Math.round((14 + o.dropM / 35 + r.stars * 3 + (r.early ? 6 : 0)) * (0.8 + 0.2 * DISTRICT[o.district].pay));
     St.addRating(r.stars);
     S.stats.deliveries++; S.today.deliveries++;
     if (r.stars === 5) { S.stats.fiveStars++; St.goalProgress('five'); }
@@ -572,6 +582,12 @@ renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) St.save(true); });
 // headless test hook: advance the simulation without rendering
 game.skipTween = () => { if (tween) tween.t = 1; };
+game.refill = () => fillBoard(true);
+// order board filter changed: drop orders from other districts (unless already taken) and refill
+game.refocus = () => {
+  if (S.focus) game.board = game.board.filter((o) => game.taken.includes(o) || o.district === S.focus);
+  fillBoard(true); updateMarkers(); updatePreview();
+};
 game.testEvent = (id, lead) => { if (ride.R.active) ride.testEvent(EVENT[id], lead); };
 game.sim = (sec, step = 1 / 30) => { for (let t = 0; t < sec; t += step) { traffic.update(step * (game.mode === 'ride' ? ride.R.timeScale : 1)); if (ride.R.active) ride.update(step); } };
 // test hook: look down the street at road tile (tx,tz) heading d (0 N, 1 E, 2 S, 3 W) from the ride camera's spot

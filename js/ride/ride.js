@@ -1,6 +1,6 @@
 // Delivery ride: the bike drives itself along the route; the player uses powers and answers events.
 import * as THREE from 'three';
-import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT } from '../data.js';
+import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT, DPROFILE } from '../data.js';
 import { DIRS, OPP, RIGHT, K } from '../city/gen.js';
 import { findPath, buildRoute, sampleRoute, LANE, laneCurve, dirBetween, routeArcs } from '../city/graph.js';
 import { planHazards, makeHazardMesh, freeHazard, HZ, warmPeds } from './hazards.js';
@@ -109,11 +109,14 @@ export function createRide(ctx) {
     // hazards
     for (const h of R.hazards) freeHazard(h);
     const tutorial = St.S.stats.deliveries < 2;
-    R.hazards = planHazards(R.route, city, rng, { density: tutorial ? 0.6 : 1, tutorial, rain: ctx.weather?.rain || 0 });
+    // veterans meet a busier street: hazards and events ramp up with courier level
+    const lvlP = Math.min(1.5, 1 + 0.04 * (St.S.lvl - 1));
+    R.hazards = planHazards(R.route, city, rng, { density: tutorial ? 0.6 : lvlP, tutorial, rain: ctx.weather?.rain || 0 });
     for (const h of R.hazards) { h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); }
     // event
     const isDrop = leg.kind === 'drop';
-    const p = St.S.stats.deliveries < 1 ? 0 : isDrop ? 0.5 : 0.22;
+    const evD = city.tiles[R.route.steps[0].tile].d;
+    const p = St.S.stats.deliveries < 1 ? 0 : (isDrop ? 0.5 : 0.22) * (DPROFILE[evD]?.ev ?? 1) * Math.min(1.35, 1 + 0.025 * (St.S.lvl - 1));
     R.event = null; R.eventDone = false;
     if (rng() < p && R.route.length > 90) {
       const foods = R.orders.filter((x) => x.picked && !x.done).map((x) => x.o.food);
@@ -719,8 +722,13 @@ export function createRide(ctx) {
         if (passable) { if (B.d < 3) target = Math.min(target, 2.2); else target = Math.min(target, Math.max(2.2, stop)); }
         else if (!(B.h.hopped && R.hop)) target = Math.min(target, stop);
         if (B.d < 14) blockedBy = B.h.type;
-        // a double-parked car leaves after a while; autopilot squeezes past it slowly when clear
-        if (B.h.type === 'parked' && B.d < 3 && R.v < 0.5) { B.h.waited = (B.h.waited || 0) + dt; if (B.h.waited > 4.5 && oncoming().dist > 30) { R.ot = { t: 0, dir: 1, hz: B.h, until: 0, time: 0, slow: true }; } }
+        // stuck in front of a double-parked car or road works (no hop): the autopilot squeezes past slowly once the
+        // other lane is clear — it costs time, it never strands the courier
+        if ((B.h.type === 'parked' || (!passable && HZ[B.h.type].block)) && B.d < 4 && R.v < 0.5) {
+          B.h.waited = (B.h.waited || 0) + dt;
+          const clear = oncoming().dist > (B.h.waited > 12 ? 16 : 30);
+          if (B.h.waited > (B.h.type === 'parked' ? 4.5 : 5) && clear) { R.ot = { t: 0, dir: 1, hz: B.h, until: 0, time: 0, slow: true }; }
+        }
       }
     }
     const L2 = nextLight();

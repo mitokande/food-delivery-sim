@@ -27,6 +27,7 @@ const fresh = () => ({
   settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
   seen: {}, // one-time tips
   onboard: { step: 0 }, // first-time guide; 99 = finished
+  focus: null, // order board: work one district only (id) or all (null)
   name: '',
 });
 

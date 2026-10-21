@@ -6,15 +6,28 @@ export const DAY_START = 8 * 60, DAY_END = 24 * 60;
 
 export const DISTRICTS = [
   { id: 'oldtown', name: 'Old Town', employer: 'Corner Bites Co-op', pay: 1, traffic: 0.55, peds: 1.0, fee: 0,
-    req: { lvl: 1 }, color: '#f2a541', desc: 'Narrow streets and family shops. Every courier starts here.' },
+    req: { lvl: 1 }, color: '#f2a541', desc: 'Short hops between family shops and cafés. Fragile coffee, chatty grannies. Every courier starts here.' },
   { id: 'downtown', name: 'Downtown', employer: 'ZipEats', pay: 1.8, traffic: 1.0, peds: 1.2, fee: 150,
-    req: { lvl: 3, rating: 4.0, tier: 1 }, color: '#4aa8ff', desc: 'Towers, offices and heavy traffic. Tight ETAs, better pay.' },
+    req: { lvl: 3, rating: 4.0, tier: 1 }, color: '#4aa8ff', desc: 'Offices: lunch rushes, VIPs and express orders. Heavy traffic, police and rivals; tips are stingy.' },
   { id: 'harbor', name: 'Harbor', employer: 'Dockside Express', pay: 2.6, traffic: 0.8, peds: 0.7, fee: 800,
-    req: { lvl: 6, rating: 4.2 }, color: '#2ec4b6', desc: 'Warehouses, piers and seafood. Long wide roads, big orders.' },
+    req: { lvl: 6, rating: 4.2 }, color: '#2ec4b6', desc: 'Long wide roads to the docks. Group orders for whole crews, road works and loose crates.' },
   { id: 'hills', name: 'Green Hills', employer: 'Hilltop Gourmet', pay: 3.6, traffic: 0.4, peds: 0.6, fee: 3500,
-    req: { lvl: 10, rating: 4.5, speed: 50 }, color: '#7bd44a', desc: 'Quiet suburbs, long rides, generous tips. Watch for dogs.' },
+    req: { lvl: 10, rating: 4.5, speed: 50 }, color: '#7bd44a', desc: 'Long rides out to the villas and the best tips in town. VIPs everywhere. Watch for dogs.' },
 ];
 export const DISTRICT = Object.fromEntries(DISTRICTS.map((d) => [d.id, d]));
+
+// How each district plays (beyond its pay):
+//   dist   restaurant → customer distance, in tiles (Manhattan) — Old Town hops, Green Hills long rides
+//   same   share of customers in the same district (the rest live across town: longer rides)
+//   tip    tip generosity            haz  road-hazard density       ev  chance of a street event
+//   types  order-type weight multipliers (see ORDER_TYPES)          evW event weight multipliers (see ride/events.js)
+//   traits short labels for the Jobs tab
+export const DPROFILE = {
+  oldtown: { dist: [5, 20], same: 0.85, tip: 1.0, haz: 1.0, ev: 1.0, types: { fragile: 1.6, big: 0.5, vip: 0.4, express: 0.3 }, evW: { granny: 1.6, pigeons: 1.5, door: 1.3, soup: 1.3 }, traits: ['Short hops', 'Fragile coffee', 'Grannies crossing'] },
+  downtown: { dist: [8, 26], same: 0.8, tip: 0.85, haz: 0.9, ev: 1.25, types: { rush: 2.2, vip: 1.8, express: 1.8, big: 0.7, fragile: 0.8 }, evW: { rival: 1.7, police: 2, yellow: 1.5, door: 1.4 }, traits: ['Rush, VIP & Express', 'Heavy traffic', 'Tips ×0.85'] },
+  harbor: { dist: [12, 34], same: 0.7, tip: 1.0, haz: 1.35, ev: 1.0, types: { big: 3.2, fragile: 0.5, rush: 0.8, express: 0.8 }, evW: { roadworks: 2, rival: 1.3, police: 1.2 }, traits: ['Group orders', 'Longer roads', 'Road works'] },
+  hills: { dist: [16, 44], same: 0.5, tip: 1.6, haz: 0.75, ev: 0.9, types: { vip: 2.4, fragile: 1.6, big: 1.4, rush: 0.5, express: 0.6 }, evW: { dog: 3, ball: 1.6, granny: 1.3 }, traits: ['Long rides', 'Tips ×1.6', 'VIP villas', 'Dogs!'] },
+};
 
 // speed km/h; accel 0..1; bump = damage multiplier on bumps; fuel $/km; breakdown chance per ride
 export const VEHICLES = [
@@ -93,6 +106,7 @@ export const ORDER_TYPES = {
   fragile: { name: 'Fragile', pay: 1.35, eta: 1.1, tip: 1.3, w: 2, badge: 'FRAGILE', fragile: 1.8 },
   big: { name: 'Group order', pay: 2.1, eta: 1.15, tip: 1.1, w: 2, badge: 'BIG ×2', size: 2 },
   vip: { name: 'VIP', pay: 2.4, eta: 0.9, tip: 2, w: 1, badge: 'VIP', minLvl: 4 },
+  express: { name: 'Express', pay: 2.2, eta: 0.7, tip: 1.5, w: 1.4, badge: 'EXPRESS', minLvl: 8 },
 };
 
 export const FIRST_NAMES = ['Emma', 'Mert', 'Lena', 'Kaan', 'Noah', 'Zeynep', 'Leo', 'Ayla', 'Omar', 'Mia', 'Can', 'Sofia', 'Jonas', 'Elif', 'Theo',
