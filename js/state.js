@@ -1,6 +1,6 @@
 // Save game + derived stats + economy actions. No three.js, no DOM.
 import { VEHICLE, VEHICLES, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICT, DISTRICTS, FLEET, fleetRate,
-  xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES } from './data.js';
+  xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, CONTRACT_DAYS } from './data.js';
 
 const KEY = 'fds_save_v1';
 const listeners = new Set();
@@ -20,7 +20,8 @@ const fresh = () => ({
   districts: { oldtown: true },
   pos: null, // tile index where the player is parked; null = garage
   fleet: { office: false, level: 0, couriers: [], last: Date.now(), bank: 0, applicants: [] },
-  stats: { deliveries: 0, earned: 0, fiveStars: 0, meters: 0, overtakes: 0, shortcuts: 0, perfectHops: 0, early: 0, events: 0, bestTip: 0 },
+  stats: { deliveries: 0, earned: 0, fiveStars: 0, meters: 0, overtakes: 0, shortcuts: 0, perfectHops: 0, early: 0, events: 0, bestTip: 0,
+    express: 0, vip: 0, rainy: 0, night: 0, maxFlow: 1, contracts: 0 },
   today: { earned: 0, deliveries: 0, fuel: 0, tips: 0, fleet: 0 },
   goals: null,
   look: { char: 'male-a', helmet: '#e8432f' },
@@ -28,6 +29,10 @@ const fresh = () => ({
   seen: {}, // one-time tips
   onboard: { step: 0 }, // first-time guide; 99 = finished
   focus: null, // order board: work one district only (id) or all (null)
+  emp: {}, // per district: { del, r: last 20 star ratings there, sus: suspended through this day }
+  week: null, // weekly contracts
+  ach: {}, // achievement id → time unlocked
+  unlocked: { paints: [] }, // premium finishes
   name: '',
 });
 
@@ -41,6 +46,7 @@ export function load() {
       const f = fresh();
       S = { ...f, ...d, fleet: { ...f.fleet, ...d.fleet }, stats: { ...f.stats, ...d.stats }, skills: { ...f.skills, ...d.skills },
         settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, today: { ...f.today, ...d.today }, seen: { ...d.seen },
+        emp: { ...d.emp }, ach: { ...d.ach }, unlocked: { ...f.unlocked, ...d.unlocked },
         onboard: d.onboard ? { ...d.onboard } : { step: 99 } }; // saves from before onboarding existed skip it
       return true;
     }
@@ -110,10 +116,17 @@ export function spend(n) {
 }
 export function earn(n, why) { S.cash += n; S.stats.earned += Math.max(0, n); emit('cash', { n, why }); save(); }
 
+// what one delivery is worth to this courier right now (best district they work in, a little more as they level)
+export function typicalPay() {
+  const bp = Math.max(1, ...Object.keys(S.districts).filter((d) => S.districts[d]).map((d) => DISTRICT[d].pay));
+  return 12 * bp * (1 + 0.04 * S.lvl);
+}
+export const levelReward = () => Math.round(typicalPay() * 4 / 5) * 5; // cash bonus on reaching a level
+
 export function addXP(n) {
   S.xp += n;
   let ups = 0;
-  while (S.xp >= xpNeed()) { S.xp -= xpNeed(); S.lvl++; ups++; emit('levelup', S.lvl); }
+  while (S.xp >= xpNeed()) { S.xp -= xpNeed(); S.lvl++; ups++; const rw = levelReward(); S.cash += rw; S.stats.earned += rw; emit('levelup', S.lvl); }
   emit('xp'); save();
   return ups;
 }
@@ -166,9 +179,20 @@ export function rushMult(clock = S.clock) {
 }
 export function newDay() {
   const report = { day: S.day, ...S.today };
+  // couriers are paid at the end of each day: from the fleet bank first, then cash. If you can't pay, someone quits.
+  const wages = S.fleet.couriers.reduce((a, c) => a + courierWage(c), 0);
+  if (wages > 0) {
+    const fromBank = Math.min(S.fleet.bank, wages); S.fleet.bank -= fromBank;
+    const rest = wages - fromBank, fromCash = Math.min(Math.max(0, S.cash), rest); S.cash -= fromCash;
+    report.wages = fromBank + fromCash;
+    if (rest - fromCash > 0.5 && S.fleet.couriers.length) {
+      const q = [...S.fleet.couriers].sort((a, b) => a.skill - b.skill)[0];
+      fire(q.id); report.quit = q.name;
+    }
+  }
   S.day++; S.clock = DAY_START;
   S.today = { earned: 0, deliveries: 0, fuel: 0, tips: 0, fleet: 0 };
-  S.goals = null; ensureGoals();
+  S.goals = null; ensureGoals(); ensureWeek();
   emit('clock'); save(true);
   return report;
 }
@@ -181,15 +205,114 @@ export function ensureGoals(rng = Math.random) {
   while (list.length < 3 && pool.length) {
     const g = pool.splice(Math.floor(rng() * pool.length), 1)[0];
     const n = g.n[Math.min(g.n.length - 1, Math.floor(rng() * g.n.length + (S.lvl > 6 ? 1 : 0)))];
-    list.push({ id: g.id, n, p: 0, reward: Math.round((40 + S.lvl * 25) * g.reward * (n / g.n[0]) / 5) * 5, claimed: false });
+    list.push({ id: g.id, n, p: 0, reward: Math.round(typicalPay() * 2 * g.reward * Math.sqrt(n / g.n[0]) / 5) * 5, claimed: false });
   }
   S.goals = { day: S.day, list };
   save(); return S.goals;
 }
-export function goalProgress(id, by = 1) {
+export function goalProgress(id, by = 1, ctx = {}) {
   ensureGoals();
   for (const g of S.goals.list) if (g.id === id && g.p < g.n) { g.p = Math.min(g.n, g.p + by); if (g.p >= g.n) emit('goal', g); }
+  weekProgress(id, by, ctx);
   save();
+}
+
+// ---------- weekly contracts (a set of three bigger goals every CONTRACT_DAYS in-game days) ----------
+export function ensureWeek(rng = Math.random) {
+  if (S.week && S.day < S.week.from + CONTRACT_DAYS) return S.week;
+  const pool = CONTRACTS.filter((c) => !c.minLvl || S.lvl >= c.minLvl);
+  const open = DISTRICTS.filter((d) => S.districts[d.id]);
+  const list = [];
+  while (list.length < 3 && pool.length) {
+    const c = pool.splice(Math.floor(rng() * pool.length), 1)[0];
+    const k = 1 + 0.03 * S.lvl;
+    const n = c.money ? Math.round(typicalPay() * 30 / 50) * 50 : Math.round(c.n * k);
+    const d = c.district ? open[Math.floor(rng() * open.length)].id : null;
+    list.push({ id: c.id, n, p: 0, d, reward: Math.round(typicalPay() * 8 / 10) * 10, claimed: false });
+  }
+  // finishing all three wins a premium finish (or a fat cheque once you own them all)
+  const paints = PREMIUM.filter((x) => !x.award && !S.unlocked.paints.includes(x.id));
+  const bonus = paints.length ? { paint: paints[Math.floor(rng() * paints.length)].id } : { cash: Math.round(typicalPay() * 20 / 10) * 10 };
+  S.week = { from: S.day, list, bonus, bonusClaimed: false };
+  save(); return S.week;
+}
+export function weekProgress(id, by = 1, ctx = {}) {
+  if (!S.week) return;
+  for (const c of S.week.list) {
+    if (c.p >= c.n) continue;
+    const match = c.id === id && (!c.d || c.d === ctx.d) || (c.id === 'dist' && id === 'deliver' && c.d === ctx.d);
+    if (!match) continue;
+    c.p = Math.min(c.n, c.p + by);
+    if (c.p >= c.n) emit('contract', c);
+  }
+}
+export function claimContract(i) {
+  const c = S.week?.list[i];
+  if (!c || c.p < c.n || c.claimed) return false;
+  c.claimed = true; earn(c.reward, 'contract'); addXP(60);
+  if (S.week.list.every((x) => x.claimed)) S.stats.contracts++;
+  return true;
+}
+export function claimWeekBonus() {
+  const w = S.week;
+  if (!w || w.bonusClaimed || !w.list.every((x) => x.claimed)) return null;
+  w.bonusClaimed = true;
+  if (w.bonus.paint) { if (!S.unlocked.paints.includes(w.bonus.paint)) S.unlocked.paints.push(w.bonus.paint); }
+  else earn(w.bonus.cash, 'contract');
+  emit('look'); save(); return w.bonus;
+}
+
+// ---------- employers: ranks, perks, probation ----------
+export function empData(d) { return (S.emp[d] ||= { del: 0, r: [], sus: 0 }); }
+export function empAvg(d) { const e = empData(d); return e.r.length ? e.r.reduce((a, b) => a + b, 0) / e.r.length : 5; }
+export function empRank(d) {
+  const e = empData(d), avg = empAvg(d);
+  let r = RANKS[0];
+  for (const k of RANKS) if (e.del >= k.del && (e.r.length < 5 || avg >= k.rating)) r = k;
+  return r;
+}
+export function empState(d) {
+  const e = empData(d), req = DISTRICT[d].req.rating || 0, avg = empAvg(d);
+  const suspended = e.sus >= S.day;
+  const probation = !suspended && req > 0 && e.r.length >= 5 && avg < req;
+  const rank = empRank(d);
+  return { rank, next: RANKS[RANKS.indexOf(rank) + 1] || null, avg, n: e.r.length, del: e.del, probation, suspended, req };
+}
+// perks that apply right now (none while on probation or suspended)
+export function empPerks(d) { const st = empState(d); return st.probation || st.suspended ? RANKS[0] : st.rank; }
+export function empRecord(d, stars) {
+  const e = empData(d), before = empState(d);
+  e.del++; e.r.push(stars); while (e.r.length > 20) e.r.shift();
+  let after = empState(d);
+  if (after.req && e.r.length >= 5 && after.avg < after.req - 0.4 && !after.suspended) { e.sus = S.day; after = empState(d); }
+  const out = [];
+  if (RANKS.indexOf(after.rank) > RANKS.indexOf(before.rank)) out.push({ kind: 'promoted', d, rank: after.rank });
+  if (after.suspended && !before.suspended) out.push({ kind: 'suspended', d });
+  else if (after.probation && !before.probation) out.push({ kind: 'probation', d, req: after.req });
+  else if (before.probation && !after.probation) out.push({ kind: 'cleared', d });
+  return out;
+}
+
+// ---------- premium finishes ----------
+export const hasPaint = (id) => S.unlocked.paints.includes(id);
+export function buyPaint(id) {
+  const p = PREMIUM.find((x) => x.id === id);
+  if (!p || p.award || hasPaint(id)) return false;
+  if (!spend(p.price)) return false;
+  S.unlocked.paints.push(id); emit('look'); save(); return true;
+}
+
+// ---------- save code: move a career between devices by copy & paste ----------
+export function exportCode() { return 'FDS1.' + btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
+export function importCode(code) {
+  const m = /^FDS1\.([A-Za-z0-9+/=]+)$/.exec(String(code).replace(/\s+/g, ''));
+  if (!m) return false;
+  let d;
+  try { d = JSON.parse(decodeURIComponent(escape(atob(m[1])))); } catch { return false; }
+  if (!d || typeof d !== 'object' || d.v !== 1 || typeof d.cash !== 'number' || !d.vehicles || !d.districts) return false;
+  clearTimeout(saveT);
+  try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { return false; }
+  return true;
 }
 export function claimGoal(i) {
   const g = S.goals.list[i];
@@ -201,8 +324,17 @@ export function claimGoal(i) {
 export const officeLevel = () => FLEET.levels[S.fleet.level];
 export const assignedCount = (veh) => S.fleet.couriers.filter((c) => c.veh === veh && !c.own).length;
 export const freeVehicles = (veh) => owned(veh) - assignedCount(veh) - (S.active === veh ? 1 : 0);
-export function fleetPerMin() {
-  return S.fleet.couriers.reduce((a, c) => a + fleetRate(c.district, c.veh || 'rustbucket', c.skill) * (c.own ? 0.8 : 1), 0);
+// one courier's $/min right now: benched couriers earn nothing, catering jobs pay ×2.5 for an hour
+export function courierRate(c, now = Date.now()) {
+  if (c.benched >= S.day) return 0;
+  return fleetRate(c.district, c.veh || 'rustbucket', c.skill, c.cut ?? FLEET.commission) * (c.own ? 0.8 : 1) * (c.boostUntil > now ? 2.5 : 1);
+}
+export function courierWage(c) {
+  return Math.max(5, Math.round(fleetRate(c.district, c.veh || 'rustbucket', c.skill, c.cut ?? FLEET.commission) * (c.own ? 0.8 : 1) * FLEET.wageMin));
+}
+export function fleetPerMin(mult = 1) {
+  const now = Date.now();
+  return S.fleet.couriers.reduce((a, c) => a + courierRate(c, now), 0) * mult;
 }
 export function openOffice() {
   if (S.fleet.office || S.lvl < FLEET.unlockLvl) return false;
@@ -253,16 +385,20 @@ export function train(id) {
   if (!spend(trainCost(c))) return false;
   c.skill++; emit('fleet'); save(); return true;
 }
-// Accrue fleet income. Returns { offline: $ added since last visit if > 1 min away }.
-export function tickFleet(now = Date.now(), offlineCheck = false) {
+// Accrue fleet income (×FLEET.dispatch while the player is out riding). Returns { offline: $ added since last visit if > 1 min away }.
+export function tickFleet(now = Date.now(), offlineCheck = false, mult = 1) {
   const f = S.fleet;
   if (!f.office || !f.couriers.length || !(f.last > 1.6e12)) { f.last = now; return null; }
   let mins = Math.max(0, (now - f.last) / 60000);
   const capMin = officeLevel().cap * 60;
   const away = mins;
   mins = Math.min(mins, capMin);
-  const gain = fleetPerMin() * mins;
-  f.bank = Math.min(f.bank + gain, fleetPerMin() * capMin + 1);
+  const gain = fleetPerMin(mult) * mins;
+  f.bank = Math.min(f.bank + gain, fleetPerMin(Math.max(1, mult)) * capMin + 1);
+  // now and then the office needs a decision
+  f.evT = (f.evT || 0) + mins;
+  f.events ||= [];
+  if (f.evT > FLEET.eventEvery * (f.evNext ||= 0.6 + Math.random() * 0.8) && f.events.length < 2) { f.evT = 0; f.evNext = 0; const ev = makeFleetEvent(); if (ev) { f.events.push(ev); emit('fleetevent', ev); } }
   f.last = now;
   S.today.fleet += gain;
   emit('fleetbank');
@@ -273,4 +409,42 @@ export function collectFleet() {
   const n = Math.floor(S.fleet.bank);
   if (n <= 0) return 0;
   S.fleet.bank -= n; earn(n, 'fleet'); return n;
+}
+
+// ---------- fleet decisions ----------
+function makeFleetEvent(rng = Math.random) {
+  const cs = S.fleet.couriers.filter((c) => !(c.benched >= S.day));
+  if (!cs.length) return null;
+  const c = cs[Math.floor(rng() * cs.length)];
+  const kinds = [['crash', 3], ['raise', (c.cut ?? FLEET.commission) <= 0.35 ? 2 : 0], ['catering', cs.length >= 2 ? 2 : 0], ['star', c.skill < 5 ? 2 : 0]];
+  let t = 0; for (const [, w] of kinds) t += w; let r = rng() * t, kind = 'crash';
+  for (const [k, w] of kinds) { r -= w; if (r <= 0) { kind = k; break; } }
+  const id = Math.random().toString(36).slice(2, 8);
+  if (kind === 'crash') return { id, kind, cid: c.id, cost: Math.round((40 + VEHICLE[c.veh || 'rustbucket'].price * 0.06) / 5) * 5 };
+  if (kind === 'raise') return { id, kind, cid: c.id };
+  if (kind === 'star') return { id, kind, cid: c.id, cost: Math.round(trainCost(c) * 0.4 / 10) * 10 };
+  const two = [...cs].sort(() => rng() - 0.5).slice(0, 2).map((x) => x.id);
+  return { id, kind, cids: two, pay: Math.round(typicalPay() * 2 / 5) * 5 };
+}
+// choice: 'a' (pay / accept) or 'b' (bench / refuse / decline / skip). Returns a short result line.
+export function resolveFleetEvent(id, choice) {
+  const f = S.fleet, ev = (f.events || []).find((e) => e.id === id);
+  if (!ev) return null;
+  const c = f.couriers.find((x) => x.id === ev.cid);
+  let msg = '';
+  if (ev.kind === 'crash') {
+    if (choice === 'a') { if (!spend(ev.cost)) return null; msg = `${c?.name || 'The bike'} is back on the road.`; }
+    else { if (c) c.benched = S.day; msg = `${c?.name} sits out until tomorrow.`; }
+  } else if (ev.kind === 'raise') {
+    if (choice === 'a') { if (c) c.cut = (c.cut ?? FLEET.commission) + 0.05; msg = `${c?.name} is happy. Their cut is now ${Math.round((c?.cut || 0) * 100)}%.`; }
+    else { if (c) fire(c.id); msg = `${c?.name} handed in the keys.`; }
+  } else if (ev.kind === 'star') {
+    if (choice === 'a') { if (!spend(ev.cost)) return null; if (c && c.skill < 5) c.skill++; msg = `${c?.name} levelled up!`; }
+    else msg = 'Maybe next time.';
+  } else if (ev.kind === 'catering') {
+    if (choice === 'a') { const until = Date.now() + 60 * 60000; for (const x of f.couriers) if (ev.cids.includes(x.id)) x.boostUntil = until; earn(ev.pay, 'fleet'); msg = 'Catering run booked: ×2.5 for an hour.'; }
+    else msg = 'Declined.';
+  }
+  f.events = f.events.filter((e) => e !== ev);
+  emit('fleet'); save(); return msg;
 }

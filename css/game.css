@@ -478,3 +478,37 @@ body[data-mode="ride"] #markers { display: none; }
 .g-act:not(:empty) { margin: 6px 0 2px; }
 .g-act .btn.ghost { color: var(--ink-2); background: rgba(0,0,0,.06); }
 .g-skip { font: 600 11.5px var(--font); color: #9a8a9c; text-decoration: underline; margin-top: 2px; }
+
+/* ===== career: premium finishes, contracts, achievements, ranks, fleet decisions, save code ===== */
+.prem-row { margin-top: 6px; }
+.sw.prem { position: relative; background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75), transparent 38%), var(--c); }
+.sw.prem.metal { background: linear-gradient(135deg, rgba(255,255,255,.65), transparent 45%, rgba(0,0,0,.25) 70%, rgba(255,255,255,.35)), var(--c); }
+.sw.prem.glow { box-shadow: 0 0 10px var(--c), inset 0 0 0 2px rgba(255,255,255,.5); }
+.sw.prem.locked { filter: saturate(.55) brightness(.8); }
+.sw.prem.locked small { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: #dfe7f8; white-space: nowrap; }
+.prem-row { row-gap: 18px; padding-bottom: 12px; }
+.sw.prem.mini { width: 22px; height: 22px; display: inline-block; vertical-align: middle; border-radius: 50%; }
+.goal.bonus .sw { width: 26px; height: 26px; border-radius: 50%; flex: none; }
+.achs { display: flex; flex-direction: column; gap: 6px; }
+.ach { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 12px; background: rgba(255,255,255,.05); }
+.ach .ic { width: 26px; height: 26px; flex: none; opacity: .55; }
+.ach.done { background: linear-gradient(90deg, rgba(255,213,107,.18), rgba(255,255,255,.04)); }
+.ach.done .ic { opacity: 1; }
+.ach > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ach b { font-size: 14px; } .ach small { font-size: 12px; color: #b9c6e6; }
+.ach i { height: 5px; border-radius: 3px; background: rgba(0,0,0,.35); margin-top: 4px; overflow: hidden; } .ach i u { display: block; height: 100%; background: linear-gradient(90deg, #ffd56b, #ffb02e); }
+.ach em { font-style: normal; font-family: var(--display); font-size: 14px; color: #8ff07c; }
+.rankbar { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 12.5px; color: #dfe7fb; }
+.rankbar .rk { height: 6px; border-radius: 3px; background: rgba(0,0,0,.35); overflow: hidden; } .rankbar .rk u { display: block; height: 100%; background: var(--dc); }
+.hired .perk { font-size: 12px; color: #9ff07c; font-weight: 700; }
+.hired.rank-star { color: #ffd56b; }
+.emp-warn { margin-top: 8px; padding: 7px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 600; background: rgba(255, 194, 58, .18); color: #ffe2a3; display: flex; gap: 6px; align-items: center; }
+.emp-warn.bad { background: rgba(214, 55, 42, .25); color: #ffc2bb; }
+.emp-warn .ic { width: 18px; height: 18px; }
+.fevs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.fev { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 14px; background: linear-gradient(135deg, rgba(255,213,107,.2), rgba(255,255,255,.05)); border: 1.5px solid rgba(255,213,107,.5); }
+.fev > .ic { width: 30px; height: 30px; flex: none; }
+.lvcash { font-family: var(--display); font-size: 20px; color: #2f9a1d; display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 6px; }
+.lvcash .ic { width: 26px; height: 26px; }
+textarea.code { width: 100%; height: 110px; border-radius: 12px; border: 2px solid #d9cdb4; padding: 8px; font: 11px/1.3 ui-monospace, monospace; word-break: break-all; resize: none; background: #fffaf0; color: #3a2a1a; margin: 6px 0 10px; }
+.codebox .btn.ghost { color: #6b5a44; background: rgba(60, 40, 20, .08); box-shadow: none; }

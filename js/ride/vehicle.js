@@ -1,7 +1,7 @@
 // The player's (and fleet couriers') scooter: vehicles.glb node (or a placeholder) + Kenney rider + helmet.
 import * as THREE from 'three';
 import { loadKit, getNode, makeChar } from '../assets.js';
-import { VEHICLE } from '../data.js';
+import { VEHICLE, PREMIUM_BY_COLOR } from '../data.js';
 import { useEnv } from '../look.js';
 
 let vehKit = null;
@@ -31,6 +31,16 @@ function placeholder(id) {
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return g;
 }
+
+// premium finishes: metallic and glowing paints (data.js PREMIUM); plain colours reset to the base finish
+function finish(m, hex) {
+  const p = PREMIUM_BY_COLOR[String(hex).toLowerCase()];
+  m.userData.base ||= { metal: m.metalness ?? 0, rough: m.roughness ?? 0.5 };
+  m.metalness = p?.metal ?? m.userData.base.metal;
+  m.roughness = p?.metal ? Math.min(m.userData.base.rough, 0.3) : m.userData.base.rough;
+  if (m.emissive) { if (p?.glow) { m.emissive.set(hex); m.emissiveIntensity = p.glow; } else m.emissiveIntensity = 0; }
+}
+export { finish as paintFinish };
 
 // toy-like shine: painted parts and glass pick up the sky in reflections
 function glossy(m) {
@@ -64,8 +74,8 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
     model.traverse((o) => {
       if (!o.isMesh) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-        if (p && m.name === 'paint') m.color.set(p);
-        if (b && m.name === 'box') m.color.set(b);
+        if (p && m.name === 'paint') { m.color.set(p); finish(m, p); }
+        if (b && m.name === 'box') { m.color.set(b); finish(m, b); }
       }
     });
   }
@@ -83,7 +93,7 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
       // long hair / caps poke through on some characters — give them a roomier helmet
       const roomy = { 'female-f': 1.17, 'male-c': 1.15, 'female-a': 1.12, 'female-c': 1.12, 'female-d': 1.12, 'female-e': 1.12, 'male-b': 1.04, 'male-d': 1.04 }[char];
       if (roomy) helm.scale.setScalar(roomy);
-      helm.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); if (o.material.name === 'helmet_paint') { o.material.color.set(helmet); o.material.roughness = 0.28; } if (o.material.isMeshStandardMaterial) glossy(o.material); } });
+      helm.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); if (o.material.name === 'helmet_paint') { o.material.color.set(helmet); o.material.roughness = 0.28; finish(o.material, helmet); } if (o.material.isMeshStandardMaterial) glossy(o.material); } });
       helm.position.set(0, 0, 0); helm.rotation.set(0, 0, 0);
       if (roomy) helm.position.y = -0.01;
       ch.head.add(helm);

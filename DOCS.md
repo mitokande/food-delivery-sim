@@ -122,6 +122,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/main.js` | açılış, ana döngü, hub ⇄ sürüş geçişi (kamera tween), sipariş panosu, harita işaretçileri, garaj vitrini, iş sonu fiş/XP/gün |
 | `js/data.js` | tüm içerik tabloları: bölgeler, araçlar, parçalar, beceriler, yemekler, restoranlar, sipariş tipleri, filo, hedefler |
 | `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, gün saati |
+| `js/career.js` | başarımlar (istatistikten okunur, ödülü hemen verir) |
 | `js/orders.js` | sipariş üretimi (bölge profiline göre mesafe ve tip karışımı, pano bölge filtresi), ücret, süre (`etaFor`: ölçülmüş otomatik pilot hızı × seviye payı), yıldız/bahşiş hesabı |
 | `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
 | `js/city/graph.js` | A* (U dönüşü yok), şerit eğrileri (sağdan trafik), rota örnekleme |
@@ -204,5 +205,18 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     ölçümde 6 dakikalık duruşlar). Artık ~5 sn sonra karşı şerit boşalınca yavaşça yanından geçiyor.
   - Ölçüm: `tools/speed.mjs` (Old Town otomatik pilot: Külüstür 4,8 · Vespetta 6,3 · Viper 8,0 m/s; turbo ≈ ×1,35).
     Tahmini gelir: Old Town ~$10/dk → Downtown ~$27 → Harbor ~$44 → Hills (Viper) ~$99/dk.
+- 2026-10-21: paket 3–6 (ödül dengesi, işverenler, filo, geç oyun). Mantık `state.js` + `career.js`, veriler `data.js`.
+  - **Ödüller:** günlük hedef ≈ 2 teslimatlık para (`typicalPay()` = en iyi bölgedeki tipik teslimat ücreti; eskiden ~5 teslimat).
+    Her seviye atlayışı ≈ 4 teslimatlık nakit bonus verir. Yakıt fiyatları ×3 (Külüstür $3,3/km; Volt'un ucuzluğu artık hissediliyor).
+  - **İşverenler:** her bölgede rütbe (Rookie → Regular 15 teslimat ★4,2 → Pro 50 ★4,5 → Star 120 ★4,7), o bölgenin
+    siparişlerine +%5/10/15 ücret ve +%5/10 bahşiş. Bölgedeki son 20 puanın ortalaması bölge şartının altına düşerse deneme
+    süresi (avantajlar durur), 0,4 altına düşerse o gün askıya alınma (o bölgeden sipariş gelmez). Jobs kartında rütbe çubuğu.
+  - **Filo:** pasif gelir ×0,45 (sürüşün altında kalsın), sen sürerken ×1,3 ("yolda dağıtım"). Günlük maaş = kuryenin
+    10 dakikalık kazancı (gün sonunda önce kasadan, sonra nakitten; ödenemezse en zayıf kurye ayrılır). Ortalama 45 dakikalık
+    filo zamanında bir karar: kaza (tamir / yedeğe al), zam isteği (+%5 pay / ayrılır), catering işi (peşin para + 1 saat ×2,5),
+    yıldız kurye (kurs → +1 beceri). Bekleyen karar Fleet sekmesinde kırmızı nokta.
+  - **Geç oyun:** 22 başarım (Courier sekmesi; ödül nakit ya da özel boya; eski kariyerler ilk açılışta toplu alır),
+    5 oyun günü süren haftalık sözleşme (3 büyük hedef + üçü bitince premium boya), 7 premium boya (metalik/parlayan; Garage'da
+    satın alınır ya da kazanılır; motor, kutu ve kaskta), kayıt kodu (Ayarlar → Copy / Load save code: cihazlar arası taşıma).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

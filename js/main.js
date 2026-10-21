@@ -19,6 +19,7 @@ import { buildRibbon, ribbonTime } from './ride/ribbon.js';
 import { EVENT } from './ride/events.js';
 import { makeBike } from './ride/vehicle.js';
 import { createUI, ICON } from './ui/ui.js';
+import { checkAchievements } from './career.js';
 import { createOnboarding } from './ui/onboard.js';
 import { createAudio } from './audio.js';
 import { makeOrder, refreshOrder, etaFor, pathMeters } from './orders.js';
@@ -309,7 +310,7 @@ const LEVEL_UNLOCKS = {
 async function finishJob(sum) {
   const lines = [];
   let total = 0, starsSum = 0, xp = 0, tipsT = 0;
-  const goalsHit = [], levels = [];
+  const goalsHit = [], levels = [], empNews = [];
   const unsub = St.on((w, g) => { if (w === 'goal') goalsHit.push(g); if (w === 'levelup') levels.push(g); });
   for (const x of sum.orders) {
     const r = x.result; if (!r) continue;
@@ -319,11 +320,17 @@ async function finishJob(sum) {
     total += r.pay + r.bonus + r.tip; tipsT += r.tip; starsSum += r.stars;
     xp += Math.round((14 + o.dropM / 35 + r.stars * 3 + (r.early ? 6 : 0)) * (0.8 + 0.2 * DISTRICT[o.district].pay));
     St.addRating(r.stars);
+    empNews.push(...St.empRecord(o.district, r.stars));
     S.stats.deliveries++; S.today.deliveries++;
-    if (r.stars === 5) { S.stats.fiveStars++; St.goalProgress('five'); }
-    if (r.early) { S.stats.early++; St.goalProgress('early'); }
-    if (r.cond >= 99) St.goalProgress('nodamage');
-    St.goalProgress('deliver');
+    const ctx = { d: o.district };
+    if (r.stars === 5) { S.stats.fiveStars++; St.goalProgress('five', 1, ctx); }
+    if (r.early) { S.stats.early++; St.goalProgress('early', 1, ctx); }
+    if (r.cond >= 99) St.goalProgress('nodamage', 1, ctx);
+    if (o.type === 'express') { S.stats.express++; St.weekProgress('express', 1, ctx); }
+    if (o.type === 'vip') { S.stats.vip++; St.weekProgress('vip', 1, ctx); }
+    if (WEATHER.rain > 0.35) S.stats.rainy++;
+    if (S.clock >= 20.5 * 60 || S.clock < 6 * 60) S.stats.night++;
+    St.goalProgress('deliver', 1, ctx);
     S.stats.bestTip = Math.max(S.stats.bestTip, r.tip);
   }
   if (sum.stats.cash) { lines.push({ label: `${ICON('ui-cash')} Cash found on the road`, amount: sum.stats.cash, cls: 'pos' }); total += sum.stats.cash; }
@@ -335,12 +342,16 @@ async function finishJob(sum) {
   S.today.earned += total; S.today.fuel += sum.fuel; S.today.tips += tipsT;
   const n = sum.orders.filter((x) => x.result).length || 1;
   St.earn(total, 'job');
+  if (total > 0) St.weekProgress('earn', Math.round(total));
+  S.stats.maxFlow = Math.max(S.stats.maxFlow || 1, sum.stats.bestFlow || 1);
   St.addXP(xp);
   const dayOver = St.advanceClock(sum.time * GAME_MIN_PER_SEC + 3 * n);
   unsub();
   await new Promise((r) => setTimeout(r, 350));
   await ui.receipt({ lines, total, xp, avgStars: starsSum / n, goals: goalsHit.length ? `${goalsHit.length} goal${goalsHit.length > 1 ? 's' : ''} done!` : '' });
   for (const l of levels) await ui.levelUp(l, LEVEL_UNLOCKS[l] || []);
+  for (const n of empNews) ui.employerNews(n);
+  for (const a of checkAchievements()) ui.achievement(a);
   if (dayOver) { const rep = St.newDay(); await ui.dayReport(rep); }
   St.save(true);
   backToHub();
@@ -452,8 +463,10 @@ addEventListener('keyup', (e) => { if (e.code === 'Space' && game.mode === 'ride
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); game.amb = undefined; } }, { capture: true });
 
 // ---------------------------------------------------------------- boot finish
-St.ensureGoals();
+St.ensureGoals(); St.ensureWeek();
 fillBoard(true);
+// achievements can also come from shopping, hiring and applying for jobs
+St.on((w) => { if (['vehicles', 'fleet', 'districts'].includes(w)) for (const a of checkAchievements()) ui.achievement(a); });
 await parkBike();
 const startT = city.tiles[playerTile()];
 hubCam.snap(startT.x * TILE, startT.z * TILE, q.get('dist') ? +q.get('dist') : 230);
@@ -469,6 +482,8 @@ if (off && off.gain >= 1) ui.offline(off);
 // first launch: intro + guided first delivery (tests pass ?noti to skip it)
 if (q.has('noti')) { if (S.onboard.step < 99) S.onboard.step = 99; }
 else ob.start();
+// careers from before achievements existed get theirs at once, in one note
+{ const got = checkAchievements(); if (got.length && !fresh) setTimeout(() => ui.toast(`🏆 ${got.length} achievement${got.length > 1 ? 's' : ''} unlocked from your career so far — see Courier`, 'good'), 1800); }
 
 // ---------------------------------------------------------------- hub view offset: centre the map in the area the sheet leaves free
 const vo = { x: 0, y: 0 };
@@ -570,7 +585,7 @@ function frame() {
       boardT += dt; if (boardT > 4) { boardT = 0; if (fillBoard()) { updateMarkers(); if (ui.tab === 'city' && !document.querySelector('.modal')) ui.render(); } }
     }
   }
-  fleetT += dt; if (fleetT > 1) { fleetT = 0; St.tickFleet(); }
+  fleetT += dt; if (fleetT > 1) { fleetT = 0; St.tickFleet(Date.now(), false, game.mode === 'ride' ? FLEET.dispatch : 1); }
   if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); props.setNight(lastNight); carUni.uNight.value = lastNight; lampUni.uNight.value = lastNight; ride.setNight?.(lastNight); renderer.toneMappingExposure = 1.0 + lastNight * 0.25; setEnvNight(lastNight); }
   // rain sound follows the weather (ride: city / night ambience otherwise)
   const ambWant = weather.rain > 0.3 ? 'amb-rain' : game.mode === 'ride' ? (sky.state.night > 0.5 ? 'amb-night' : 'amb-city') : null;

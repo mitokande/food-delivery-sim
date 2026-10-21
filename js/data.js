@@ -31,17 +31,17 @@ export const DPROFILE = {
 
 // speed km/h; accel 0..1; bump = damage multiplier on bumps; fuel $/km; breakdown chance per ride
 export const VEHICLES = [
-  { id: 'rustbucket', name: 'Rust Bucket', tier: 0, price: 0, speed: 32, accel: 0.55, bump: 1.5, cap: 1, fuel: 1.1, breakdown: 0.28, boost: 1.0,
+  { id: 'rustbucket', name: 'Rust Bucket', tier: 0, price: 0, speed: 32, accel: 0.55, bump: 1.5, cap: 1, fuel: 3.3, breakdown: 0.28, boost: 1.0,
     engine: 'engine-moped', horn: 'horn-moped', paint: '#7fc8b8', box: '#b98a55', desc: 'Held together by tape and hope. It was free.' },
-  { id: 'zippy', name: 'Zippy 50', tier: 1, price: 150, speed: 40, accel: 0.7, bump: 1.2, cap: 1, fuel: 0.6, breakdown: 0.06, boost: 1.0,
+  { id: 'zippy', name: 'Zippy 50', tier: 1, price: 150, speed: 40, accel: 0.7, bump: 1.2, cap: 1, fuel: 1.8, breakdown: 0.06, boost: 1.0,
     engine: 'engine-scooter', horn: 'horn-scooter', paint: '#e9edf2', box: '#d9573f', desc: 'Second-hand, honest, starts every time.' },
-  { id: 'vespetta', name: 'Vespetta 125', tier: 2, price: 900, speed: 52, accel: 0.8, bump: 1.0, cap: 2, fuel: 0.8, breakdown: 0.02, boost: 1.1,
+  { id: 'vespetta', name: 'Vespetta 125', tier: 2, price: 900, speed: 52, accel: 0.8, bump: 1.0, cap: 2, fuel: 2.4, breakdown: 0.02, boost: 1.1,
     engine: 'engine-scooter', horn: 'horn-scooter', paint: '#e8432f', box: '#e8432f', desc: 'The classic. Two orders at once, and it looks great.' },
-  { id: 'volt', name: 'Volt E-Scooter', tier: 3, price: 3000, speed: 58, accel: 0.95, bump: 0.9, cap: 2, fuel: 0.15, breakdown: 0, boost: 1.25,
+  { id: 'volt', name: 'Volt E-Scooter', tier: 3, price: 3000, speed: 58, accel: 0.95, bump: 0.9, cap: 2, fuel: 0.45, breakdown: 0, boost: 1.25,
     engine: 'engine-electric', horn: 'horn-scooter', paint: '#f4f6f8', box: '#2f6fd6', desc: 'Silent, instant torque, almost free to run. Never stalls.' },
-  { id: 'mule', name: 'Mule Cargo Trike', tier: 3, price: 6000, speed: 48, accel: 0.6, bump: 0.55, cap: 4, fuel: 1.0, breakdown: 0.01, boost: 0.9,
+  { id: 'mule', name: 'Mule Cargo Trike', tier: 3, price: 6000, speed: 48, accel: 0.6, bump: 0.55, cap: 4, fuel: 3.0, breakdown: 0.01, boost: 0.9,
     engine: 'engine-cargo', horn: 'horn-scooter', paint: '#4b6584', box: '#f39c33', desc: 'Four orders, rock steady. Soup arrives as soup.' },
-  { id: 'viper', name: 'Viper 600', tier: 4, price: 10000, speed: 75, accel: 1.0, bump: 1.15, cap: 2, fuel: 1.5, breakdown: 0, boost: 1.5,
+  { id: 'viper', name: 'Viper 600', tier: 4, price: 10000, speed: 75, accel: 1.0, bump: 1.15, cap: 2, fuel: 4.5, breakdown: 0, boost: 1.5,
     engine: 'engine-sport', horn: 'horn-sport', paint: '#43b34a', box: '#22262e', desc: 'Stupidly fast. The turbo will make you laugh.' },
 ];
 export const VEHICLE = Object.fromEntries(VEHICLES.map((v) => [v.id, v]));
@@ -126,9 +126,13 @@ export const FLEET = {
   ],
   commission: 0.3,
   hireBase: 120,
+  rateScale: 0.45, // passive income stays below what riding yourself earns
+  dispatch: 1.3, // ×income while you are out riding (you dispatch on the go)
+  wageMin: 10, // daily wage = this many minutes of the courier's own earnings (always leaves them profitable)
+  eventEvery: 45, // minutes of fleet time between decisions, on average
 };
 // $/min for one courier: district pay × base × vehicle speed factor × skill factor × (1-commission)
-export const fleetRate = (district, veh, skill) => DISTRICT[district].pay * 1.9 * (VEHICLE[veh].speed / 32) * (0.75 + skill * 0.12) * (1 - FLEET.commission);
+export const fleetRate = (district, veh, skill, cut = FLEET.commission) => DISTRICT[district].pay * 1.9 * (VEHICLE[veh].speed / 32) * (0.75 + skill * 0.12) * (1 - cut) * FLEET.rateScale;
 
 export const xpToNext = (lvl) => Math.round(90 * Math.pow(lvl, 1.35) / 10) * 10;
 
@@ -141,4 +145,63 @@ export const GOALS = [
   { id: 'perfect', text: (n) => `Land ${n} perfect hops`, n: [3, 5], reward: 0.8 },
   { id: 'early', text: (n) => `Deliver ${n} orders early`, n: [2, 3, 4], reward: 1.1 },
   { id: 'nodamage', text: (n) => `${n} deliveries with no food damage`, n: [1, 2, 3], reward: 1.2 },
+];
+
+// Employer ranks per district (deliveries there + rating there). Perks apply to that district's orders.
+export const RANKS = [
+  { id: 'rookie', name: 'Rookie', del: 0, rating: 0, pay: 0, tip: 0, perk: '' },
+  { id: 'regular', name: 'Regular', del: 15, rating: 4.2, pay: 0.05, tip: 0, perk: '+5% pay' },
+  { id: 'pro', name: 'Pro', del: 50, rating: 4.5, pay: 0.1, tip: 0.05, perk: '+10% pay · +5% tips' },
+  { id: 'star', name: 'Star', del: 120, rating: 4.7, pay: 0.15, tip: 0.1, perk: '+15% pay · +10% tips' },
+];
+
+// Premium finishes for scooter paint, delivery box and helmet. Bought in the Garage or won (achievements, contracts).
+export const PREMIUM = [
+  { id: 'midnight', name: 'Midnight', color: '#1d2547', price: 900, metal: 0.4 },
+  { id: 'mint', name: 'Mint Chrome', color: '#7fe0c8', price: 1600, metal: 0.75 },
+  { id: 'neon', name: 'Neon Pink', color: '#ff3fa8', price: 2200, glow: 0.35 },
+  { id: 'gold', name: 'Gold', color: '#d9a93a', price: 4500, metal: 0.9 },
+  { id: 'chrome', name: 'Chrome', color: '#c9cfd8', price: 7000, metal: 1 },
+  { id: 'lava', name: 'Lava', color: '#ff5a1f', price: 0, glow: 0.45, award: true },
+  { id: 'galaxy', name: 'Galaxy', color: '#5b3fd6', price: 0, metal: 0.6, glow: 0.2, award: true },
+];
+export const PREMIUM_BY_COLOR = Object.fromEntries(PREMIUM.map((p) => [p.color, p]));
+
+// Achievements: `stat` reads the save, `n` is the target. Reward: cash, or a premium paint (`paint`).
+export const ACHIEVEMENTS = [
+  { id: 'd10', name: 'First Shift', desc: 'Deliver 10 orders', stat: 'deliveries', n: 10, cash: 60 },
+  { id: 'd100', name: 'Regular Face', desc: 'Deliver 100 orders', stat: 'deliveries', n: 100, cash: 400 },
+  { id: 'd500', name: 'Street Legend', desc: 'Deliver 500 orders', stat: 'deliveries', n: 500, cash: 3000 },
+  { id: 'd1000', name: 'The Whole City Knows You', desc: 'Deliver 1,000 orders', stat: 'deliveries', n: 1000, paint: 'galaxy' },
+  { id: 'five50', name: 'Five-Star Service', desc: '50 five-star ratings', stat: 'fiveStars', n: 50, cash: 500 },
+  { id: 'early50', name: 'Ahead of Time', desc: '50 early deliveries', stat: 'early', n: 50, cash: 500 },
+  { id: 'ot100', name: 'Lane Splitter', desc: 'Overtake 100 cars', stat: 'overtakes', n: 100, cash: 300 },
+  { id: 'hop100', name: 'Pothole Ballet', desc: '100 perfect hops', stat: 'perfectHops', n: 100, cash: 300 },
+  { id: 'sc50', name: 'Local Knowledge', desc: 'Take 50 shortcuts', stat: 'shortcuts', n: 50, cash: 400 },
+  { id: 'km100', name: 'Hundred Kilometres', desc: 'Ride 100 km', stat: 'km', n: 100, cash: 800 },
+  { id: 'rain25', name: 'Singing in the Rain', desc: '25 deliveries in the rain', stat: 'rainy', n: 25, cash: 600 },
+  { id: 'night25', name: 'Night Owl', desc: '25 deliveries after dark', stat: 'night', n: 25, cash: 600 },
+  { id: 'vip25', name: 'Red Carpet', desc: '25 VIP deliveries', stat: 'vip', n: 25, cash: 1200 },
+  { id: 'exp25', name: 'Need for Speed', desc: '25 Express deliveries', stat: 'express', n: 25, paint: 'lava' },
+  { id: 'flow2', name: 'In the Zone', desc: 'Reach a ×2.0 Flow', stat: 'maxFlow', n: 2, cash: 500 },
+  { id: 'earn10k', name: 'Five Figures', desc: 'Earn $10,000 in total', stat: 'earned', n: 10000, cash: 1000 },
+  { id: 'earn100k', name: 'Delivery Tycoon', desc: 'Earn $100,000 in total', stat: 'earned', n: 100000, cash: 10000 },
+  { id: 'all4', name: 'Key to the City', desc: 'Work in all four districts', stat: 'districts', n: 4, cash: 2000 },
+  { id: 'star1', name: 'Employee of the Month', desc: 'Reach Star rank with any employer', stat: 'stars', n: 1, cash: 3000 },
+  { id: 'fleet10', name: 'Dispatch Boss', desc: 'Have 10 couriers', stat: 'couriers', n: 10, cash: 5000 },
+  { id: 'garage', name: 'Collector', desc: 'Own all six vehicles', stat: 'vehicles', n: 6, cash: 5000 },
+  { id: 'contract10', name: 'Contractor', desc: 'Complete 10 weekly contracts', stat: 'contracts', n: 10, cash: 4000 },
+];
+
+// Weekly contracts: a fresh set every CONTRACT_DAYS in-game days. Scaled by level in state.js.
+export const CONTRACT_DAYS = 5;
+export const CONTRACTS = [
+  { id: 'deliver', text: (n) => `Deliver ${n} orders`, n: 30 },
+  { id: 'dist', text: (n, d) => `Deliver ${n} orders in ${d}`, n: 15, district: true },
+  { id: 'five', text: (n) => `Get ${n} five-star ratings`, n: 15 },
+  { id: 'early', text: (n) => `Deliver ${n} orders early`, n: 12 },
+  { id: 'earn', text: (n) => `Earn $${n.toLocaleString('en-US')} riding`, n: 1, money: true },
+  { id: 'nodamage', text: (n) => `${n} deliveries with no food damage`, n: 12 },
+  { id: 'express', text: (n) => `Deliver ${n} Express orders`, n: 6, minLvl: 8 },
+  { id: 'vip', text: (n) => `Deliver ${n} VIP orders`, n: 6, minLvl: 4 },
 ];

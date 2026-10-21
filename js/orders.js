@@ -1,7 +1,7 @@
 // Order board: generation, pricing, ETA, scoring. Pure (uses the city graph, no three.js).
 import { DISTRICT, DPROFILE, RESTAURANT, RESTAURANTS, FOODS, ORDER_TYPES, FIRST_NAMES, CHAR_IDS } from './data.js';
 import { findPath, buildRoute } from './city/graph.js';
-import { S, rushMult, skillFx, vehStats } from './state.js';
+import { S, rushMult, skillFx, vehStats, empPerks, empState } from './state.js';
 import { pick } from './rng.js';
 import { W, rainBonus } from './weather.js';
 
@@ -24,16 +24,20 @@ export function etaFor(meters, district, typeEta = 1) {
 let nextId = 1;
 const routeLen = new Map();
 export function pathMeters(city, a, b) {
+  if (a === b) return 0; // already at the door
   const k = a * 100000 + b;
   if (routeLen.has(k)) return routeLen.get(k);
   const p = findPath(city, a, b);
-  const m = p ? buildRoute(city, p).length : Infinity;
+  let m = Infinity;
+  if (p && p.length > 1) { try { m = buildRoute(city, p).length; } catch { m = (p.length - 1) * 10; } }
   routeLen.set(k, m);
   return m;
 }
 
 export function makeOrder(city, rng, { from, restId, type } = {}) {
   let open = RESTAURANTS.filter((r) => S.districts[r.district] && city.restaurants.some((x) => x.id === r.id));
+  // a suspended employer sends no work today (unless that is all there is)
+  const ok = open.filter((r) => !empState(r.district).suspended); if (ok.length) open = ok;
   // the courier can choose to work one district only (order board filter)
   if (S.focus && S.districts[S.focus]) { const f = open.filter((r) => r.district === S.focus); if (f.length) open = f; }
   const R = restId ? RESTAURANT[restId] : pick(rng, open);
@@ -67,7 +71,7 @@ export function makeOrder(city, rng, { from, restId, type } = {}) {
   const D = DISTRICT[R.district];
   const rush = rushMult();
   const wet = rainBonus();
-  const base = Math.max(5, Math.round((3 + 0.03 * dropM + 0.01 * pickM) * D.pay * T.pay * rush.m * wet));
+  const base = Math.max(5, Math.round((3 + 0.03 * dropM + 0.01 * pickM) * D.pay * T.pay * rush.m * wet * (1 + empPerks(R.district).pay)));
   const eta = etaFor(pickM + dropM, R.district, T.eta);
   return {
     id: nextId++, rest: R.id, restName: R.name, food: R.food, restLot: restLot.id, cust: cust.id, district: R.district,
@@ -99,7 +103,7 @@ export function scoreOrder(o, { elapsed, heat, integrity, tipMult = 1, ratingAdj
   const early = ratio < 0.85;
   const tipPct = [0, 0, 0.03, 0.08, 0.16, 0.28][stars];
   const T = ORDER_TYPES[o.type];
-  const tip = Math.round(o.base * tipPct * T.tip * fx.tips * tipMult * (DPROFILE[o.district]?.tip ?? 1) * (early ? 1.15 : 1) * (W.rain > 0.35 ? 1.2 : 1));
+  const tip = Math.round(o.base * tipPct * T.tip * fx.tips * tipMult * (DPROFILE[o.district]?.tip ?? 1) * (1 + empPerks(o.district).tip) * (early ? 1.15 : 1) * (W.rain > 0.35 ? 1.2 : 1));
   const bonus = early ? Math.round(o.base * 0.15) : 0;
   const latePenalty = ratio > 1.5 ? Math.round(o.base * 0.25) : 0;
   return { stars, early, late: ratio > 1, ratio, tip, bonus, latePenalty, pay: o.base - latePenalty, cond };

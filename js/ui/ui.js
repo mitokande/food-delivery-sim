@@ -1,13 +1,16 @@
 // DOM UI: hub (top bar, tabs, sheets), ride HUD, modals, toasts.
 import * as St from '../state.js';
 import { S } from '../state.js';
-import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT,
+import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT, RANKS, PREMIUM, ACHIEVEMENTS, CONTRACTS, CONTRACT_DAYS,
   FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END } from '../data.js';
 import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
 import { autoSpeed } from '../orders.js';
+import { achValue, achDone } from '../career.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
+// pointer capture throws for pointers that already ended (and for synthetic ones): never let that break input
+const capture = (el, e) => { try { el.setPointerCapture(e.pointerId); } catch { /* fine without */ } };
 export const money = (n, dec = false) => {
   const a = Math.abs(n), sg = n < 0 ? '−' : '';
   if (a >= 1e6) return `${sg}$${(a / 1e6).toFixed(a >= 1e7 ? 1 : 2)}M`;
@@ -111,7 +114,7 @@ export function createUI(game) {
     const bank = Math.floor(S.fleet.bank);
     fb.hidden = !(S.fleet.office && bank >= 1);
     $('b', fb).textContent = '+' + money(bank);
-    $('.tabs .dot', hub).hidden = !(S.lvl >= FLEET.unlockLvl && !S.fleet.office);
+    $('.tabs .dot', hub).hidden = !((S.lvl >= FLEET.unlockLvl && !S.fleet.office) || (S.fleet.events || []).length);
   }
 
   // ---------- tabs ----------
@@ -183,7 +186,23 @@ export function createUI(game) {
       ${filter}
       <div class="orders">${list.map((o) => orderCard(o, game.taken.includes(o))).join('')}</div>
       ${start}
-      <div class="sec-head"><h2>Today</h2><span class="sub">Day ${S.day} goals</span></div><div class="goals">${goals}</div>`;
+      <div class="sec-head"><h2>Today</h2><span class="sub">Day ${S.day} goals</span></div><div class="goals">${goals}</div>
+      ${renderWeek()}`;
+  }
+  function renderWeek() {
+    const w = St.ensureWeek(); if (!w) return '';
+    const left = w.from + CONTRACT_DAYS - S.day;
+    const rows = w.list.map((c, i) => {
+      const T = CONTRACTS.find((x) => x.id === c.id);
+      const text = T ? T.text(c.n, c.d ? DISTRICT[c.d].name : '') : c.id;
+      return `<div class="goal ${c.p >= c.n ? 'done' : ''}">${ICON(c.p >= c.n ? 'ui-gift' : 'ui-trophy')}<span>${text}<i><u style="width:${c.p / c.n * 100}%"></u></i></span>
+        ${c.claimed ? '<em>✓</em>' : c.p >= c.n ? `<button class="btn gold sm" data-act="contract" data-i="${i}">${money(c.reward)}</button>` : `<small>${c.id === 'earn' ? money(c.p) : c.p}/${c.id === 'earn' ? money(c.n) : c.n}</small>`}</div>`;
+    }).join('');
+    const prem = w.bonus.paint && PREMIUM.find((p) => p.id === w.bonus.paint);
+    const all = w.list.every((c) => c.claimed);
+    const bonus = `<div class="goal bonus ${all ? 'done' : ''}"><span class="sw prem" style="--c:${prem ? prem.color : '#ffd56b'}"></span><span>All three: <b>${prem ? prem.name + ' finish' : money(w.bonus.cash)}</b></span>
+      ${w.bonusClaimed ? '<em>✓</em>' : all ? `<button class="btn gold sm" data-act="weekbonus">Claim</button>` : ''}</div>`;
+    return `<div class="sec-head"><h2>Contract</h2><span class="sub">${left > 1 ? `${left} days left` : 'last day'}</span></div><div class="goals">${rows}${bonus}</div>`;
   }
   function goalText(g) {
     const t = { deliver: `Deliver ${g.n} orders`, five: `Get ${g.n} five-star ratings`, shortcut: `Take ${g.n} shortcuts`, overtake: `Overtake ${g.n} cars`, perfect: `Land ${g.n} perfect hops`, early: `Deliver ${g.n} orders early`, nodamage: `${g.n} deliveries with no damage` };
@@ -192,6 +211,15 @@ export function createUI(game) {
 
   // ---------- Garage ----------
   function stat(label, v, max, txt) { return `<div class="stat"><span>${label}</span><i><u style="width:${Math.min(100, v / max * 100)}%"></u></i><b>${txt}</b></div>`; }
+  // premium finishes: owned ones apply like paint; others show a price (or a trophy when they are won, not bought)
+  function premiumSwatches(cur, which, vid) {
+    return PREMIUM.map((p) => {
+      const own = St.hasPaint(p.id);
+      const act = own ? (which === 'helmet' ? `data-act="helmet" data-c="${p.color}"` : `data-act="paint" data-w="${which}" data-c="${p.color}" data-id="${vid}"`) : p.award ? 'data-act="premiuminfo"' : `data-act="buypaint" data-id="${p.id}"`;
+      return `<button class="sw prem ${own ? '' : 'locked'} ${cur === p.color ? 'on' : ''} ${p.glow ? 'glow' : ''} ${p.metal ? 'metal' : ''}" style="--c:${p.color}" ${act} title="${p.name}">
+        ${own ? '' : `<small>${p.award ? '🏆' : money(p.price)}</small>`}</button>`;
+    }).join('');
+  }
   function renderGarage() {
     const sel = VEHICLE[state.selVeh] ? state.selVeh : S.active;
     const v = VEHICLE[sel], own = St.owned(sel), vs = St.vehStats(sel);
@@ -210,15 +238,17 @@ export function createUI(game) {
     }).join('') : '';
     const paint = own ? `<div class="sec-head"><h3>Paint</h3><span class="sub">${money(PAINT_COST)} each</span></div>
       <div class="swatches">${PAINTS.map((c) => `<button class="sw ${vs.paint === c ? 'on' : ''}" style="--c:${c}" data-act="paint" data-w="paint" data-c="${c}" data-id="${sel}"></button>`).join('')}</div>
+      <div class="swatches prem-row">${premiumSwatches(vs.paint, 'paint', sel)}</div>
       <div class="sec-head"><h3>Delivery box</h3></div>
-      <div class="swatches">${PAINTS.map((c) => `<button class="sw box ${vs.boxColor === c ? 'on' : ''}" style="--c:${c}" data-act="paint" data-w="box" data-c="${c}" data-id="${sel}"></button>`).join('')}</div>` : '';
+      <div class="swatches">${PAINTS.map((c) => `<button class="sw box ${vs.boxColor === c ? 'on' : ''}" style="--c:${c}" data-act="paint" data-w="box" data-c="${c}" data-id="${sel}"></button>`).join('')}</div>
+      <div class="swatches prem-row">${premiumSwatches(vs.boxColor, 'box', sel)}</div>` : '';
     return `<div class="sec-head"><h2>Garage</h2><span class="sub">${money(S.cash)} to spend</span></div>
       <div class="vcards">${cards}</div>
       <div class="vdetail"><h3>${v.name}</h3><p class="desc">${v.desc}</p>
         ${stat('Top speed', vs.top * 3.6, 90, Math.round(vs.top * 3.6) + ' km/h')}
         ${stat('Capacity', vs.cap, 5, vs.cap + (vs.cap > 1 ? ' orders' : ' order'))}
         ${stat('Smoothness', 2 - vs.bump, 1.6, Math.round((2 - vs.bump) / 1.6 * 100) + '%')}
-        ${stat('Fuel', 1.6 - vs.fuel, 1.6, '$' + vs.fuel.toFixed(2) + '/km')}
+        ${stat('Fuel', 5 - vs.fuel, 5, '$' + vs.fuel.toFixed(2) + '/km')}
         ${v.breakdown ? stat('Reliability', 1 - vs.breakdown, 1, Math.round((1 - vs.breakdown) * 100) + '%') : ''}
         <div class="actions">${actions}</div></div>
       ${own ? `<div class="sec-head"><h3>Upgrades</h3></div><div class="rows">${parts}</div>${paint}` : ''}`;
@@ -239,13 +269,25 @@ export function createUI(game) {
       <div class="rows">${rows}</div>
       <div class="sec-head"><h3>Look</h3><span class="sub">free</span></div>
       <div class="pchars">${chars}</div>
-      <div class="sec-head"><h3>Helmet</h3></div><div class="swatches">${helm}</div>
+      <div class="sec-head"><h3>Helmet</h3></div><div class="swatches">${helm}</div><div class="swatches prem-row">${premiumSwatches(S.look.helmet, 'helmet')}</div>
       <div class="sec-head"><h3>Career</h3></div>
       <div class="career"><span><b>${st.deliveries}</b>deliveries</span><span><b>${money(st.earned)}</b>earned</span><span><b>${st.fiveStars}</b>five stars</span>
-        <span><b>${(st.meters / 1000).toFixed(1)} km</b>ridden</span><span><b>${st.overtakes}</b>overtakes</span><span><b>${money(st.bestTip)}</b>best tip</span></div>`;
+        <span><b>${(st.meters / 1000).toFixed(1)} km</b>ridden</span><span><b>${st.overtakes}</b>overtakes</span><span><b>${money(st.bestTip)}</b>best tip</span></div>
+      <div class="sec-head"><h3>Achievements</h3><span class="sub">${ACHIEVEMENTS.filter(achDone).length}/${ACHIEVEMENTS.length}</span></div>
+      <div class="achs">${ACHIEVEMENTS.map((a) => { const done = achDone(a), v = Math.min(a.n, achValue(a)); const prem = a.paint && PREMIUM.find((p) => p.id === a.paint);
+        return `<div class="ach ${done ? 'done' : ''}">${ICON(done ? 'ui-trophy' : 'ui-star')}<span><b>${a.name}</b><small>${a.desc}</small>${done ? '' : `<i><u style="width:${v / a.n * 100}%"></u></i>`}</span>
+          <em>${prem ? `<span class="sw prem mini" style="--c:${prem.color}"></span>` : money(a.cash)}</em></div>`; }).join('')}</div>`;
   }
 
   // ---------- Jobs ----------
+  function empBlock(d) {
+    const e = St.empState(d.id);
+    const next = e.next ? `<small>${e.del}/${e.next.del} deliveries${e.next.rating ? ` · ★${e.next.rating.toFixed(1)}+` : ''} → <b>${e.next.name}</b></small><i class="rk"><u style="width:${Math.min(100, e.del / e.next.del * 100)}%"></u></i>` : '<small>Top rank. Legend.</small>';
+    const warn = e.suspended ? `<div class="emp-warn bad">${ICON('ui-lock')} Suspended for today — rating here ★${e.avg.toFixed(1)}. Orders return tomorrow.</div>`
+      : e.probation ? `<div class="emp-warn">${ICON('ui-star')} On probation: keep ★${e.req.toFixed(1)}+ here (now ★${e.avg.toFixed(1)}). Rank perks paused.</div>` : '';
+    return `<div class="hired rank-${e.rank.id}">${ICON('ui-star')} ${e.rank.name}${e.n ? ` · ★${e.avg.toFixed(1)} here` : ''}${e.rank.perk ? ` · <span class="perk">${e.rank.perk}</span>` : ''}</div>
+      <div class="rankbar">${next}</div>${warn}`;
+  }
   function renderJobs() {
     const cards = DISTRICTS.map((d) => {
       const s = St.districtStatus(d.id);
@@ -258,7 +300,7 @@ export function createUI(game) {
         <div class="dh"><b>${d.name}</b><span class="mult">×${d.pay} pay</span></div>
         <small class="emp">${d.employer}</small><p>${d.desc}</p>
         <div class="traits">${(DPROFILE[d.id]?.traits || []).map((t) => `<span>${t}</span>`).join('')}</div>
-        ${s.open ? `<div class="hired">${ICON('ui-star')} You work here</div>` : `<ul class="reqs">${req.map(([t, ok]) => `<li class="${ok ? 'ok' : ''}">${ok ? '✓' : '✗'} ${t}</li>`).join('')}</ul>
+        ${s.open ? empBlock(d) : `<ul class="reqs">${req.map(([t, ok]) => `<li class="${ok ? 'ok' : ''}">${ok ? '✓' : '✗'} ${t}</li>`).join('')}</ul>
         <button class="btn ${s.canApply ? 'green' : 'locked'}" data-act="apply" data-id="${d.id}" ${s.canApply && S.cash >= d.fee ? '' : 'disabled'}>${s.canApply ? `Apply · ${money(d.fee)}` : `${ICON('ui-lock')} Locked`}</button>`}
       </div>`;
     }).join('');
@@ -281,18 +323,36 @@ export function createUI(game) {
       return `<div class="crow">${ICON('char-' + c.char, 'cava')}<span class="rt"><b>${esc(c.name)}</b>${pips(c.skill, 5)}
         <span class="sel"><select data-act="cdist" data-id="${c.id}">${opts(c.district, DISTRICTS.filter((d) => S.districts[d.id]).map((d) => [d.id, d.name]))}</select>
         <select data-act="cveh" data-id="${c.id}">${opts(c.veh, vehOpts)}</select></span>
-        <small>${money(fleetRate(c.district, c.veh, c.skill) * (c.own ? 0.8 : 1), true)}/min</small></span>
+        <small>${c.benched >= S.day ? 'benched today' : `${money(St.courierRate(c), true)}/min`}${c.boostUntil > Date.now() ? ' · catering ×2.5' : ''} · cut ${Math.round((c.cut ?? FLEET.commission) * 100)}% · ${money(St.courierWage(c))}/day</small></span>
         <span class="cbtns">${c.skill < 5 ? `<button class="btn blue sm" data-act="train" data-id="${c.id}" ${S.cash < St.trainCost(c) ? 'disabled' : ''}>Train ${money(St.trainCost(c))}</button>` : ''}
         <button class="btn ghost sm" data-act="fire" data-id="${c.id}">Let go</button></span></div>`;
     }).join('') || '<div class="hint">No couriers yet — hire one below.</div>';
     const apps = (f.applicants || []).map((a) => `<div class="crow app">${ICON('char-' + a.char, 'cava')}<span class="rt"><b>${esc(a.name)}</b>${pips(a.skill, 5)}<small>Brings a ${VEHICLE[a.ownVeh].name} · ~${money(fleetRate('oldtown', a.ownVeh, a.skill) * 0.8, true)}/min</small></span>
       <button class="btn green sm" data-act="hire" data-id="${a.id}" ${S.cash < a.fee || f.couriers.length >= L.slots ? 'disabled' : ''}>Hire ${money(a.fee)}</button></div>`).join('');
+    const evs = (f.events || []).map((ev) => fleetEventCard(ev)).join('');
+    const wages = f.couriers.reduce((a, c) => a + St.courierWage(c), 0);
     return `<div class="sec-head"><h2>Fleet</h2><span class="sub">${f.couriers.length}/${L.slots} couriers</span></div>
-      <div class="bank"><span>${ICON('ui-cash')}<b>${money(Math.floor(f.bank))}</b><small>${money(perMin, true)}/min · offline up to ${L.cap} h</small></span>
+      ${evs ? `<div class="fevs">${evs}</div>` : ''}
+      <div class="bank"><span>${ICON('ui-cash')}<b>${money(Math.floor(f.bank))}</b><small>${money(perMin, true)}/min · ×${FLEET.dispatch} while you ride · offline up to ${L.cap} h${wages ? ` · wages ${money(wages)}/day` : ''}</small></span>
         <button class="btn gold" data-act="collect" ${f.bank < 1 ? 'disabled' : ''}>Collect</button></div>
       ${next ? `<div class="row">${ICON('ui-building')}<span class="rt"><b>Office level ${f.level + 1}</b><small>Next: ${next.slots} couriers, ${next.cap} h offline</small></span><button class="btn green sm" data-act="officeup" ${S.cash < next.cost ? 'disabled' : ''}>${money(next.cost)}</button></div>` : ''}
       <div class="sec-head"><h3>Your couriers</h3></div><div class="crows">${couriers}</div>
       <div class="sec-head"><h3>Applicants</h3><button class="link" data-act="reroll">new applicants · $20</button></div><div class="crows">${apps}</div>`;
+  }
+
+  function fleetEventCard(ev) {
+    const c = S.fleet.couriers.find((x) => x.id === ev.cid);
+    const names = (ev.cids || []).map((id) => S.fleet.couriers.find((x) => x.id === id)?.name).filter(Boolean).join(' & ');
+    const T = {
+      crash: [`${esc(c?.name || 'A courier')} scraped the ${VEHICLE[c?.veh || 'rustbucket'].name}`, 'Pay for repairs, or bench them until tomorrow.', `Repair ${money(ev.cost)}`, 'Bench'],
+      raise: [`${esc(c?.name || 'A courier')} wants a bigger cut`, `+5% commission for them, or they walk.`, 'Agree', 'Refuse'],
+      star: [`${esc(c?.name || 'A courier')} is on a roll`, 'Pay for a training course: +1 skill.', `Train ${money(ev.cost)}`, 'Skip'],
+      catering: [`Catering job for ${esc(names)}`, `${money(ev.pay)} up front and ×2.5 earnings for an hour.`, 'Accept', 'Decline'],
+    }[ev.kind];
+    if (!T) return '';
+    const need = ev.cost && S.cash < ev.cost;
+    return `<div class="fev">${ICON('ui-people')}<span class="rt"><b>${T[0]}</b><small>${T[1]}</small></span>
+      <span class="cbtns"><button class="btn green sm" data-act="fev" data-id="${ev.id}" data-c="a" ${need ? 'disabled' : ''}>${T[2]}</button><button class="btn ghost sm" data-act="fev" data-id="${ev.id}" data-c="b">${T[3]}</button></span></div>`;
   }
 
   // ---------- events (delegation) ----------
@@ -315,6 +375,11 @@ export function createUI(game) {
       case 'start': game.startJob(); break;
       case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); render(); } break;
       case 'focus': S.focus = b.dataset.d || null; St.save(); game.refocus?.(); render(); break;
+      case 'contract': if (St.claimContract(+b.dataset.i)) { game.audio?.play('ui-coins'); render(); } break;
+      case 'weekbonus': { const bn = St.claimWeekBonus(); if (bn) { game.audio?.play('ui-unlock'); toast(bn.paint ? `New finish: ${PREMIUM.find((p) => p.id === bn.paint).name}! Try it in the Garage.` : `+${money(bn.cash)} contract bonus`, 'good'); render(); } break; }
+      case 'buypaint': if (St.buyPaint(id)) { game.audio?.play('ui-purchase'); toast(`${PREMIUM.find((p) => p.id === id).name} finish unlocked`, 'good'); render(); } else toast(`Costs ${money(PREMIUM.find((p) => p.id === id).price)}`, 'bad'); break;
+      case 'premiuminfo': toast('Won through achievements and contracts', ''); break;
+      case 'fev': { const msg = St.resolveFleetEvent(id, b.dataset.c); if (msg) { toast(msg, 'good'); refreshTop(); render(); } else toast('Not enough cash', 'bad'); break; }
       case 'veh': state.selVeh = id; game.previewVehicle?.(id); render(); break;
       case 'buyveh': if (St.buyVehicle(id)) { game.audio?.play('ui-purchase'); toast(`${VEHICLE[id].name} is yours!`, 'good'); if (St.owned(id) === 1) { St.setActive(id); game.previewVehicle?.(id); } render(); } break;
       case 'ride': if (St.setActive(id)) { game.previewVehicle?.(id); render(); } break;
@@ -390,7 +455,7 @@ export function createUI(game) {
     const h = e.target.closest('.grab, .sheet-body > .sec-head:first-child');
     if (!h || e.target.closest('button, a, select, input')) return;
     e.preventDefault();
-    sheet.setPointerCapture?.(e.pointerId);
+    capture(sheet, e);
     dragStart(e.clientY);
   });
   sheet.addEventListener('pointermove', (e) => { if (drag.on && !drag.touch) dragMove(e.clientY); });
@@ -420,7 +485,8 @@ export function createUI(game) {
       <label class="set">Sound<input type="range" min="0" max="1" step="0.05" value="${S.settings.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${S.settings.quality === q ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
       <label class="set">Vibration<input type="checkbox" data-k="haptics" ${S.settings.haptics ? 'checked' : ''}></label>
-      <p class="small">Progress is saved on this device.</p>
+      <p class="small">Progress is saved on this device. Use a save code to move it to another phone.</p>
+      <div class="set-more"><button class="btn ghost sm" data-x="export">Copy save code</button><button class="btn ghost sm" data-x="import">Load save code</button></div>
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
       <button class="btn green big" data-x="close">Done</button>`, { dismiss: true, cls: 'settings' });
     m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S.settings[k] = e.target.type === 'range' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value; St.save(); game.applySettings?.(); });
@@ -429,7 +495,35 @@ export function createUI(game) {
       if (x === 'close') m.close();
       if (x === 'replay') { m.close(); game.ob?.replay(); }
       if (x === 'reset') { m.close(); confirmReset(); }
+      if (x === 'export') { m.close(); saveCode(); }
+      if (x === 'import') { m.close(); loadCode(); }
     });
+  }
+  function saveCode() {
+    St.save(true);
+    const code = St.exportCode();
+    const m = modal(`<h2>Save code</h2><p class="small">Copy this and paste it into <b>Load save code</b> on another device.</p>
+      <textarea class="code" readonly>${code}</textarea>
+      <button class="btn green big" data-x="copy">Copy</button><button class="btn ghost" data-x="close">Close</button>`, { dismiss: true, cls: 'codebox' });
+    const ta = m.card.querySelector('textarea');
+    ta.addEventListener('focus', () => ta.select());
+    m.card.querySelector('[data-x="copy"]').onclick = async () => {
+      tap(); ta.select();
+      try { await navigator.clipboard.writeText(code); toast('Save code copied', 'good'); } catch { try { document.execCommand('copy'); toast('Save code copied', 'good'); } catch { toast('Select the text and copy it', ''); } }
+    };
+    m.card.querySelector('[data-x="close"]').onclick = () => { tap(); m.close(); };
+  }
+  function loadCode() {
+    const m = modal(`<h2>Load save code</h2><p class="small">This replaces the career on this device.</p>
+      <textarea class="code" placeholder="FDS1.…" autocomplete="off" spellcheck="false"></textarea>
+      <button class="btn green big" data-x="load">Load</button><button class="btn ghost" data-x="close">Cancel</button>`, { dismiss: true, cls: 'codebox' });
+    const ta = m.card.querySelector('textarea');
+    m.card.querySelector('[data-x="load"]').onclick = () => {
+      tap();
+      if (St.importCode(ta.value)) { toast('Career loaded', 'good'); setTimeout(() => location.reload(), 400); }
+      else toast("That code doesn't look right", 'bad');
+    };
+    m.card.querySelector('[data-x="close"]').onclick = () => { tap(); m.close(); };
   }
   // erasing a career needs a deliberate hold, not a stray tap
   function confirmReset() {
@@ -449,7 +543,7 @@ export function createUI(game) {
       if (f >= 1) { label.textContent = 'Erasing…'; game.audio?.play('ui-error'); St.wipe(); setTimeout(() => location.reload(), 250); return; }
       raf = requestAnimationFrame(tick);
     };
-    const down = (e) => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); t0 = performance.now(); label.textContent = 'Keep holding…'; cancelAnimationFrame(raf); tick(); };
+    const down = (e) => { e.preventDefault(); capture(btn, e); t0 = performance.now(); label.textContent = 'Keep holding…'; cancelAnimationFrame(raf); tick(); };
     const up = () => { if (fill.style.width === '100%') return; cancelAnimationFrame(raf); fill.style.width = '0%'; label.textContent = 'Hold to erase'; };
     btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up);
     m.card.querySelector('[data-x="cancel"]').addEventListener('click', () => { tap(); m.close(); });
@@ -489,7 +583,7 @@ export function createUI(game) {
     e.preventDefault();
     b.classList.add('down');
     game.rideInput(b.dataset.ride, true);
-    if (b.dataset.ride === 'boost') { b.setPointerCapture?.(e.pointerId); }
+    if (b.dataset.ride === 'boost') { capture(b, e); }
   });
   const rideUp = (e) => { const b = e.target.closest('[data-ride]'); if (!b) return; b.classList.remove('down'); if (b.dataset.ride === 'boost') game.rideInput('boost', false); };
   hud.addEventListener('pointerup', rideUp); hud.addEventListener('pointercancel', rideUp); hud.addEventListener('lostpointercapture', rideUp);
@@ -698,7 +792,7 @@ export function createUI(game) {
           const btn = bodyEl.querySelector('button'), fill = bodyEl.querySelector('.qbar i');
           const tick = () => { const now = performance.now(); if (down) held += (now - last) / 1000; last = now; fill.style.width = Math.min(100, held / q.need * 100) + '%'; if (held >= q.need) return outcome(true, okFx, failFx); if (!done) requestAnimationFrame(tick); };
           tick();
-          btn.addEventListener('pointerdown', (e) => { e.preventDefault(); down = true; btn.setPointerCapture?.(e.pointerId); if (q.sfx) game.audio?.play('horn-scooter'); });
+          btn.addEventListener('pointerdown', (e) => { e.preventDefault(); down = true; capture(btn, e); if (q.sfx) game.audio?.play('horn-scooter'); });
           btn.addEventListener('pointerup', () => (down = false)); btn.addEventListener('pointercancel', () => (down = false));
           keyH = (e) => { if (e.code === 'Space') { e.preventDefault(); down = e.type === 'keydown'; } };
           addEventListener('keydown', keyH); addEventListener('keyup', keyH);
@@ -781,7 +875,7 @@ export function createUI(game) {
   }
   function levelUp(lvl, unlocks) {
     return new Promise((resolve) => {
-      const m = modal(`<div class="burst"></div><div class="lvbig">${lvl}</div><h2>Level up!</h2>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
+      const m = modal(`<div class="burst"></div><div class="lvbig">${lvl}</div><h2>Level up!</h2><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
         <button class="btn green big" data-x="ok">Nice!</button>`, { cls: 'pop' });
       game.audio?.play('ui-levelup');
       m.card.querySelector('[data-x]').onclick = () => { tap(); m.close(); resolve(); };
@@ -802,10 +896,28 @@ export function createUI(game) {
       const m = modal(`<h2>End of Day ${r.day}</h2><p class="small">The city goes to sleep. Tomorrow starts at 08:00.</p>
         <div class="rlines"><div class="rl"><span>Deliveries</span><b>${r.deliveries}</b></div><div class="rl"><span>Earned riding</span><b>${money(r.earned)}</b></div>
         <div class="rl"><span>Tips</span><b>${money(r.tips)}</b></div><div class="rl"><span>Fuel</span><b class="bad">−${money(r.fuel, true)}</b></div>
-        ${r.fleet ? `<div class="rl"><span>Fleet income</span><b class="good">+${money(r.fleet)}</b></div>` : ''}</div>
+        ${r.fleet ? `<div class="rl"><span>Fleet income</span><b class="good">+${money(r.fleet)}</b></div>` : ''}
+        ${r.wages ? `<div class="rl"><span>Courier wages</span><b class="bad">−${money(r.wages)}</b></div>` : ''}
+        ${r.quit ? `<div class="rl"><span>${esc(r.quit)} quit — wages unpaid</span><b class="bad">!</b></div>` : ''}</div>
         <button class="btn green big" data-x="ok">${ICON('ui-sun')} Next day</button>`, { cls: 'pop' });
       m.card.querySelector('[data-x]').onclick = () => { tap(); m.close(); resolve(); };
     });
+  }
+  function employerNews(n) {
+    const d = DISTRICT[n.d];
+    if (n.kind === 'promoted') { game.audio?.play('ui-levelup', { vol: 0.7 }); toast(`${d.employer}: promoted to ${n.rank.name}! ${n.rank.perk}`, 'good'); }
+    if (n.kind === 'probation') toast(`${d.employer}: on probation — get your ${d.name} rating back to ★${n.req.toFixed(1)}`, 'bad');
+    if (n.kind === 'cleared') toast(`${d.employer}: probation over. Perks are back.`, 'good');
+    if (n.kind === 'suspended') toast(`${d.employer} suspended you for today. ${d.name} orders return tomorrow.`, 'bad');
+  }
+  let achQ = Promise.resolve();
+  function achievement(a) {
+    achQ = achQ.then(() => new Promise((r) => {
+      const prem = a.paint && PREMIUM.find((p) => p.id === a.paint);
+      game.audio?.play('ui-unlock', { vol: 0.7 });
+      toast(`🏆 ${a.name} — ${prem ? `${prem.name} finish unlocked` : `+${money(a.cash)}`}`, 'good');
+      setTimeout(r, 1600);
+    }));
   }
   function tutorial(text, { at = 'center', btn = 'Got it' } = {}) {
     return new Promise((resolve) => {
@@ -821,12 +933,14 @@ export function createUI(game) {
     if (mode === 'hub') { refreshTop(); render(); }
     refreshStartbar();
   }
-  St.on((what) => {
-    if (['cash', 'xp', 'rating', 'clock', 'fleetbank', 'look', 'vehicles', 'skills', 'districts', 'fleet'].includes(what)) refreshTop();
+  St.on((what, data) => {
+    if (['cash', 'xp', 'rating', 'clock', 'fleetbank', 'look', 'vehicles', 'skills', 'districts', 'fleet', 'fleetevent'].includes(what)) refreshTop();
+    if (what === 'fleetevent' && !hub.hidden) { toast('Your dispatch office needs a decision — see Fleet', ''); if (tab === 'fleet') render(); }
+    if (what === 'contract' && data) toast('Contract goal done — claim it on the City tab', 'good');
   });
 
   return {
-    setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial,
+    setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement,
     rideLeg, rideFrame, routeChanged, flash, coach, flowPop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };

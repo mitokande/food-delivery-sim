@@ -21,7 +21,7 @@ export function createHubCamera(camera, dom, city) {
   dom.addEventListener('pointerdown', (e) => {
     if (!st.enabled) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    dom.setPointerCapture?.(e.pointerId);
+    try { dom.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
     if (pointers.size === 1) { last = { x: e.clientX, y: e.clientY }; st.dragging = true; st.moved = 0; st.vx = st.vz = 0; lastT = performance.now(); }
     if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = st.tdist; }
   });
