@@ -31,13 +31,13 @@ export function createUI(game) {
   <div id="hubui">
     <header class="topbar">
       <button class="who" data-act="tab" data-tab="courier"><span class="ava">${ICON('char-' + S.look.char)}</span>
-        <span class="lvlbox"><small class="nm"></small><b class="lvl">Lv. 1</b><span class="xpbar"><i></i><em class="xptext"></em></span></span></button>
+        <span class="lvwrap"><span class="shield"><b class="lvl">1</b></span></span>
+        <span class="lvlbox"><small class="nm"></small><span class="xpbar"><i></i><em class="xptext"></em></span></span></button>
       <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
-      <span class="res rate">${ICON('ui-star')}<b class="ratev">4.5</b></span>
       <button class="gear" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
     </header>
-    <div class="clockbar"><span class="day">Day 1</span><b class="clock">08:00</b><span class="rush" hidden></span><span class="rainchip" hidden>${ICON('ui-rain')}Rain pay ×${RAIN_PAY}</span><button class="fleetbank" data-act="collect" hidden>${ICON('ui-cash')}<b></b></button></div>
-    <section id="sheet" class="sheet"><div class="grab" data-act="grab"><i></i></div><div class="sheet-body"></div></section>
+    <div class="clockbar"><span class="clockchip"><span class="tod"></span><b class="clock">08:00</b><span class="day">Day 1</span></span><span class="rush" hidden></span><span class="rainchip" hidden>${ICON('ui-rain')}Rain pay ×${RAIN_PAY}</span><button class="fleetbank" data-act="collect" hidden>${ICON('ui-cash')}<b></b></button><span class="res rate">${ICON('ui-star')}<b class="ratev">4.5</b></span></div>
+    <section id="sheet" class="sheet"><div class="sheet-rib ribwrap" data-act="grab"><span class="ribbon"></span></div><div class="grab" data-act="grab"><i></i></div><div class="sheet-body"></div></section>
     <div id="startbar" hidden></div>
     <nav class="tabs">
       <button data-act="tab" data-tab="city">${ICON('ui-pin')}<span>City</span></button>
@@ -53,17 +53,17 @@ export function createUI(game) {
     <div class="r-pops"></div>
     <div class="r-top">
       <div class="r-order"><span class="r-food"></span><span class="r-what"><small class="r-verb">Pick up at</small><b class="r-name"></b></span><span class="r-dist"></span></div>
-      <div class="r-timer">${ICON('ui-clock')}<b>0:00</b></div>
+      <div class="r-timer"><span class="tw"><span><b>0:00</b><small>left</small></span></span></div>
     </div>
     <div class="r-sub">
       <div class="r-cond" hidden><span class="m heat">${ICON('ui-thermo')}<i><u></u></i></span><span class="m integ">${ICON('ui-package')}<i><u></u></i></span></div>
       <canvas class="r-map" width="240" height="240"></canvas>
     </div>
     <div class="r-ctx"></div>
-    <div class="r-speed"><b>0</b><small>km/h</small></div>
+    <div class="r-speed"><svg viewBox="0 0 72 40" aria-hidden="true"><path class="trk" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/><path class="val" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/></svg><b>0</b><small>km/h</small></div>
     <button class="r-btn horn" data-ride="horn" aria-label="Horn">${ICON('ui-horn')}</button>
     <button class="r-btn hop" data-ride="hop" aria-label="Hop">${ICON('ui-jump')}<span>HOP</span></button>
-    <button class="r-btn boost" data-ride="boost" aria-label="Turbo"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" class="bg"/><circle cx="50" cy="50" r="45" class="fg"/></svg>${ICON('ui-nitro')}<span>TURBO</span></button>
+    <button class="r-btn boost" data-ride="boost" aria-label="Turbo"><i class="ring"></i>${ICON('ui-nitro')}<span>TURBO</span></button>
     <div class="r-keys">Space turbo · W hop · E action · H horn · drag to look</div>
   </div>
   <div id="modals"></div>
@@ -97,8 +97,10 @@ export function createUI(game) {
 
   // ---------- top bar ----------
   function refreshTop() {
-    $('.lvl', hub).textContent = `Lv. ${S.lvl}`;
-    const nm = $('.nm', hub); nm.textContent = S.name || ''; nm.hidden = !S.name;
+    $('.lvl', hub).textContent = S.lvl;
+    $('.nm', hub).textContent = S.name || `Level ${S.lvl}`;
+    const night = S.clock >= 20.5 * 60 || S.clock < 6 * 60, tod = $('.tod', hub);
+    if (tod.dataset.n !== String(night)) { tod.dataset.n = String(night); tod.innerHTML = ICON(night ? 'ui-moon' : 'ui-sun'); }
     const need = St.xpNeed();
     $('.xpbar i', hub).style.width = `${Math.min(100, S.xp / need * 100)}%`;
     $('.xptext', hub).textContent = `${S.xp}/${need}`;
@@ -133,6 +135,8 @@ export function createUI(game) {
     const keep = renderedTab === tab ? body.scrollTop : 0;
     body.innerHTML = fn();
     body.scrollTop = keep;
+    // the tab's title rides on the ribbon over the sheet's top edge
+    $('.sheet-rib .ribbon', sheet).textContent = body.querySelector('.sec-head h2')?.textContent || '';
     renderedTab = tab;
     refreshStartbar();
   }
@@ -149,9 +153,10 @@ export function createUI(game) {
     if (key === startKey) return;
     const grew = startKey && key.split('|')[0].split(',').length > startKey.split('|')[0].split(',').length;
     startKey = key;
-    startbar.innerHTML = `<span class="sb-foods">${game.taken.map((o) => ICON(FOODS[o.food].icon)).join('')}</span>
+    startbar.dataset.act = 'start';
+    startbar.innerHTML = `<i class="sb-n">${game.taken.length}</i><span class="sb-foods">${game.taken.map((o) => ICON(FOODS[o.food].icon)).join('')}</span>
       <span class="sb-info"><b>${game.taken.length === 1 ? esc(game.taken[0].restName) : `${game.taken.length} orders`}</b><small>${money(pay)} + tips · box ${used}/${cap}</small></span>
-      <button class="btn green sb-go" data-act="start">Start ${ICON('ui-nitro')}</button>`;
+      <button class="sb-go" data-act="start">${ICON('ui-nitro')}START!</button>`;
     if (grew) { startbar.classList.remove('bump'); void startbar.offsetWidth; startbar.classList.add('bump'); }
   }
 
@@ -161,11 +166,12 @@ export function createUI(game) {
     const d = DISTRICT[o.district];
     const left = Math.max(0, o.life - (performance.now() - o.born) / 1000);
     const est = Math.round((o.pickM + o.dropM) / autoSpeed(o.district) + 5); // autopilot alone, no turbo
+    const badges = `${T.badge ? `<em class="badge b-${o.type}">${T.badge}</em>` : ''}${o.rain ? '<em class="badge b-rain">RAIN</em>' : ''}${o.size > 1 ? `<em class="badge">${o.size} slots</em>` : ''}`;
     return `<div class="ocard ${taken ? 'taken' : ''} ${game.selOrder === o.id ? 'sel' : ''}" data-act="order" data-id="${o.id}">
       <span class="ofood">${ICON(FOODS[o.food].icon)}</span>
-      <span class="oinfo"><b>${esc(o.restName)}</b><small>to ${esc(o.name)} · <i style="color:${d.color}">${d.name}</i></small>
-        <span class="ometa">${ICON('ui-route')}${km(o.pickM + o.dropM)} ${ICON('ui-clock')}${mmss(o.eta)} <i class="est ${est <= o.eta * 0.85 ? 'fast' : est > o.eta ? 'slow' : ''}">you ~${mmss(est)}</i>${T.badge ? `<em class="badge b-${o.type}">${T.badge}</em>` : ''}${o.rain ? '<em class="badge b-rain">RAIN</em>' : ''}${o.size > 1 ? `<em class="badge">${o.size} slots</em>` : ''}</span></span>
-      <span class="opay"><b>${money(o.base)}</b><small>+ tips</small><span class="otake">${taken ? '✓' : '+'}</span></span>
+      <span class="oinfo"><b><span class="onm">${esc(o.restName)}</span>${badges}</b><small>to ${esc(o.name)} · <i style="color:${d.color}">${d.name}</i></small>
+        <span class="ometa"><span>${ICON('ui-route')}${km(o.pickM + o.dropM)}</span><span>${ICON('ui-clock')}${mmss(o.eta)}</span><i class="est ${est <= o.eta * 0.85 ? 'fast' : est > o.eta ? 'slow' : ''}">you ~${mmss(est)}</i></span></span>
+      <span class="opay"><span class="price">${ICON('ui-cash')}${money(o.base)}</span><span class="otake">${taken ? '✓ Taken' : 'Take'}</span></span>
       <i class="olife" style="width:${Math.min(100, left / o.life * 100)}%"></i>
     </div>`;
   }
@@ -452,7 +458,7 @@ export function createUI(game) {
     sheet.style.height = '';
   }
   sheet.addEventListener('pointerdown', (e) => {
-    const h = e.target.closest('.grab, .sheet-body > .sec-head:first-child');
+    const h = e.target.closest('.grab, .sheet-rib, .sheet-body > .sec-head:first-child');
     if (!h || e.target.closest('button, a, select, input')) return;
     e.preventDefault();
     capture(sheet, e);
@@ -563,8 +569,9 @@ export function createUI(game) {
   const rh = {
     name: $('.r-name', hud), verb: $('.r-verb', hud), food: $('.r-food', hud), dist: $('.r-dist', hud), timer: $('.r-timer b', hud), timerBox: $('.r-timer', hud),
     cond: $('.r-cond', hud), heat: $('.heat u', hud), integ: $('.integ u', hud), speed: $('.r-speed b', hud), ctx: $('.r-ctx', hud),
-    ring: $('.boost .fg', hud), boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud),
+    boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud), timerLbl: $('.r-timer small', hud), dial: $('.r-speed .val', hud),
   };
+  let vTop = 9; // the active bike's top speed (m/s), for the speed dial
   const mapCtx = rh.map.getContext('2d');
   const flowEl = $('.r-flow', hud), flowMult = $('.r-flow em', hud), flowBar = $('.r-flow u', hud), pops = $('.r-pops', hud), speedEl = $('#speedlines', hud);
   function flowPop(label, F, lost = false) {
@@ -604,6 +611,7 @@ export function createUI(game) {
     rh.name.textContent = leg.kind === 'pickup' ? o.restName : o.name;
     rh.food.innerHTML = leg.kind === 'pickup' ? ICON(FOODS[o.food].icon) : ICON('char-' + o.char);
     rh.cond.hidden = !R.orders.some((x) => x.picked && !x.done);
+    vTop = St.vehStats().top || 9;
     routeChanged(R);
   }
   let mapPts = [];
@@ -653,6 +661,8 @@ export function createUI(game) {
       const u = live.reduce((a, b) => (a.o.eta - a.elapsed < b.o.eta - b.elapsed ? a : b));
       const rem = u.o.eta - u.elapsed;
       rh.timer.textContent = rem >= 0 ? mmss(rem) : '+' + mmss(-rem);
+      rh.timerBox.style.setProperty('--p', Math.max(0, Math.min(1, rem / u.o.eta)).toFixed(3));
+      rh.timerLbl.textContent = rem < 0 ? 'late' : 'left';
       const sec = Math.ceil(rem);
       if (sec !== lastTick && sec <= 10 && sec >= 1 && R.phase === 'ride' && R.timeScale === 1) { lastTick = sec; game.audio?.play('countdown-tick', { vol: 0.7 }); }
       rh.timerBox.classList.toggle('late', rem < 0);
@@ -660,12 +670,13 @@ export function createUI(game) {
       const carried = live.filter((x) => x.picked);
       if (carried.length) {
         const h = Math.min(...carried.map((x) => x.heat)), g = Math.min(...carried.map((x) => x.integrity));
-        rh.heat.style.width = h + '%'; rh.integ.style.width = g + '%';
+        rh.heat.style.setProperty('--v', h + '%'); rh.integ.style.setProperty('--v', g + '%');
         rh.heat.parentNode.parentNode.classList.toggle('low', h < 50); rh.integ.parentNode.parentNode.classList.toggle('low', g < 50);
         rh.cond.hidden = false;
       }
     }
     rh.speed.textContent = Math.round(R.v * 3.6);
+    rh.dial.style.strokeDasharray = `${Math.min(100, R.v / (vTop * 1.35) * 100).toFixed(1)} 100`;
     const F = R.flow;
     if (F) {
       flowEl.hidden = !(F.n > 0);
@@ -674,7 +685,7 @@ export function createUI(game) {
     const sp = R.phase === 'ride' ? Math.max(0, Math.min(1, (R.v - 6.5) / 7)) * (R.boost ? 1 : 0.35) : 0;
     speedEl.style.opacity = sp.toFixed(2);
     const e = R.energy / R.energyMax;
-    rh.ring.style.strokeDashoffset = String(283 * (1 - e));
+    rh.boost.style.setProperty('--e', (e * 100).toFixed(1) + '%');
     rh.boost.classList.toggle('empty', R.energy < 5);
     rh.boost.classList.toggle('on', R.boost);
     // context actions
@@ -862,9 +873,15 @@ export function createUI(game) {
   function receipt(sum) {
     return new Promise((resolve) => {
       const rows = sum.lines.map((l) => `<div class="rl ${l.cls || ''}"><span>${l.label}</span><b>${l.amount >= 0 ? '+' : ''}${money(l.amount, Math.abs(l.amount) < 10 && l.amount % 1 !== 0)}</b></div>`).join('');
-      const m = modal(`<h2>Delivery complete!</h2><div class="stars">${stars(Math.round(sum.avgStars))}</div>
-        <div class="rlines">${rows}</div><div class="rtotal"><span>Total</span><b class="${sum.total < 0 ? 'neg' : ''}">${money(sum.total, Math.abs(sum.total) < 100)}</b></div>
-        <div class="rxp">${ICON('ui-xp')} +${sum.xp} XP${sum.goals ? ` · ${sum.goals}` : ''}</div>
+      // XP bar: what you had before this run (gold) and what it added (blue); a level-up starts the new level's bar
+      const need = St.xpNeed(), before = S.xp - sum.xp, up = before < 0;
+      const w0 = up ? 0 : before / need * 100, w1 = Math.min(100 - w0, (up ? S.xp : sum.xp) / need * 100);
+      const m = modal(`<div class="ribwrap top"><span class="ribbon">${sum.total >= 0 ? 'Delivered!' : 'Rough ride'}</span></div>
+        <div class="stars arc">${stars(Math.round(sum.avgStars))}</div>
+        <div class="ramt ${sum.total < 0 ? 'neg' : ''}">${sum.total >= 0 ? '+' : ''}${money(sum.total, Math.abs(sum.total) < 100)}</div>
+        <div class="rlines">${rows}</div>
+        <div class="rxp2"><span class="shield"><b>${S.lvl}</b></span><span class="bar"><u style="width:${w0.toFixed(1)}%"></u><s style="left:${w0.toFixed(1)}%;width:${w1.toFixed(1)}%"></s><em>+${sum.xp} XP${up ? ' · Level up!' : ''}</em></span><span class="shield next"><b>${S.lvl + 1}</b></span></div>
+        ${sum.goals ? `<div class="rgoal">${ICON('ui-trophy')} ${sum.goals}</div>` : ''}
         <button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`, { cls: 'receipt' });
       game.ob?.event('receipt');
       const go = () => { game.audio?.play('ui-coins'); removeEventListener('keydown', kh); m.close(); resolve(); };
@@ -875,7 +892,7 @@ export function createUI(game) {
   }
   function levelUp(lvl, unlocks) {
     return new Promise((resolve) => {
-      const m = modal(`<div class="burst"></div><div class="lvbig">${lvl}</div><h2>Level up!</h2><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
+      const m = modal(`<div class="burst"></div><div class="lvshield"><span class="shield"><b>${lvl}</b></span></div><div class="ribwrap"><span class="ribbon">Level up!</span></div><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
         <button class="btn green big" data-x="ok">Nice!</button>`, { cls: 'pop' });
       game.audio?.play('ui-levelup');
       m.card.querySelector('[data-x]').onclick = () => { tap(); m.close(); resolve(); };
@@ -893,7 +910,7 @@ export function createUI(game) {
   }
   function dayReport(r) {
     return new Promise((resolve) => {
-      const m = modal(`<h2>End of Day ${r.day}</h2><p class="small">The city goes to sleep. Tomorrow starts at 08:00.</p>
+      const m = modal(`<div class="ribwrap"><span class="ribbon">End of Day ${r.day}</span></div><p class="small">The city goes to sleep. Tomorrow starts at 08:00.</p>
         <div class="rlines"><div class="rl"><span>Deliveries</span><b>${r.deliveries}</b></div><div class="rl"><span>Earned riding</span><b>${money(r.earned)}</b></div>
         <div class="rl"><span>Tips</span><b>${money(r.tips)}</b></div><div class="rl"><span>Fuel</span><b class="bad">−${money(r.fuel, true)}</b></div>
         ${r.fleet ? `<div class="rl"><span>Fleet income</span><b class="good">+${money(r.fleet)}</b></div>` : ''}

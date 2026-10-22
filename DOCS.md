@@ -93,7 +93,8 @@ kuryelerimiz şehirde dolaşır. "Your drivers kept working!" ekranı.
 
 Dikey, tek elle. Üst bar: seviye/XP, nakit, puan, saat. Alt sekmeler: **City · Garage · Courier · Jobs · Fleet**.
 Görsel dil konseptten: lacivert yarı saydam paneller, yeşil "oyun" butonları, krem menü zemini, kalın yuvarlak yazı
-(Lilita One + Fredoka), kırmızı kask/kutu marka rengi. Masaüstünde de çalışır (Space turbo, W/↑ zıpla, E eylem,
+(Lilita One + Fredoka), kırmızı kask/kutu marka rengi. "D2 · Rozet" katmanı: başlıklar kırmızı kurdele, seviye altın
+kalkan, önemli yazılar açılış logosu gibi koyu konturlu, süre altın kronometre. Masaüstünde de çalışır (Space turbo, W/↑ zıpla, E eylem,
 H korna, 1–3 olay seçimi).
 
 ## 6. Teknik
@@ -227,5 +228,16 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   çukur (toz + moloz), kaza (POW + kıvılcım + moloz + başın etrafında dönen yıldızlar), para/enerji alma, motor arızası,
   kıl payı rüzgâr çizgileri, kapıda 4–5 yıldızda konfeti/kalp/bahşiş paraları, fren izinde lastik dumanı, yağmurda teker spreyi.
   Test: `node tools/fxshots.mjs` (her efektin ekran görüntüsü).
+- 2026-10-21: arayüz "D2 · Rozet" görünümüne geçti (renkler, fontlar ve 3D ikonlar aynı; `css/game.css` + `ui/ui.js`).
+  Açılış logosunun koyu konturlu yazısı oyun geneline taşındı. Üst bar: avatar + altın seviye kalkanı + isim/XP çubuğu,
+  ikonu kenardan taşan para sayacı; altında saat rozeti (gece ay ikonu), yoğun saat/yağmur kurdeleleri, puan sayacı.
+  Alt sayfanın üst kenarında sekme adı kırmızı kurdelede (sürüklenebilir), aktif sekme yükselen altın daire. Sipariş kartı:
+  karttan taşan yemek tabağı, rozetler isim yanında, mesafe/süre/tahmin çipleri, para etiketi + "Take" butonu, kalan süre
+  kartın alt kenarında. Start çubuğu tek büyük yeşil buton (sipariş sayısı kırmızı balonda). Harita işaretleri altın çerçeveli
+  yuvarlak tabak; "You" ve müşteri avatar + etiket. Sürüş: taşan yemek/müşteri tabağı, mesafe altın hap, süre altın
+  kronometre (kalan süre halkası `--p`), sıcaklık/kutu dikey tüpler (`--v`), harita altın çerçeve, akış logo yazısıyla,
+  hız yay göstergesi, turbo halkası parçalı (`--e`). Fiş kutlama ekranı (kurdele, kavisli yıldızlar, büyük tutar,
+  seviye kalkanları arası XP çubuğu), seviye atlamada büyük kalkan + kurdele, gün sonu kurdele başlık.
+  Test: `node tools/d2shots.mjs` (yemek alınmış sürüş, puan kartı, seviye atlama).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

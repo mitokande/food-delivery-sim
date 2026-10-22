@@ -204,8 +204,8 @@ function updateMarkers() {
   markers.add({ x: garageLot.cx * TILE, y: 16, z: garageLot.cz * TILE, cls: 'mk', html: `<span class="bub" style="--mc:#8a8f9c">${ICON('ui-wrench')}</span>`, onTap: () => ui.setTab('garage') });
   if (S.fleet.office) markers.add({ x: officeLot.cx * TILE, y: 18, z: officeLot.cz * TILE, cls: 'mk', html: `<span class="bub" style="--mc:#2ec4b6">${ICON('ui-building')}</span>`, onTap: () => ui.setTab('fleet') });
   const t = city.tiles[playerTile()];
-  markers.add({ x: t.x * TILE, y: 9, z: t.z * TILE, cls: 'mk me', html: `<span class="bub" style="--mc:#e8432f">${ICON('char-' + S.look.char)}You</span>` });
-  for (const o of game.taken) { const l = city.lots[o.cust]; markers.add({ x: l.cx * TILE, y: 14, z: l.cz * TILE, cls: 'mk cust', html: `<span class="bub">${ICON('char-' + o.char)}${o.name}</span>` }); }
+  markers.add({ x: t.x * TILE, y: 9, z: t.z * TILE, cls: 'mk me', html: `<span class="bub" style="--mc:#e8432f">${ICON('char-' + S.look.char)}<em>You</em></span>` });
+  for (const o of game.taken) { const l = city.lots[o.cust]; markers.add({ x: l.cx * TILE, y: 14, z: l.cz * TILE, cls: 'mk cust', html: `<span class="bub">${ICON('char-' + o.char)}<em>${o.name}</em></span>` }); }
   fleetMarkers = [];
   for (const c of S.fleet.couriers) {
     const r = [...riders.entries()].find(([k]) => k.startsWith(c.id + '|'))?.[1];
