@@ -298,7 +298,7 @@ game.startJob = async () => {
   if (!S.seen.rideTip) {
     S.seen.rideTip = 1; St.save();
     ride.R.timeScale = 0;
-    await ui.tutorial(`Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> (or swipe up) to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
+    await ui.tutorial(`Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
     ride.R.timeScale = 1;
   }
 };

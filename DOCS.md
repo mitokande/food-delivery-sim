@@ -36,7 +36,7 @@ yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanaca�
 | Güç | Tetik | Etki | Risk |
 |---|---|---|---|
 | **Turbo** | basılı tut (her zaman) | hız +%45; enerji barı harcar | virajda/çukurda daha çok sarsıntı |
-| **Zıpla** | yukarı kaydır / buton | çukur, koni, su birikintisi, kaldırım üstünden geç | yanlış zaman → sert iniş |
+| **Zıpla** | HOP butonu | çukur, koni, su birikintisi, kaldırım üstünden geç | yanlış zaman → sert iniş |
 | **Sollama** | öndeki araç yavaşlatınca parlar | karşı şeride çıkıp geçer | karşıdan araç varsa çarpışma |
 | **Işıkta geç** | kırmızıda durunca parlar | beklemeden geçer | çapraz trafik, ceza olayı |
 | **Korna** | yaya / yavaş araç | yol açar | kaba → küçük puan kaybı (bazı olaylarda) |
@@ -248,5 +248,7 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     doğru sayar ve zıplar (harcamada anında düşer). Fişte tutar sıfırdan sayar, yıldızlar sırayla patlar, XP çubuğu dolar;
     kurdeleler açılırken fırlar (sekme değişince de), seviye kalkanı yukarıdan düşer, aktif sekme dairesi zıplar,
     son 10 saniyede kronometre sallanır, START butonundan parlama geçer. `prefers-reduced-motion` hepsini kapatır.
+- 2026-10-22: sürüşte yukarı kaydırarak zıplama kaldırıldı (yukarı sürükleyip kamerayı oynatmakla çakışıyordu); zıplama
+  artık yalnızca HOP butonu. Sola fiske = sollama duruyor; top olayındaki "yukarı kaydır" görevi de aynen duruyor.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

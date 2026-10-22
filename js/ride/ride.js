@@ -318,7 +318,7 @@ export function createRide(ctx) {
   }
   // first-time hints: slow time and point at the right button
   const COACH = {
-    hop: { text: 'Pothole ahead! Tap <b>HOP</b> (or swipe up) to jump it.', btn: 'hop' },
+    hop: { text: 'Pothole ahead! Tap <b>HOP</b> to jump it.', btn: 'hop' },
     overtake: { text: 'Slow car! Tap <b>Overtake</b> — green means the other lane is clear.', btn: 'overtake' },
     go: { text: 'Red light. Wait… or tap <b>Run it!</b> (cameras sometimes fine you).', btn: 'go' },
     shortcut: { text: 'Your Navigation skill found a <b>shortcut</b>! Tap it to cut through.', btn: 'shortcut' },

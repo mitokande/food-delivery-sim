@@ -632,14 +632,13 @@ export function createUI(game) {
   });
   const rideUp = (e) => { const b = e.target.closest('[data-ride]'); if (!b) return; b.classList.remove('down'); if (b.dataset.ride === 'boost') game.rideInput('boost', false); };
   hud.addEventListener('pointerup', rideUp); hud.addEventListener('pointercancel', rideUp); hud.addEventListener('lostpointercapture', rideUp);
-  // swipe up anywhere on the road = hop
+  // swipe left anywhere on the road = overtake (no swipe-up hop: an upward drag moves the camera; HOP is the button)
   let sw = null;
   document.getElementById('gl').addEventListener('pointerdown', (e) => { if (!hud.hidden) sw = { x: e.clientX, y: e.clientY, t: performance.now() }; });
   document.getElementById('gl').addEventListener('pointerup', (e) => {
     if (!sw || hud.hidden) return;
     const dy = e.clientY - sw.y, dx = e.clientX - sw.x;
-    if (dy < -45 && Math.abs(dx) < Math.abs(dy) && performance.now() - sw.t < 450) game.rideInput('hop', true);
-    else if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5 && performance.now() - sw.t < 450) game.rideInput('overtake', true);
+    if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5 && performance.now() - sw.t < 450) game.rideInput('overtake', true);
     sw = null;
   });
 
