@@ -15,6 +15,7 @@ import { makeChar, loadKit, pieceParts } from '../assets.js';
 import { scoreOrder } from '../orders.js';
 import * as St from '../state.js';
 import { mulberry32 } from '../rng.js';
+import { track } from '../analytics.js';
 
 const A_LAT = 8.5, B_DEC = 7.5, ROAD_Y = 0.1; // asphalt top (kit 0.01 × 10 m)
 const v3 = new THREE.Vector3(), v3b = new THREE.Vector3();
@@ -81,7 +82,7 @@ export function createRide(ctx) {
     R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
     R.orders = job.orders.map((o) => ({ o, elapsed: 0, heat: 100, integrity: 100, picked: false, done: false, tipMult: 1, ratingAdj: 0, result: null }));
-    R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1 };
+    R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1, hops: 0, horns: 0, boostT: 0, stopT: 0, skids: 0, reroutes: 0 };
     R.flow = { n: 0, t: 0, mult: 1 };
     R.meters = 0;
     scene.add(R.bike.root);
@@ -296,6 +297,7 @@ export function createRide(ctx) {
     for (let k = k0; k <= J.k; k++) path.push(steps[k].tile);
     path.push(...rest);
     replaceRoute(path);
+    R.stats.reroutes++;
     ctx.audio?.play('ui-tap', { vol: 0.6 });
     updateJunction();
     if (R.junc && R.junc.cur !== R.junc.gps) ctx.ui.toast('Rerouting…', '');
@@ -323,6 +325,7 @@ export function createRide(ctx) {
     if (R.hop || R.crash > 0) return;
     const T = 0.62 * (1 + 0.04 * (St.S.vehicles[St.S.active].parts.tires || 0));
     R.hop = { t: 0, T, s0: R.s };
+    R.stats.hops++;
     ctx.audio?.play('hop');
     { const p = R.bike.root.position; pfx.hopTakeoff(p.x, p.z); }
     // judge against the nearest hoppable hazard
@@ -338,6 +341,7 @@ export function createRide(ctx) {
   function doHorn() {
     if (R.hornCd > 0) return;
     R.hornCd = 1.2;
+    R.stats.horns++;
     ctx.audio?.play(VEHICLE[St.S.active].horn || 'horn-scooter');
     for (const h of R.hazards) if (h.type === 'ped' && !h.done && h.s - R.s < 30 && h.s > R.s - 2) { h.hurry = true; if (h.ped) h.ped.c.play('sprint', 0.1); }
     const L = leaderAhead(); if (L.who && L.gap < 18 && L.who.kind === 'car') { L.who.vmax += 2.5; L.who.wait = 0; }
@@ -448,6 +452,7 @@ export function createRide(ctx) {
     if (R.crash > 0) return;
     ctx.audio?.play('skid', { vol: 0.8 });
     R.crash = 1.8; R.v = 0; R.stats.crashes++;
+    track('crash', { why: why || 'Crash!', d: city.tiles[stepAt().tile].d, ot: R.ot ? 1 : 0, manual: R.manual ? 1 : 0, lvl: St.S.lvl, veh: St.S.active });
     if (R.ot) R.ot.clean = false;
     flowBreak();
     hurtFood(20, why);
@@ -478,6 +483,7 @@ export function createRide(ctx) {
     buzz(40);
     R.eventCam = true;
     const res = await ctx.ui.event(e, R);
+    track('ride_event', { id: e.id, d: city.tiles[stepAt().tile].d, opt: res?.__opt ?? null, act: res?.__act ?? null, good: res?.__good ? 1 : res?.__bad ? 0 : null, auto: res?.__auto ? 1 : 0, manual: R.manual ? 1 : 0, lvl: St.S.lvl, veh: St.S.active });
     R.eventCam = false;
     R.timeScale = 1;
     actor?.resolve?.(res || {});
@@ -829,8 +835,9 @@ export function createRide(ctx) {
     else R.v = Math.max(target, R.v - 11 * dt);
     const ds = R.v * dt;
     R.s += ds; R.meters += ds;
+    if (R.v < 0.5) R.stats.stopT += dt;
     // energy
-    if (R.boost) { R.energy -= 26 / R.fx.boostDur * dt; if (R.energy <= 0) { R.energy = 0; R.boost = false; } }
+    if (R.boost) { R.stats.boostT += dt; R.energy -= 26 / R.fx.boostDur * dt; if (R.energy <= 0) { R.energy = 0; R.boost = false; } }
     else R.energy = Math.min(R.energyMax, R.energy + 5.5 * R.fx.regen * dt);
     // ---- overtake lateral motion ----
     if (R.ot) {
@@ -978,7 +985,7 @@ export function createRide(ctx) {
       if (ar.s0 > R.s) { if (R.v > vt * 1.12) R.cornerWarn = true; continue; }
       if (R.v > vt * 1.55 && R.crash <= 0) { crash('Way too fast for that corner!'); break; }
       if (R.v > vt * 1.2 && R.skidCd <= 0) {
-        R.skidCd = 1.2; R.v = vt * 1.05; R.wobble = 0.8; hurtFood(6); flowBreak();
+        R.skidCd = 1.2; R.v = vt * 1.05; R.wobble = 0.8; hurtFood(6); flowBreak(); R.stats.skids++;
         ctx.audio?.play('skid', { vol: 0.6 }); ctx.ui.toast('Too fast! Brake before corners', 'warn');
         const b = R.bike.root.position, h = R.bike.root.rotation.y;
         for (let i = 0; i < 4; i++) pfx.skidMark(b.x - Math.sin(h) * i * 0.4, b.z - Math.cos(h) * i * 0.4, h + 0.3);

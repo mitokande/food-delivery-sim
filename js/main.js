@@ -1,4 +1,5 @@
 // Boot + main loop + mode router (hub ⇄ ride).
+import * as An from './analytics.js'; // first, so boot errors are reported too
 import * as THREE from 'three';
 import { generateCity, DIRS, OPP } from './city/gen.js';
 import { buildCityView, waterTime, cullChunks, setCityNight, lampUni, cityMaterials } from './city/view.js';
@@ -280,6 +281,8 @@ game.startJob = async () => {
       stops++;
     }
   }
+  An.track('job_start', { n: orders.length, veh: S.active, lvl: S.lvl, manual: game.manual() ? 1 : 0, clock: Math.round(S.clock), rain: Math.round(WEATHER.rain * 100) / 100, rush: St.rushMult().m,
+    orders: orders.map((o) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, m: Math.round(o.pickM + o.dropM), eta: Math.round(o.eta), pay: o.base })) });
   game.board = game.board.filter((o) => !orders.includes(o));
   game.taken = []; game.selOrder = null; updatePreview();
   showroom.on = false;
@@ -354,12 +357,16 @@ async function finishJob(sum) {
   St.addXP(xp);
   const dayOver = St.advanceClock(sum.time * GAME_MIN_PER_SEC + 3 * n);
   unsub();
+  An.track('job_end', { secs: Math.round(sum.time), m: Math.round(sum.meters), total, xp, fuel: sum.fuel, fines: sum.fines, cash: sum.stats.cash, levels: levels.length, dayOver: dayOver ? 1 : 0,
+    veh: S.active, lvl: S.lvl, manual: ride.R.manual ? 1 : 0, stats: { ...sum.stats, boostT: Math.round(sum.stats.boostT * 10) / 10, stopT: Math.round(sum.stats.stopT * 10) / 10 },
+    orders: sum.orders.filter((x) => x.result).map(({ o, result: r }) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, stars: r.stars, early: r.early ? 1 : 0, late: r.late ? 1 : 0,
+      ratio: Math.round(r.ratio * 100) / 100, pay: r.pay, tip: r.tip, bonus: r.bonus, cond: Math.round(r.cond) })) });
   await new Promise((r) => setTimeout(r, 350));
   await ui.receipt({ lines, total, xp, avgStars: starsSum / n, goals: goalsHit.length ? `${goalsHit.length} goal${goalsHit.length > 1 ? 's' : ''} done!` : '' });
   for (const l of levels) await ui.levelUp(l, LEVEL_UNLOCKS[l] || []);
   for (const n of empNews) ui.employerNews(n);
   for (const a of checkAchievements()) ui.achievement(a);
-  if (dayOver) { const rep = St.newDay(); await ui.dayReport(rep); }
+  if (dayOver) { const rep = St.newDay(); An.track('day_end', { ...rep, earned: Math.round(rep.earned), fuel: Math.round(rep.fuel), tips: Math.round(rep.tips), fleet: Math.round(rep.fleet) }); await ui.dayReport(rep); }
   St.save(true);
   backToHub();
 }
@@ -412,6 +419,7 @@ async function leaveShowroom() {
 game.onTab = async (t) => {
   if (game.mode !== 'hub') return;
   ob.event('tab:' + t);
+  An.track('tab', { tab: t });
   if (t === 'garage') return enterShowroom();
   await leaveShowroom();
   if (t === 'fleet' && S.fleet.office) hubCam.lookAt(officeLot.cx * TILE, officeLot.cz * TILE + 20, 160);
@@ -494,7 +502,7 @@ fill.style.width = '100%';
 document.getElementById('boot').classList.add('out');
 
 const off = St.tickFleet(Date.now(), true);
-if (off && off.gain >= 1) ui.offline(off);
+if (off && off.gain >= 1) { ui.offline(off); An.track('offline_earn', { gain: Math.round(off.gain), away: Math.round(off.away), capped: off.capped ? 1 : 0 }); }
 // first launch: intro + guided first delivery (tests pass ?noti to skip it)
 if (q.has('noti')) { if (S.onboard.step < 99) S.onboard.step = 99; }
 else ob.start();
@@ -530,6 +538,7 @@ function adapt(dt) {
     if (perf.step === 2) { renderer.setPixelRatio(1); sky.sun.shadow.mapSize.set(1024, 1024); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
     if (perf.step === 3) { renderer.shadowMap.enabled = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
     resize(); console.log('quality step', perf.step, ms.toFixed(1) + 'ms');
+    An.track('quality_step', { step: perf.step, ms: Math.round(ms * 10) / 10, mode: game.mode });
   }
 }
 if (q.has('fps')) { const el = document.createElement('div'); el.style.cssText = 'position:fixed;left:4px;bottom:70px;z-index:99;font:12px monospace;background:#000a;color:#0f0;padding:2px 4px'; document.body.append(el); let f = 0, t0 = performance.now(); setInterval(() => { el.textContent = `${Math.round(f * 1000 / (performance.now() - t0))} fps · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · step ${perf.step}`; f = 0; t0 = performance.now(); }, 1000); renderer.info.autoReset = true; const r0 = renderer.render.bind(renderer); renderer.render = (a, b) => { f++; r0(a, b); }; }
@@ -636,3 +645,11 @@ game.peek = async (tx, tz, d = 1, { back = 8, up = 4.3, ahead = 10, fov = 62, bi
 };
 window.game = Object.assign(game, { scene, camera, renderer, view, sky, hubCam, St, traffic, peds, ui, markers, props, train, backdrop });
 window.ready = true;
+// analytics: where the player is right now (quit points, errors)
+An.ready({ fresh, gl: renderer.getContext(), at: () => {
+  if (document.getElementById('intro')) return 'intro';
+  const m = document.querySelector('.modal');
+  if (m) return 'modal:' + (m.classList[1] || '?');
+  if (game.mode === 'ride') return 'ride:' + ride.R.phase;
+  return game.mode === 'hub' ? 'hub:' + ui.tab : game.mode;
+} });

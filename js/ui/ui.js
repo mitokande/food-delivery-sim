@@ -7,6 +7,7 @@ import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
 import { autoSpeed } from '../orders.js';
 import { achValue, achDone } from '../career.js';
+import { track } from '../analytics.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 // pointer capture throws for pointers that already ended (and for synthetic ones): never let that break input
@@ -440,7 +441,7 @@ export function createUI(game) {
       case 'hire': if (St.hire(id)) { game.audio?.play('ui-purchase'); St.rollApplicants(); render(); } break;
       case 'fire': St.fire(id); render(); break;
       case 'train': if (St.train(id)) { game.audio?.play('ui-unlock'); render(); } break;
-      case 'reroll': if (St.spend(20)) { St.rollApplicants(); render(); } break;
+      case 'reroll': if (St.spend(20)) { track('buy', { k: 'reroll', cost: 20, lvl: S.lvl, cash: Math.round(S.cash) }); St.rollApplicants(); render(); } break;
       case 'collect': { const n = St.collectFleet(); if (n) { game.audio?.play('ui-coins'); coinsTo(b, 8); toast(`+${money(n)} from your fleet`, 'cash'); if (tab === 'fleet') render(); } break; }
     }
   });
@@ -536,6 +537,7 @@ export function createUI(game) {
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
       <button class="btn green big" data-x="close">Done</button>`, { dismiss: true, cls: 'settings' });
     m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S.settings[k] = e.target.type === 'range' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value; St.save(); game.applySettings?.(); });
+    m.card.addEventListener('change', (e) => { const k = e.target.dataset.k; if (k) track('setting', { k, v: S.settings[k] }); });
     m.card.addEventListener('click', (e) => {
       const x = e.target.closest('[data-x]')?.dataset.x;
       if (x === 'close') m.close();
@@ -548,6 +550,7 @@ export function createUI(game) {
   function saveCode() {
     St.save(true);
     const code = St.exportCode();
+    track('save_export', { lvl: S.lvl });
     const m = modal(`<h2>Save code</h2><p class="small">Copy this and paste it into <b>Load save code</b> on another device.</p>
       <textarea class="code" readonly>${code}</textarea>
       <button class="btn green big" data-x="copy">Copy</button><button class="btn ghost" data-x="close">Close</button>`, { dismiss: true, cls: 'codebox' });
@@ -566,7 +569,7 @@ export function createUI(game) {
     const ta = m.card.querySelector('textarea');
     m.card.querySelector('[data-x="load"]').onclick = () => {
       tap();
-      if (St.importCode(ta.value)) { toast('Career loaded', 'good'); setTimeout(() => location.reload(), 400); }
+      if (St.importCode(ta.value)) { track('save_import', { from_lvl: S.lvl }); toast('Career loaded', 'good'); setTimeout(() => location.reload(), 400); }
       else toast("That code doesn't look right", 'bad');
     };
     m.card.querySelector('[data-x="close"]').onclick = () => { tap(); m.close(); };
@@ -792,10 +795,11 @@ export function createUI(game) {
       const m = dock(`<div class="ev-head">${ICON(ev.icon || 'ui-bolt', 'evi')}<h2 class="ribbon">${esc(ev.title)}</h2></div><p>${esc(ev.text)}</p>
         <div class="ev-body"></div><div class="ev-timer"><i></i></div>`);
       const bodyEl = m.card.querySelector('.ev-body'), bar = m.card.querySelector('.ev-timer i');
-      let done = false, raf = 0, keyH = null;
+      let done = false, raf = 0, keyH = null, picked = null, auto = false;
       const cleanups = [];
       const finish = (res) => {
         if (done) return; done = true; cancelAnimationFrame(raf);
+        if (res) { res.__opt = picked; res.__auto = auto; } // for analytics: which option, or the timer chose
         if (keyH) removeEventListener('keydown', keyH);
         for (const f of cleanups) f();
         if (res && (res.__good || res.__bad)) m.card.classList.add(res.__good ? 'good' : 'bad');
@@ -869,7 +873,7 @@ export function createUI(game) {
         const choose = (i) => {
           const o = opts[i]; if (!o) return;
           tap();
-          act = o.act || null;
+          act = o.act || null; picked = i;
           if (o.qte) { cancelAnimationFrame(raf); if (keyH) removeEventListener('keydown', keyH); runQte(o.qte, o.ok, o.fail); return; }
           if (o.risk) { const bad = Math.random() < o.risk.p; game.audio?.play(bad ? 'qte-bad' : 'qte-good'); finish({ ...(bad ? o.risk.bad : o.risk.good), __good: !bad, __bad: bad, __act: act }); return; }
           finish({ ...(o.effect || {}), __act: act });
@@ -877,7 +881,7 @@ export function createUI(game) {
         bodyEl.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) choose(+b.dataset.i); });
         keyH = (e) => { const n = +e.key; if (n >= 1 && n <= opts.length) choose(n - 1); }; addEventListener('keydown', keyH);
         // undecided → the last (safe/plain) option
-        timed(7, () => choose(opts.length - 1));
+        timed(7, () => { auto = true; choose(opts.length - 1); });
       }
     });
   }

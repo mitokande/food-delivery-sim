@@ -1,0 +1,4 @@
+# Shared login code is included by index.php / api.php only.
+<Files "auth.php">
+  Require all denied
+</Files>

@@ -118,6 +118,8 @@ H korna, 1–3 olay seçimi).
   her chunk ≈ kit başına 1 draw call. Gölge sadece oyuncu çevresinde.
 - Trafik: yol grafiği üzerinde rastgele rotalı araçlar, takip mesafesi, trafik ışıkları; kaldırımda yayalar.
 - Kayıt: `localStorage` `fds_save_v1`. Kapalıyken geçen süre filo gelirine.
+- Analitik: `js/analytics.js` olayları toplayıp 15 sn'de bir (sayfa gizlenince `sendBeacon` ile) `api/collect.php`'ye yollar;
+  PHP + SQLite (`api/`), panel `admin/` (şifreli). Ayrıntı: §10.
 - Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
 
 ## 7. Varlıklar
@@ -151,6 +153,9 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi |
+| `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
+| `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
+| `admin/` | analitik paneli: `index.php` giriş + kabuk, `api.php` salt-okunur sorgular, `app.js` görünümler + SVG grafikler (isimleri oyunun `data.js`'inden alır) |
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
@@ -269,5 +274,31 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   çarpma, park etmiş araçta "Go round A" ipucu. Ayarlar'da *Auto-drive* anahtarı (yalnızca dokunmatik olmayan cihazda).
   Test: `node tools/manual.mjs` (1280x720, dokunmasız; bir sürücü işi baştan sona bitirir). Dokunmatik testler
   (`play`, `onboard`, …) otomatik sürüşte kalır; `sweep`'in masaüstü boyutları artık manuel.
+- 2026-10-22: analitik backend + admin paneli (§10).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
+
+## 10. Analitik
+
+Oyun anonim olaylar yollar; panel `mithatck.com/food-delivery-sim/admin/` (tek şifre). Kişisel veri yok: IP saklanmaz,
+oyuncu = cihazdaki rastgele `fds_pid`, isim = oyuncunun oyunda girdiği kurye adı.
+
+- **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
+  Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.
+- **Olaylar:** `session_start`, `boot` (yükleme süresi), `boot_fail`, `error`, `intro_done`, `onboard_step`, `onboard_done`, `tab`,
+  `job_start` (siparişler, araç, yağmur, `manual`), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
+  zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
+  `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
+  `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,
+  `save_export` / `save_import` / `save_reset`. Her pakette kaydın özeti de gider (seviye, para, teslimat, bölgeler, bulunulan ekran).
+- **Geliştirici cihazı:** oyunu bir kez `?an=dev` ile aç → o cihazın oturumları istatistiklere girmez (panelde "Geliştirici
+  cihazları dahil" ile görünür). `?an=off` göndermeyi kapatır, `?an=on` sıfırlar. Headless testler (`navigator.webdriver`)
+  hiçbir şey göndermez; `?an=force` ile açılır.
+- **Panel:** Genel bakış (KPI'lar + önceki döneme göre, günlük grafik, yeni oyuncu hunisi, retention tablosu, saat, çıkış ekranı,
+  cihaz/OS/tarayıcı, FPS ve GPU), Canlı (son 10 dk oturumlar + olay akışı, 10 sn'de bir yenilenir), Oturumlar (filtre, sıralama,
+  oturum detayında zaman çizelgesi: her sürüş bir blok, yarım kalan sürüş işaretli), Oyuncular (oyuncu detayı: seviye süreleri,
+  oturumlar, satın almalar), Oynanış (bölge/sipariş tipi tabloları, olay seçimleri, kaza nedenleri, satın almalar, seviye süreleri,
+  tutorial adımları), Hatalar (mesaja göre gruplu, örnek oturum + stack).
+- **Kurulum (sunucu):** veritabanı web kökünün dışında olmalı ve PHP kullanıcısı yazabilmeli:
+  `php api/cli.php init /var/www/vhosts/mithatck.com/fds-analytics` → `api/config.local.php` yazar ve rastgele panel şifresini basar.
+  Şifre değiştirmek: `php api/cli.php set-password`. Durum: `php api/cli.php info`. Eski ham olayları silmek: `php api/cli.php prune 180`.

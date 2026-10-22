@@ -5,3 +5,7 @@ tools/shots/
 __pycache__/
 *.log
 .DS_Store
+# analytics: server-only settings and the database
+api/config.local.php
+api/data/*
+!api/data/.htaccess

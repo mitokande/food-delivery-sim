@@ -1,0 +1,2 @@
+# The analytics database (only used here when config.local.php does not move it out of the web root).
+Require all denied

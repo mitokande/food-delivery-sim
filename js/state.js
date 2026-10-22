@@ -6,6 +6,8 @@ const KEY = 'fds_save_v1';
 const listeners = new Set();
 export const on = (fn) => (listeners.add(fn), () => listeners.delete(fn));
 export const emit = (what, data) => { for (const fn of listeners) fn(what, data); };
+// economy actions announce themselves for analytics.js: did('buy', { k: 'vehicle', id, cost })
+const did = (ev, d) => emit('act', { ev, ...d });
 
 const fresh = () => ({
   v: 1,
@@ -137,31 +139,33 @@ export function buyVehicle(id) {
   if (!spend(v.price)) return false;
   if (!S.vehicles[id]) S.vehicles[id] = { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, paint: null, box: null, count: 0 };
   S.vehicles[id].count++;
+  did('buy', { k: 'vehicle', id, cost: v.price });
   emit('vehicles'); save(); return true;
 }
-export function setActive(id) { if (owned(id) - assignedCount(id) > 0 || S.active === id) { S.active = id; emit('vehicles'); save(); return true; } return false; }
+export function setActive(id) { if (owned(id) - assignedCount(id) > 0 || S.active === id) { if (S.active !== id) did('equip', { id }); S.active = id; emit('vehicles'); save(); return true; } return false; }
 export function upgradePart(id, part) {
   const o = S.vehicles[id], lvl = o.parts[part] || 0;
   if (lvl >= PART_MAX) return false;
-  if (!spend(partCost(VEHICLE[id], part, lvl))) return false;
-  o.parts[part] = lvl + 1; emit('vehicles'); save(); return true;
+  const cost = partCost(VEHICLE[id], part, lvl);
+  if (!spend(cost)) return false;
+  o.parts[part] = lvl + 1; did('buy', { k: 'part', id, part, to: lvl + 1, cost }); emit('vehicles'); save(); return true;
 }
 export function paintVehicle(id, which, color) {
   if (!spend(PAINT_COST)) return false;
-  S.vehicles[id][which] = color; emit('vehicles'); save(); return true;
+  S.vehicles[id][which] = color; did('buy', { k: 'paint', id, which, color, cost: PAINT_COST }); emit('vehicles'); save(); return true;
 }
 export function skillReq(id) { return Math.max(1, skill(id) * 2); } // courier level needed for the next level
 export function upgradeSkill(id) {
   const lvl = skill(id);
   if (lvl >= SKILL_MAX || S.lvl < skillReq(id)) return false;
   if (!spend(skillCost(lvl))) return false;
-  S.skills[id] = lvl + 1; emit('skills'); save(); return true;
+  S.skills[id] = lvl + 1; did('buy', { k: 'skill', id, to: lvl + 1, cost: skillCost(lvl) }); emit('skills'); save(); return true;
 }
 export function applyDistrict(id) {
   const st = districtStatus(id);
   if (st.open || !st.canApply) return false;
   if (!spend(st.fee)) return false;
-  S.districts[id] = true; emit('districts', id); save(); return true;
+  S.districts[id] = true; did('buy', { k: 'district', id, cost: st.fee }); emit('districts', id); save(); return true;
 }
 
 // ---------- day / clock ----------
@@ -249,7 +253,7 @@ export function weekProgress(id, by = 1, ctx = {}) {
 export function claimContract(i) {
   const c = S.week?.list[i];
   if (!c || c.p < c.n || c.claimed) return false;
-  c.claimed = true; earn(c.reward, 'contract'); addXP(60);
+  c.claimed = true; did('claim', { k: 'contract', id: c.id, reward: c.reward }); earn(c.reward, 'contract'); addXP(60);
   if (S.week.list.every((x) => x.claimed)) S.stats.contracts++;
   return true;
 }
@@ -257,6 +261,7 @@ export function claimWeekBonus() {
   const w = S.week;
   if (!w || w.bonusClaimed || !w.list.every((x) => x.claimed)) return null;
   w.bonusClaimed = true;
+  did('claim', { k: 'week', paint: w.bonus.paint || null, reward: w.bonus.cash || 0 });
   if (w.bonus.paint) { if (!S.unlocked.paints.includes(w.bonus.paint)) S.unlocked.paints.push(w.bonus.paint); }
   else earn(w.bonus.cash, 'contract');
   emit('look'); save(); return w.bonus;
@@ -299,7 +304,7 @@ export function buyPaint(id) {
   const p = PREMIUM.find((x) => x.id === id);
   if (!p || p.award || hasPaint(id)) return false;
   if (!spend(p.price)) return false;
-  S.unlocked.paints.push(id); emit('look'); save(); return true;
+  S.unlocked.paints.push(id); did('buy', { k: 'premium', id, cost: p.price }); emit('look'); save(); return true;
 }
 
 // ---------- save code: move a career between devices by copy & paste ----------
@@ -317,7 +322,7 @@ export function importCode(code) {
 export function claimGoal(i) {
   const g = S.goals.list[i];
   if (!g || g.p < g.n || g.claimed) return false;
-  g.claimed = true; earn(g.reward, 'goal'); addXP(30); return true;
+  g.claimed = true; did('claim', { k: 'goal', id: g.id, reward: g.reward }); earn(g.reward, 'goal'); addXP(30); return true;
 }
 
 // ---------- fleet ----------
@@ -339,12 +344,12 @@ export function fleetPerMin(mult = 1) {
 export function openOffice() {
   if (S.fleet.office || S.lvl < FLEET.unlockLvl) return false;
   if (!spend(FLEET.officeCost)) return false;
-  S.fleet.office = true; S.fleet.last = Date.now(); rollApplicants(); emit('fleet'); save(); return true;
+  S.fleet.office = true; S.fleet.last = Date.now(); rollApplicants(); did('buy', { k: 'office', cost: FLEET.officeCost }); emit('fleet'); save(); return true;
 }
 export function upgradeOffice() {
   const next = FLEET.levels[S.fleet.level + 1];
   if (!next || !spend(next.cost)) return false;
-  S.fleet.level++; emit('fleet'); save(); return true;
+  S.fleet.level++; did('buy', { k: 'office_up', to: S.fleet.level, cost: next.cost }); emit('fleet'); save(); return true;
 }
 export function rollApplicants(rng = Math.random) {
   const list = [];
@@ -367,9 +372,10 @@ export function hire(appId) {
   if (!spend(a.fee)) return false;
   S.fleet.applicants = S.fleet.applicants.filter((x) => x !== a);
   S.fleet.couriers.push({ id: a.id, name: a.name, char: a.char, skill: a.skill, veh: a.ownVeh, own: true, district: 'oldtown', hired: Date.now() });
+  did('buy', { k: 'hire', skill: a.skill, cost: a.fee, couriers: S.fleet.couriers.length });
   emit('fleet'); save(); return true;
 }
-export function fire(id) { S.fleet.couriers = S.fleet.couriers.filter((c) => c.id !== id); emit('fleet'); save(); }
+export function fire(id) { did('fleet', { k: 'fire', left: S.fleet.couriers.length - 1 }); S.fleet.couriers = S.fleet.couriers.filter((c) => c.id !== id); emit('fleet'); save(); }
 export function assign(id, patch) {
   const c = S.fleet.couriers.find((x) => x.id === id); if (!c) return false;
   if (patch.district && !S.districts[patch.district]) return false;
@@ -377,13 +383,14 @@ export function assign(id, patch) {
     if (patch.veh !== c.veh && !(c.own && patch.veh === c.ownVeh) && freeVehicles(patch.veh) <= 0) return false;
     c.own = false;
   }
-  Object.assign(c, patch); emit('fleet'); save(); return true;
+  Object.assign(c, patch); did('fleet', { k: 'assign', ...patch }); emit('fleet'); save(); return true;
 }
 export function trainCost(c) { return Math.round(200 * Math.pow(2.1, c.skill) / 10) * 10; }
 export function train(id) {
   const c = S.fleet.couriers.find((x) => x.id === id); if (!c || c.skill >= 5) return false;
-  if (!spend(trainCost(c))) return false;
-  c.skill++; emit('fleet'); save(); return true;
+  const cost = trainCost(c);
+  if (!spend(cost)) return false;
+  c.skill++; did('buy', { k: 'train', to: c.skill, cost }); emit('fleet'); save(); return true;
 }
 // Accrue fleet income (×FLEET.dispatch while the player is out riding). Returns { offline: $ added since last visit if > 1 min away }.
 export function tickFleet(now = Date.now(), offlineCheck = false, mult = 1) {
@@ -408,7 +415,7 @@ export function tickFleet(now = Date.now(), offlineCheck = false, mult = 1) {
 export function collectFleet() {
   const n = Math.floor(S.fleet.bank);
   if (n <= 0) return 0;
-  S.fleet.bank -= n; earn(n, 'fleet'); return n;
+  S.fleet.bank -= n; did('claim', { k: 'fleet', reward: n }); earn(n, 'fleet'); return n;
 }
 
 // ---------- fleet decisions ----------
@@ -446,5 +453,7 @@ export function resolveFleetEvent(id, choice) {
     else msg = 'Declined.';
   }
   f.events = f.events.filter((e) => e !== ev);
+  if (choice === 'a' && ev.cost) did('buy', { k: 'fleet_' + ev.kind, cost: ev.cost });
+  did('fleet', { k: 'decision', kind: ev.kind, choice });
   emit('fleet'); save(); return msg;
 }

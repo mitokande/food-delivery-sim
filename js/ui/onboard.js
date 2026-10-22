@@ -4,6 +4,7 @@ import * as St from '../state.js';
 import { S } from '../state.js';
 import { CHAR_IDS, PAINTS, DISTRICT, FLEET } from '../data.js';
 import { ICON } from './ui.js';
+import { track } from '../analytics.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -29,14 +30,14 @@ export function createOnboarding(game, ui) {
   guide.querySelector('.g-skip').addEventListener('click', () => finish(true));
   let raf = 0, cur = null, waiting = null;
   const step = () => S.onboard.step;
-  const setStep = (n) => { S.onboard.step = n; St.save(); };
+  const setStep = (n) => { if (n !== S.onboard.step) track('onboard_step', { step: n, from: S.onboard.step }); S.onboard.step = n; St.save(); };
 
   // ---------- intro: three slides, then pick your courier ----------
   function intro() {
     return new Promise((resolve) => {
       const el = document.createElement('div');
       el.id = 'intro';
-      let look = { char: S.look.char, helmet: S.look.helmet }, name = S.name || '';
+      let look = { char: S.look.char, helmet: S.look.helmet }, name = S.name || '', skipped = false;
       const slides = [
         { art: `<img src="assets/icons/veh-rustbucket.png" class="ia big" alt="">`, h: 'Welcome to Saffron Bay', p: 'Your uncle left you his old scooter. It rattles, it smokes, it\'s <b>yours</b>. You have <b>$25</b> and big dreams.' },
         { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-nitro', 'ia')}<i>→</i>${ICON('ui-cash', 'ia')}</span>`, h: 'The scooter rides itself', p: 'You choose when to <b>turbo</b>, <b>hop</b> over potholes and <b>overtake</b>. Fast, careful deliveries earn big tips.' },
@@ -68,9 +69,10 @@ export function createOnboarding(game, ui) {
         const a = b.dataset.i;
         if (a === 'next') { i++; render(); }
         if (a === 'back') { i = Math.max(0, i - 1); render(); }
-        if (a === 'skip') { i = slides.length; render(); }
+        if (a === 'skip') { i = slides.length; skipped = true; render(); }
         if (a === 'go') {
           S.look.char = look.char; S.look.helmet = look.helmet; S.name = name.trim();
+          track('intro_done', { char: look.char, helmet: look.helmet, named: S.name ? 1 : 0, skipped: skipped ? 1 : 0 });
           St.save(true); St.emit('look');
           el.classList.add('out'); setTimeout(() => el.remove(), 350);
           resolve();
@@ -129,6 +131,7 @@ export function createOnboarding(game, ui) {
     show(next);
   }
   function finish(skipped) {
+    track('onboard_done', { skipped: skipped ? 1 : 0, at: step() });
     setStep(99); hide(); cur = null;
     if (!skipped) ui.toast("You're on your own now — good luck out there!", 'good');
   }

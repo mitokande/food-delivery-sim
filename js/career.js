@@ -25,6 +25,7 @@ export function checkAchievements() {
     for (const a of ACHIEVEMENTS) {
       if (S.ach[a.id] || achValue(a) < a.n) continue;
       S.ach[a.id] = Date.now();
+      St.emit('act', { ev: 'achievement', id: a.id });
       if (a.paint && !S.unlocked.paints.includes(a.paint)) S.unlocked.paints.push(a.paint);
       if (a.cash) St.earn(a.cash, 'achievement');
       out.push(a);

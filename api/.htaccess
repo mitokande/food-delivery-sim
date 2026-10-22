@@ -1,0 +1,4 @@
+# Only the collector is public; settings, shared code, the CLI and the data folder are not.
+<FilesMatch "^(config|config\.local|lib|cli)\.php$">
+  Require all denied
+</FilesMatch>
