@@ -95,6 +95,43 @@ export function createUI(game) {
   }
   const tap = () => game.audio?.play('ui-tap');
 
+  // ---------- motion ----------
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fly = document.createElement('div'); fly.id = 'fly'; document.body.append(fly);
+  // coins burst out of a button and land on the cash counter (or where it sits while the hub is hidden)
+  function coinsTo(from, n = 8) {
+    if (calm || !from || !from.isConnected) return;
+    const a = from.getBoundingClientRect(), cash = $('.topbar .cash', hub);
+    const b = !hub.hidden && cash ? cash.getBoundingClientRect() : { left: innerWidth - 120, top: 14, height: 34 };
+    const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + 10, y1 = b.top + b.height / 2;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('img'); c.className = 'flycoin'; c.src = 'assets/icons/ui-coin.webp'; c.alt = '';
+      fly.append(c);
+      const ang = Math.random() * Math.PI * 2, r = 30 + Math.random() * 45;
+      const xm = x0 + Math.cos(ang) * r, ym = y0 + Math.sin(ang) * r * 0.7 - 24;
+      c.animate([
+        { transform: `translate(${x0}px, ${y0}px) scale(.4)`, opacity: 0 },
+        { transform: `translate(${xm}px, ${ym}px) scale(1.15)`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${x1}px, ${y1}px) scale(.5)`, opacity: 1 },
+      ], { duration: 650 + i * 55, delay: i * 25, easing: 'cubic-bezier(.45,0,.7,1)', fill: 'both' }).onfinish = () => c.remove();
+    }
+  }
+  // the cash counter rolls up to new money (once it is on screen); spending updates it at once
+  let shownCash = S.cash, cashRaf = 0;
+  function setCash() {
+    const el = $('.cashv', hub);
+    if (S.cash <= shownCash || calm) { cancelAnimationFrame(cashRaf); cashRaf = 0; shownCash = S.cash; el.textContent = money(S.cash); return; }
+    if (hub.hidden || cashRaf) return;
+    const from = shownCash, t0 = performance.now(), box = $('.topbar .cash', hub);
+    box.classList.remove('gain'); void box.offsetWidth; box.classList.add('gain');
+    const step = () => {
+      const f = Math.min(1, (performance.now() - t0) / 800);
+      el.textContent = money(from + (S.cash - from) * (1 - Math.pow(1 - f, 3)));
+      if (f < 1) cashRaf = requestAnimationFrame(step); else { cashRaf = 0; shownCash = S.cash; el.textContent = money(S.cash); }
+    };
+    cashRaf = requestAnimationFrame(step);
+  }
+
   // ---------- top bar ----------
   function refreshTop() {
     $('.lvl', hub).textContent = S.lvl;
@@ -104,7 +141,7 @@ export function createUI(game) {
     const need = St.xpNeed();
     $('.xpbar i', hub).style.width = `${Math.min(100, S.xp / need * 100)}%`;
     $('.xptext', hub).textContent = `${S.xp}/${need}`;
-    $('.cashv', hub).textContent = money(S.cash);
+    setCash();
     $('.ratev', hub).textContent = St.rating().toFixed(1);
     $('.ava', hub).innerHTML = ICON('char-' + S.look.char);
     $('.day', hub).textContent = `Day ${S.day}`;
@@ -135,8 +172,9 @@ export function createUI(game) {
     const keep = renderedTab === tab ? body.scrollTop : 0;
     body.innerHTML = fn();
     body.scrollTop = keep;
-    // the tab's title rides on the ribbon over the sheet's top edge
-    $('.sheet-rib .ribbon', sheet).textContent = body.querySelector('.sec-head h2')?.textContent || '';
+    // the tab's title rides on the ribbon over the sheet's top edge (and pops in when it changes)
+    const rib = $('.sheet-rib .ribbon', sheet), title = body.querySelector('.sec-head h2')?.textContent || '';
+    if (rib.textContent !== title) { rib.textContent = title; rib.classList.remove('pop'); void rib.offsetWidth; rib.classList.add('pop'); }
     renderedTab = tab;
     refreshStartbar();
   }
@@ -188,7 +226,7 @@ export function createUI(game) {
     const open = DISTRICTS.filter((d) => S.districts[d.id]);
     const focus = S.focus && S.districts[S.focus] ? S.focus : '';
     const filter = open.length > 1 ? `<div class="dfilter"><button class="${focus ? '' : 'on'}" data-act="focus" data-d="">All</button>${open.map((d) => `<button class="${focus === d.id ? 'on' : ''}" style="--dc:${d.color}" data-act="focus" data-d="${d.id}">${d.name}<small>×${d.pay}</small></button>`).join('')}</div>` : '';
-    return `<div class="sec-head"><h2>Orders</h2><span class="sub">${St.rushMult().m > 1 ? `🔥 ${St.rushMult().name}` : `${list.length} nearby`}</span></div>
+    return `<div class="sec-head"><h2>Orders</h2><span class="sub">${St.rushMult().m > 1 ? `${ICON('ui-nitro')} ${St.rushMult().name}` : `${list.length} nearby`}</span></div>
       ${filter}
       <div class="orders">${list.map((o) => orderCard(o, game.taken.includes(o))).join('')}</div>
       ${start}
@@ -379,9 +417,9 @@ export function createUI(game) {
       case 'settings': settings(); break;
       case 'order': game.toggleOrder(+id); render(); break;
       case 'start': game.startJob(); break;
-      case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); render(); } break;
+      case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); coinsTo(b, 6); render(); } break;
       case 'focus': S.focus = b.dataset.d || null; St.save(); game.refocus?.(); render(); break;
-      case 'contract': if (St.claimContract(+b.dataset.i)) { game.audio?.play('ui-coins'); render(); } break;
+      case 'contract': if (St.claimContract(+b.dataset.i)) { game.audio?.play('ui-coins'); coinsTo(b, 8); render(); } break;
       case 'weekbonus': { const bn = St.claimWeekBonus(); if (bn) { game.audio?.play('ui-unlock'); toast(bn.paint ? `New finish: ${PREMIUM.find((p) => p.id === bn.paint).name}! Try it in the Garage.` : `+${money(bn.cash)} contract bonus`, 'good'); render(); } break; }
       case 'buypaint': if (St.buyPaint(id)) { game.audio?.play('ui-purchase'); toast(`${PREMIUM.find((p) => p.id === id).name} finish unlocked`, 'good'); render(); } else toast(`Costs ${money(PREMIUM.find((p) => p.id === id).price)}`, 'bad'); break;
       case 'premiuminfo': toast('Won through achievements and contracts', ''); break;
@@ -402,7 +440,7 @@ export function createUI(game) {
       case 'fire': St.fire(id); render(); break;
       case 'train': if (St.train(id)) { game.audio?.play('ui-unlock'); render(); } break;
       case 'reroll': if (St.spend(20)) { St.rollApplicants(); render(); } break;
-      case 'collect': { const n = St.collectFleet(); if (n) { game.audio?.play('ui-coins'); toast(`+${money(n)} from your fleet`, 'cash'); if (tab === 'fleet') render(); } break; }
+      case 'collect': { const n = St.collectFleet(); if (n) { game.audio?.play('ui-coins'); coinsTo(b, 8); toast(`+${money(n)} from your fleet`, 'cash'); if (tab === 'fleet') render(); } break; }
     }
   });
   root.addEventListener('change', (e) => {
@@ -736,7 +774,7 @@ export function createUI(game) {
       const opts = ev.options;
       const qte = ev.qte;
       // the card docks at the bottom of the screen so the street (where the event happens) stays visible
-      const m = dock(`<div class="ev-head">${ICON(ev.icon || 'ui-bolt', 'evi')}<h2>${esc(ev.title)}</h2></div><p>${esc(ev.text)}</p>
+      const m = dock(`<div class="ev-head">${ICON(ev.icon || 'ui-bolt', 'evi')}<h2 class="ribbon">${esc(ev.title)}</h2></div><p>${esc(ev.text)}</p>
         <div class="ev-body"></div><div class="ev-timer"><i></i></div>`);
       const bodyEl = m.card.querySelector('.ev-body'), bar = m.card.querySelector('.ev-timer i');
       let done = false, raf = 0, keyH = null;
@@ -832,7 +870,7 @@ export function createUI(game) {
   function pickup(orders, R) {
     return new Promise((resolve) => {
       const o = orders[0];
-      const m = modal(`<div class="sc-row">${ICON(FOODS[o.food].icon, 'scf')}<span><small>Pick up order${orders.length > 1 ? 's' : ''}</small><b>${esc(o.restName)}</b>
+      const m = modal(`<div class="ribwrap top"><span class="ribbon">Pick up</span></div><div class="sc-row">${ICON(FOODS[o.food].icon, 'scf')}<span><small>Pick up order${orders.length > 1 ? 's' : ''}</small><b>${esc(o.restName)}</b>
         <em>${orders.map((x) => `${FOODS[x.food].name} for ${esc(x.name)}`).join(' · ')}</em></span></div>
         <button class="btn green big" data-x="ok">Confirm Pickup</button>`, { cls: 'scene' });
       game.ob?.event('pickup');
@@ -844,7 +882,7 @@ export function createUI(game) {
   }
   function drop(o, R) {
     return new Promise((resolve) => {
-      const m = modal(`<div class="sc-row">${ICON('char-' + o.char, 'scc')}<span><small>Deliver to</small><b>${esc(o.name)}</b><em>${FOODS[o.food].name} from ${esc(o.restName)}</em></span><span class="check">✓</span></div>
+      const m = modal(`<div class="ribwrap top"><span class="ribbon">Delivery</span></div><div class="sc-row">${ICON('char-' + o.char, 'scc')}<span><small>Deliver to</small><b>${esc(o.name)}</b><em>${FOODS[o.food].name} from ${esc(o.restName)}</em></span><span class="check">✓</span></div>
         <button class="btn green big" data-x="ok">Complete Delivery</button>`, { cls: 'scene' });
       game.ob?.event('drop');
       const go = () => { tap(); removeEventListener('keydown', kh); m.close(); game.ob?.event('dropped'); resolve(); };
@@ -884,7 +922,13 @@ export function createUI(game) {
         ${sum.goals ? `<div class="rgoal">${ICON('ui-trophy')} ${sum.goals}</div>` : ''}
         <button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`, { cls: 'receipt' });
       game.ob?.event('receipt');
-      const go = () => { game.audio?.play('ui-coins'); removeEventListener('keydown', kh); m.close(); resolve(); };
+      const amt = m.card.querySelector('.ramt');
+      if (!calm && sum.total > 0) {
+        const t0 = performance.now() + 350, dec = Math.abs(sum.total) < 100;
+        const step = () => { const f = Math.max(0, Math.min(1, (performance.now() - t0) / 900)); amt.textContent = '+' + money(sum.total * (1 - Math.pow(1 - f, 3)), dec); if (f < 1 && amt.isConnected) requestAnimationFrame(step); };
+        step();
+      }
+      const go = () => { game.audio?.play('ui-coins'); if (sum.total > 0) coinsTo(m.card.querySelector('[data-x]'), 10); removeEventListener('keydown', kh); m.close(); resolve(); };
       const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter') go(); };
       addEventListener('keydown', kh);
       m.card.querySelector('[data-x]').onclick = go;
@@ -895,7 +939,7 @@ export function createUI(game) {
       const m = modal(`<div class="burst"></div><div class="lvshield"><span class="shield"><b>${lvl}</b></span></div><div class="ribwrap"><span class="ribbon">Level up!</span></div><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
         <button class="btn green big" data-x="ok">Nice!</button>`, { cls: 'pop' });
       game.audio?.play('ui-levelup');
-      m.card.querySelector('[data-x]').onclick = () => { tap(); m.close(); resolve(); };
+      m.card.querySelector('[data-x]').onclick = (e) => { tap(); coinsTo(e.currentTarget, 8); m.close(); resolve(); };
     });
   }
   function offline(info) {
@@ -905,7 +949,7 @@ export function createUI(game) {
         <div class="rlines"><div class="rl"><span>${ICON('ui-cash')} Offline earnings</span><b class="good">+${money(info.gain)}</b></div>
         <div class="rl"><span>${ICON('ui-clock')} Away</span><b>${h ? h + ' h ' : ''}${mi} min${info.capped ? ' (capped)' : ''}</b></div></div>
         <button class="btn green big" data-x="ok">Collect</button>`, { cls: 'pop' });
-      m.card.querySelector('[data-x]').onclick = () => { St.collectFleet(); game.audio?.play('ui-coins'); m.close(); resolve(); };
+      m.card.querySelector('[data-x]').onclick = (e) => { St.collectFleet(); game.audio?.play('ui-coins'); coinsTo(e.currentTarget, 10); m.close(); resolve(); };
     });
   }
   function dayReport(r) {
@@ -932,7 +976,7 @@ export function createUI(game) {
     achQ = achQ.then(() => new Promise((r) => {
       const prem = a.paint && PREMIUM.find((p) => p.id === a.paint);
       game.audio?.play('ui-unlock', { vol: 0.7 });
-      toast(`🏆 ${a.name} — ${prem ? `${prem.name} finish unlocked` : `+${money(a.cash)}`}`, 'good');
+      toast(`${ICON('ui-trophy')} ${a.name} — ${prem ? `${prem.name} finish unlocked` : `+${money(a.cash)}`}`, 'good');
       setTimeout(r, 1600);
     }));
   }

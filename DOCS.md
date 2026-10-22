@@ -238,6 +238,15 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   kronometre (kalan süre halkası `--p`), sıcaklık/kutu dikey tüpler (`--v`), harita altın çerçeve, akış logo yazısıyla,
   hız yay göstergesi, turbo halkası parçalı (`--e`). Fiş kutlama ekranı (kurdele, kavisli yıldızlar, büyük tutar,
   seviye kalkanları arası XP çubuğu), seviye atlamada büyük kalkan + kurdele, gün sonu kurdele başlık.
-  Test: `node tools/d2shots.mjs` (yemek alınmış sürüş, puan kartı, seviye atlama).
+  Test: `node tools/d2shots.mjs` (yemek alınmış sürüş, puan kartı, seviye atlama, yemek alma kartı, fişin ortası ve
+  uçan paralar, bildirimler, ilk açılış intro'su).
+  - D2 cilası (aynı gün): kalan ekranlar da D2'de. Olay kartı lacivert + altın çerçeve, başlık kurdelede, ikon taşan tabakta;
+    yemek alma/teslim kartında "PICK UP"/"DELIVERY" kurdelesi ve yuvarlak tabaklar; intro ve tüm pencere başlıkları açılış
+    logosu gibi altın + koyu kontur, pencereler altın çerçeveli; Garage/Courier/Jobs/Fleet kartları sipariş kartı gibi
+    kabartmalı; bildirimler oyun butonu gibi (yeşil/kırmızı/sarı, konturlu). Büyük butonlarda yazı kendi renginde konturlu.
+  - Hareket: Collect / hedef ödülü / filo kasası / seviye bonusunda paralar butondan para sayacına uçar; sayaç yeni paraya
+    doğru sayar ve zıplar (harcamada anında düşer). Fişte tutar sıfırdan sayar, yıldızlar sırayla patlar, XP çubuğu dolar;
+    kurdeleler açılırken fırlar (sekme değişince de), seviye kalkanı yukarıdan düşer, aktif sekme dairesi zıplar,
+    son 10 saniyede kronometre sallanır, START butonundan parlama geçer. `prefers-reduced-motion` hepsini kapatır.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
