@@ -1,5 +1,6 @@
 // WebAudio: sample one-shots + loops from assets/audio/manifest.json, synthesized fallbacks,
-// an engine voice whose pitch follows speed.
+// an engine voice whose pitch follows speed and whose tone follows the throttle, and the rush of a ride (road roar,
+// wind, tyres at the limit, pops on the overrun).
 import { S } from './state.js';
 
 export function createAudio() {
@@ -8,7 +9,8 @@ export function createAudio() {
   const buffers = new Map(), loading = new Map();
   let manifest = {};
   let music = null, musicName = null, amb = null, ambName = null;
-  const eng = { src: null, gain: null, osc: null, on: false, name: null, rate: 1, target: 0.0 };
+  const eng = { src: null, gain: null, osc: null, lp: null, on: false, name: null, rate: 1, target: 0.0, base: 0.5, load: 0, popT: 0 };
+  let rush = null; // { road, wind, squeal } noise / sample layers, built on the first ride
 
   fetch('assets/audio/manifest.json').then((r) => (r.ok ? r.json() : {})).then((m) => { manifest = m || {}; }).catch(() => {});
 
@@ -96,34 +98,94 @@ export function createAudio() {
   // engine voice
   async function engine(on, vehId) {
     if (!ctx) return;
-    if (!on) { if (eng.gain) eng.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.15); eng.on = false; return; }
+    if (!on) {
+      if (eng.gain) eng.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
+      if (rush) for (const k in rush) rush[k].g.gain.setTargetAtTime(0, ctx.currentTime, 0.12);
+      eng.on = false; return;
+    }
+    if (!rush) makeRush();
     const map = { rustbucket: 'engine-moped', zippy: 'engine-scooter', vespetta: 'engine-scooter', volt: 'engine-electric', mule: 'engine-cargo', viper: 'engine-sport' };
     const name = map[vehId] || 'engine-scooter';
     eng.on = true;
-    if (eng.name === name && eng.gain) { eng.gain.gain.setTargetAtTime(0.5, ctx.currentTime, 0.2); return; }
+    if (eng.name === name && eng.gain) { eng.gain.gain.setTargetAtTime(eng.base, ctx.currentTime, 0.2); return; }
     if (eng.src) { try { eng.src.stop(); } catch {} eng.src = null; }
     eng.name = name;
     const b = await load(name);
     const g = ctx.createGain(); g.gain.value = 0; g.connect(engineBus);
+    // the throttle opens this filter: on the gas the engine is bright and loud, off it the note goes dull
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; lp.Q.value = 0.5; lp.connect(g);
     let src;
     let off = 0;
-    if (b) { src = ctx.createBufferSource(); src.buffer = b; src.loop = true; off = loopTrim(src, name); src.connect(g); }
+    if (b) { src = ctx.createBufferSource(); src.buffer = b; src.loop = true; off = loopTrim(src, name); src.connect(lp); }
     else {
       // synthesized putt: sawtooth through a lowpass, amplitude-modulated
       src = ctx.createOscillator(); src.type = 'sawtooth'; src.frequency.value = 38;
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
-      src.connect(lp); lp.connect(g);
+      const lp0 = ctx.createBiquadFilter(); lp0.type = 'lowpass'; lp0.frequency.value = 420;
+      src.connect(lp0); lp0.connect(lp);
       eng.osc = src;
     }
     src.start(0, off);
-    eng.src = src; eng.gain = g;
-    g.gain.setTargetAtTime(0.5 * (manifest[name]?.gain ?? 0.7), ctx.currentTime, 0.2);
+    eng.src = src; eng.gain = g; eng.lp = lp;
+    eng.base = 0.5 * (manifest[name]?.gain ?? 0.7);
+    g.gain.setTargetAtTime(eng.base, ctx.currentTime, 0.2);
   }
-  function engineSpeed(ratio, boost) {
+  // two seconds of white noise, shared by the road and wind layers
+  function makeRush() {
+    const n = ctx.sampleRate * 2, buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const layer = (type, f, q, b = buf) => {
+      const src = ctx.createBufferSource(); src.buffer = b; src.loop = true;
+      const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+      const g = ctx.createGain(); g.gain.value = 0;
+      src.connect(fl); fl.connect(g); g.connect(engineBus); src.start(0, Math.random() * b.duration * 0.5);
+      return { src, fl, g };
+    };
+    rush = { road: layer('lowpass', 300, 0.7), wind: layer('bandpass', 850, 0.55) };
+    // tyres at the limit: the middle of the skid sample, looped
+    load('skid').then((b) => {
+      if (!b || rush.squeal) return;
+      rush.squeal = layer('highpass', 500, 0.5, b);
+      rush.squeal.src.loopStart = 0.25; rush.squeal.src.loopEnd = 0.8; rush.squeal.src.playbackRate.value = 1.08;
+    });
+  }
+  // a few dull cracks from the exhaust when the throttle snaps shut at speed
+  function pops(n, vol) {
+    let t = ctx.currentTime + 0.04;
+    for (let i = 0; i < n; i++) {
+      const len = Math.floor(ctx.sampleRate * 0.035), b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+      for (let j = 0; j < len; j++) d[j] = (Math.random() * 2 - 1) * Math.exp(-j / (len * 0.18));
+      const s = ctx.createBufferSource(); s.buffer = b;
+      const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 700 + Math.random() * 500;
+      const g = ctx.createGain(); g.gain.value = vol * (0.6 + Math.random() * 0.4);
+      s.connect(fl); fl.connect(g); g.connect(engineBus); s.start(t);
+      t += 0.05 + Math.random() * 0.11;
+    }
+  }
+  // ratio: speed / top speed; load: throttle 0–1; v: m/s; slip: corner speed / grip limit (riding yourself)
+  function engineSpeed(ratio, boost, load = 0.5, v = 0, slip = 0) {
     if (!ctx || !eng.src) return;
-    const r = 0.75 + ratio * 0.95 + (boost ? 0.22 : 0);
-    if (eng.osc) eng.osc.frequency.setTargetAtTime(30 + ratio * 70 + (boost ? 20 : 0), ctx.currentTime, 0.08);
-    else eng.src.playbackRate.setTargetAtTime(r, ctx.currentTime, 0.08);
+    const t = ctx.currentTime;
+    const r = 0.75 + ratio * 0.95 + (boost ? 0.22 : 0) + load * 0.05;
+    if (eng.osc) eng.osc.frequency.setTargetAtTime(30 + ratio * 70 + (boost ? 20 : 0) + load * 4, t, 0.08);
+    else eng.src.playbackRate.setTargetAtTime(r, t, 0.08);
+    if (eng.on) {
+      eng.lp.frequency.setTargetAtTime(700 + load * 3800 + ratio * 1500 + (boost ? 2000 : 0), t, 0.06);
+      eng.gain.gain.setTargetAtTime(eng.base * (0.62 + 0.38 * load + (boost ? 0.15 : 0)), t, 0.07);
+      // overrun pops: the throttle shuts at speed (not on the electric one)
+      eng.popT = Math.max(0, eng.popT - 1 / 60);
+      if (eng.load > 0.75 && load < 0.35 && ratio > 0.55 && eng.popT <= 0 && eng.name !== 'engine-electric') {
+        eng.popT = 1.5; pops(eng.name === 'engine-sport' ? 3 + (Math.random() * 3 | 0) : 1 + (Math.random() * 2 | 0), eng.name === 'engine-sport' ? 0.5 : 0.28);
+      }
+    }
+    eng.load = load;
+    if (rush && eng.on) {
+      rush.road.g.gain.setTargetAtTime(0.11 * Math.min(1, v / 12), t, 0.1);
+      rush.road.fl.frequency.setTargetAtTime(180 + v * 14, t, 0.1);
+      rush.wind.g.gain.setTargetAtTime(0.2 * Math.min(1.3, (v / 15) ** 2) + (boost ? 0.05 : 0), t, 0.12);
+      rush.wind.fl.frequency.setTargetAtTime(600 + v * 40, t, 0.12);
+      if (rush.squeal) rush.squeal.g.gain.setTargetAtTime(0.32 * Math.min(1, Math.max(0, (slip - 1.03) / 0.15)), t, 0.05);
+    }
   }
   return { init, play, loop, engine, engineSpeed, apply, get ready() { return !!ctx; } };
 }

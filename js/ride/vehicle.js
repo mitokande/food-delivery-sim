@@ -99,38 +99,77 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
       ch.head.add(helm);
     }
   }
-  const st = { spin: 0, lean: 0, pitch: 0, bob: 0 };
+  const st = { spin: 0, lean: 0, pitch: 0, bob: 0, pv: 0, h: 0, hv: 0, acc: 0 };
+  // suspension: the body pitches (nose dives under braking, squats or wheelies under power) and bounces on its springs
+  // while the wheels stay on the road. Each wheel slides along its own mount — the rear straight up, the front along
+  // the raked fork — within its travel. Positions are measured once in the model's frame.
+  root.updateMatrixWorld(true);
+  const susp = wheels.map((w) => {
+    const p = new THREE.Vector3(); w.getWorldPosition(p);
+    const fork = w.parent !== model && w.parent ? Math.cos(w.parent.rotation.x) || 1 : 1;
+    return { w, y0: w.position.y, z: p.z, hub: p.y, fork };
+  });
+  const SPORT = { viper: 1.5, zippy: 0.7, vespetta: 0.55, volt: 0.6, rustbucket: 0.35, mule: 0.2 }[id] ?? 0.5;
+  const bump = (k) => { st.hv -= 0.55 * k; st.pv += (Math.random() - 0.5) * 0.9 * k; };
+  const wheelie = (k = 1) => { st.pv -= 1.9 * SPORT * k; };
   // rider reactions are small bone offsets layered on the 'drive' clip. The mixer skips bones whose keyframes don't
   // change, so offsets are undone before every mixer update and re-applied after it.
   const bones = {};
   if (ch) ch.obj.traverse((o) => { if (o.isBone) bones[o.name] = o; });
   const pose = { tuck: 0, tuckV: 0, cheer: 0, look: 0 };
   const saved = [];
-  const qa = new THREE.Quaternion(), ax = new THREE.Vector3(1, 0, 0), ay = new THREE.Vector3(0, 1, 0);
+  const qa = new THREE.Quaternion(), ax = new THREE.Vector3(1, 0, 0), ay = new THREE.Vector3(0, 1, 0), az = new THREE.Vector3(0, 0, 1);
   function offset(bone, axis, ang) { if (!bone || Math.abs(ang) < 1e-4) return; saved.push([bone, bone.quaternion.clone()]); bone.quaternion.multiply(qa.setFromAxisAngle(axis, ang)); }
   function applyPose(dt) {
     pose.tuckV += (pose.tuck - pose.tuckV) * Math.min(1, dt * 6);
     pose.cheer = Math.max(0, pose.cheer - dt); pose.look = Math.max(0, pose.look - dt);
     const ch1 = pose.cheer > 0 ? Math.min(1, (0.9 - pose.cheer) / 0.2, pose.cheer / 0.25) : 0; // raise, hold, lower
     const lk = pose.look > 0 ? Math.sin(Math.PI * (1 - pose.look / 0.9)) : 0;
-    offset(bones.torso, ax, 0.32 * pose.tuckV);
-    offset(bones.head, ax, -0.22 * pose.tuckV);
+    // the rider tucks, hangs a little into the corner, and is thrown forward under braking / back under power
+    const surge = THREE.MathUtils.clamp(-st.acc * 0.022, -0.09, 0.16);
+    offset(bones.torso, ax, 0.32 * pose.tuckV + surge);
+    offset(bones.torso, az, st.lean * 0.45);
+    offset(bones.head, ax, -0.22 * pose.tuckV - surge * 0.6);
+    offset(bones.head, az, -st.lean * 0.3);
     offset(bones['arm-right'], ax, -2.2 * ch1);
     offset(bones.head, ay, 1.1 * lk);
   }
   function undoPose() { while (saved.length) { const [b, q] = saved.pop(); b.quaternion.copy(q); } }
-  function update(dt, speed, leanTarget = 0, steerAng = 0) {
+  function update(dt, speed, leanTarget = 0, steerAng = 0, acc = 0) {
     st.spin += speed * dt / 0.27;
     for (const w of wheels) w.rotation.x = st.spin;
     if (steer) steer.rotation.y += (steerAng - steer.rotation.y) * Math.min(1, dt * 10);
     st.lean += (leanTarget - st.lean) * Math.min(1, dt * 4.5);
     lean.rotation.z = -st.lean;
+    st.acc = acc;
+    // springs, a few sub-steps so a long frame can't blow them up. Pitch is a touch under-damped (the nose settles
+    // with a small bounce after a stop), heave bouncier (bumps).
+    const pT = THREE.MathUtils.clamp(-acc * 0.0085, -0.045, 0.075);
+    const n = Math.min(4, Math.ceil(dt / 0.012));
+    for (let i = 0; i < n; i++) {
+      const h = dt / n;
+      st.pv += (-120 * (st.pitch - pT) - 9.5 * st.pv) * h; st.pitch += st.pv * h;
+      st.hv += (-220 * st.h - 8.5 * st.hv) * h; st.h += st.hv * h;
+    }
+    st.pitch = THREE.MathUtils.clamp(st.pitch, -0.42, 0.11); st.h = THREE.MathUtils.clamp(st.h, -0.07, 0.05);
+    if (st.pitch <= -0.42 && st.pv < 0) st.pv = 0;
+    // nose up past a squat the body pivots on the rear axle (a wheelie); otherwise round the middle
+    const th = st.pitch, piv = th < 0 ? -0.62 * Math.min(1, -th / 0.1) : 0;
+    const sn = Math.sin(th), cs = Math.cos(th);
     st.bob += dt * (6 + speed * 0.6);
-    model.position.y = Math.sin(st.bob) * 0.012 * Math.min(1, speed / 3);
+    const ty = piv * sn + st.h + Math.sin(st.bob) * 0.012 * Math.min(1, speed / 3);
+    model.rotation.x = th;
+    model.position.set(0, ty, piv - piv * cs);
+    for (const s of susp) {
+      // where the hub would sit if the wheel were bolted to the pitched, raised body → slide it back to the road
+      let d = ((s.hub - ty + s.z * sn) / cs - s.hub);
+      d = THREE.MathUtils.clamp(d, -0.06, 0.075);
+      s.w.position.y = s.y0 + d / s.fork;
+    }
     if (ch) { undoPose(); ch.mixer.update(dt); applyPose(dt); }
   }
   const cheer = () => { if (pose.cheer <= 0.2) pose.cheer = 0.9; };
   const lookBack = () => { pose.look = 0.9; };
   function openLid(open) { if (lid) lid.rotation.x = open ? -1.2 : 0; }
-  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id, pose, cheer, lookBack };
+  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id, pose, cheer, lookBack, bump, wheelie };
 }

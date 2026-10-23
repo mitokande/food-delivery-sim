@@ -1,5 +1,5 @@
 // Measures what the autopilot really averages (m/s) per vehicle and district — calibrates order timers.
-//   node tools/speed.mjs <district> <veh,veh> [rides]     env BOOST=1: hold turbo whenever there is energy
+//   node tools/speed.mjs <district> <veh,veh> [rides]     env BOOST=1: hold turbo whenever there is energy; SEED=n: repeatable
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
 const require = createRequire(import.meta.url);
@@ -9,6 +9,8 @@ const browser = await puppeteer.launch({ executablePath: '/root/.cache/puppeteer
 const page = await browser.newPage();
 await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
 page.on('pageerror', (e) => console.log('pageerror', e.message));
+// SEED=n: the same orders and traffic on every run, to compare two builds
+if (process.env.SEED) await page.evaluateOnNewDocument((seed) => { let a = seed >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; Date.now = () => 1792000000000; }, +process.env.SEED);
 await page.goto(`${base}/index.html?noti=1&clock=600`, { waitUntil: 'networkidle0', timeout: 180000 });
 await page.waitForFunction('window.ready', { timeout: 120000 });
 const out = [];

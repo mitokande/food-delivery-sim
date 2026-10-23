@@ -575,7 +575,7 @@ function frame() {
     scene.fog.near = (QV === 'low' ? 45 : 60) * (1 - 0.45 * wr); scene.fog.far = (QV === 'low' ? 230 : 420) * (1 - 0.45 * wr);
     sky.state.rain = wr;
     sky.set(clk);
-    audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost);
+    audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost, ride.R.load, ride.R.v, ride.R.slip);
   } else if (game.mode === 'peek') {
     // test camera: a fixed rider's-eye view of one street (tools/look.mjs)
     const b = ride.R.bike?.root.position || camera.position;

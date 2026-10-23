@@ -275,6 +275,16 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   Test: `node tools/manual.mjs` (1280x720, dokunmasız; bir sürücü işi baştan sona bitirir). Dokunmatik testler
   (`play`, `onboard`, …) otomatik sürüşte kalır; `sweep`'in masaüstü boyutları artık manuel.
 - 2026-10-22: analitik backend + admin paneli (§10).
+- 2026-10-23: motor hissi paketi (telefon + masaüstü). Gövde yaylı süspansiyonla eğiliyor: frende burun dalar, gazda
+  arka çöker, durunca küçük bir sekmeyle oturur; tekerlekler yerde kalır (arka dikey, ön çatal ekseninde sıkışır).
+  Turbo kalkışında ön kalkar (spor motorda gerçek wheelie). Tümsek/iniş = yay sekmesi + kameraya aşağı tekme
+  (eski rastgele titreme yalnızca kazada). Sürücü virajda gövdesini içeri atar, frende öne, gazda geriye kayar.
+  Kamera: gazda geride kalır, frende yaklaşır; yatışın %15'i kadar ufuk eğilir; hızla artan ince yol titreşimi;
+  ivmede FOV açılır. Ses: gaz açıkken motor parlak/yüksek, kapalıyken boğuk (lowpass); hızla artan yol uğultusu ve
+  rüzgâr (gürültüden sentez); manuelde viraj sınırında lastik sesi; yüksek devirde gaz kesilince egzoz patlaması
+  (spor motorda bol); sert frende `brake` sesi + kısa titreşim. Otopilot: kalkışta güçlü, tepe hıza yaklaşınca
+  yumuşar (ortalama hız eskisiyle aynı tutuldu: `SEED=n node tools/speed.mjs`), fren birkaç onda birde oturur, son
+  metre yumuşak durur. Önce/sonra klibi: `node tools/feelclip.mjs <oyun-kökü> <çıktı.mp4>` (sanal zaman, 360x640).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 

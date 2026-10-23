@@ -32,6 +32,8 @@ export function createRide(ctx) {
     orders: [], legMeters: 0, meters: 0, stats: null, shake: 0, camFov: 60, bike: null, agent: null, offer: null, hornCd: 0,
     lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0, 0], recentEvents: [], arcs: [], blend: null, yawOff: 0, camYaw: null, fines: 0, rideTime: 0,
     manual: false, ctl: { gas: false, brake: false }, junc: null, cornerWarn: false, skidCd: 0,
+    // feel: smoothed longitudinal acceleration (m/s²), throttle load 0–1, corner grip used (manual), brake ramp, camera springs
+    accS: 0, load: 0, slip: 0, brk: 0, hardBrake: false, camG: 0, camKy: 0, camKv: 0,
   };
   const pfx = createFx(scene); // particles (R.fx is the skill table)
   // ---- Flow: chaining stunts builds a tip multiplier (×2 max) and refills turbo; mistakes break it ----
@@ -79,7 +81,7 @@ export function createRide(ctx) {
     const fx = St.skillFx();
     R.vs = vs; R.fx = fx;
     R.job = job; R.leg = 0; R.active = true; R.timeScale = 1; R.fines = 0; R.rideTime = 0;
-    R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0;
+    R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0; R.accS = 0; R.load = 0; R.slip = 0; R.brk = 0; R.camG = 0; R.camKy = 0; R.camKv = 0;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
     R.orders = job.orders.map((o) => ({ o, elapsed: 0, heat: 100, integrity: 100, picked: false, done: false, tipMult: 1, ratingAdj: 0, result: null }));
     R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1, hops: 0, horns: 0, boostT: 0, stopT: 0, skids: 0, reroutes: 0 };
@@ -234,6 +236,7 @@ export function createRide(ctx) {
       const was = R.boost; R.boost = down && R.energy > 4;
       if (R.boost && !was) {
         ctx.audio?.play('boost', { vol: 0.7 });
+        R.bike?.wheelie?.(Math.max(0.35, 1 - R.v / (R.vs.top * 1.3))); buzz(18);
         if (R.bike && R.phase === 'ride') { const b = R.bike.root, hd = b.rotation.y; if (R.bike.exhaust) R.bike.exhaust.getWorldPosition(wp); else wp.set(b.position.x - Math.sin(hd) * 0.9, 0.45, b.position.z - Math.cos(hd) * 0.9); pfx.boostStart(wp.x, wp.y, wp.z, Math.sin(hd), Math.cos(hd), R.vs.v.engine === 'engine-electric'); }
       }
       return;
@@ -446,8 +449,10 @@ export function createRide(ctx) {
   // ---------- damage ----------
   function hurtFood(amount, why) {
     for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(0, x.integrity - amount * x.o.fragile * R.vs.bump);
-    if (amount > 0) { R.stats.bumps++; R.shake = Math.min(1, R.shake + amount / 25); ctx.ui.flash?.('bump'); buzz(amount > 12 ? 60 : 30); }
+    if (amount > 0) { R.stats.bumps++; kick(Math.min(1.6, 0.35 + amount / 9)); ctx.ui.flash?.('bump'); buzz(amount > 12 ? 60 : 30); }
   }
+  // a jolt through the bike: springs bounce, the camera dips and recovers
+  function kick(k) { R.bike?.bump?.(k); R.camKv -= 1.1 * k; }
   function crash(why) {
     if (R.crash > 0) return;
     ctx.audio?.play('skid', { vol: 0.8 });
@@ -769,7 +774,8 @@ export function createRide(ctx) {
       }
       drive(dt);
     }
-    if (R.bike) R.bike.update(dt, R.v, R.lean, R.steer);
+    if (R.phase !== 'ride') { R.accS *= Math.exp(-dt * 6); R.load = 0; R.slip = 0; }
+    if (R.bike) R.bike.update(dt, R.v, R.lean, R.steer, R.accS);
     if (ctx.renderer) pfx.update(dt, camera, ctx.renderer);
     updateActors(dt);
     camUpdate(dtReal);
@@ -794,16 +800,16 @@ export function createRide(ctx) {
       target = Math.min(target, Math.sqrt(vt * vt + 2 * B_DEC * 0.75 * d));
     }
     const toEnd = route.length - R.s;
-    target = Math.min(target, Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4)));
+    target = Math.min(target, Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4)), Math.max(0, toEnd - 0.4) * 3.2);
     let blockedBy = null;
     if (R.manual) updateJunction();
     if (!R.ot && !R.manual) {
       const L = leaderAhead();
-      if (L.gap < 40) { const vt = Math.sqrt(2 * B_DEC * Math.max(0, L.gap - 2.4)); if (vt < target) { target = vt; blockedBy = L.gap < 14 ? 'car' : null; } }
+      if (L.gap < 40) { const vt = stopV(L.gap - 2.4); if (vt < target) { target = vt; blockedBy = L.gap < 14 ? 'car' : null; } }
       const B = blockingHazard();
       if (B.h && B.d < 40) {
         const passable = B.h.type === 'cones' || B.h.type === 'crates';
-        const stop = Math.sqrt(2 * B_DEC * Math.max(0, B.d));
+        const stop = stopV(B.d);
         if (passable) { if (B.d < 3) target = Math.min(target, 2.2); else target = Math.min(target, Math.max(2.2, stop)); }
         else if (!(B.h.hopped && R.hop)) target = Math.min(target, stop);
         if (B.d < 14) blockedBy = B.h.type;
@@ -821,7 +827,7 @@ export function createRide(ctx) {
     // a rider who doesn't stop at a red simply runs it (cross traffic and the camera still apply)
     if (R.manual && L2 && L2.state !== 'g' && L2.tile !== R.runLight && L2.d < 0.5 && R.v > 1.5) { R.runLight = L2.tile; R.runLightState = L2.state; if (L2.state === 'r') ctx.ui.toast('Running the red!', 'warn'); }
     if (!R.manual && L2 && L2.tile !== R.runLight && L2.state !== 'g') {
-      if (!(L2.state === 'y' && L2.d < R.v * 0.8)) { target = Math.min(target, Math.sqrt(2 * B_DEC * Math.max(0, L2.d))); if (L2.d < 18) blockedBy = blockedBy || 'light'; }
+      if (!(L2.state === 'y' && L2.d < R.v * 0.8)) { target = Math.min(target, stopV(L2.d)); if (L2.d < 18) blockedBy = blockedBy || 'light'; }
     }
     const hold = R.wait > 0 || R.crash > 0;
     if (R.wait > 0) { R.wait -= dt; target = 0; }
@@ -830,9 +836,14 @@ export function createRide(ctx) {
     // ---- integrate ----
     const vBefore = R.v;
     const acc = R.vs.accel * (R.boost ? 1.7 : 1);
+    R.slip = 0;
     if (R.manual) manualSpeed(dt, top, corner, toEnd, acc, hold);
-    else if (target > R.v) R.v = Math.min(target, R.v + acc * dt);
-    else R.v = Math.max(target, R.v - 11 * dt);
+    else autoSpeed(dt, target, top, acc);
+    // what the body, camera and engine feel: acceleration smoothed over a few frames
+    const aNow = THREE.MathUtils.clamp((R.v - vBefore) / Math.max(dt, 1e-4), -14, 9);
+    R.accS += (aNow - R.accS) * Math.min(1, dt * 7);
+    if (!R.hardBrake && R.accS < -8 && R.v > 4) { R.hardBrake = true; ctx.audio?.play('brake', { vol: 0.55, rate: 0.95 + Math.random() * 0.1 }); buzz(22); }
+    else if (R.hardBrake && R.accS > -3) R.hardBrake = false;
     const ds = R.v * dt;
     R.s += ds; R.meters += ds;
     if (R.v < 0.5) R.stats.stopT += dt;
@@ -878,7 +889,7 @@ export function createRide(ctx) {
       y = 4 * 1.05 * f * (1 - f);
       if (f >= 1) {
         y = 0; if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land);
-        ctx.audio?.play('land'); R.shake = Math.max(R.shake, 0.25); buzz(15);
+        ctx.audio?.play('land'); kick(R.hop.perfect ? 0.6 : 1); buzz(15);
         const p = R.bike.root.position; pfx.hopLand(p.x, p.z, R.hop.perfect);
         if (R.hop.perfect) flow('PERFECT HOP!');
         R.hop = null;
@@ -964,6 +975,27 @@ export function createRide(ctx) {
     // ---- arrival ----
     if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0) arrive();
   }
+  // braking target that eases the last metre in instead of planting the bike on the line
+  const stopV = (d) => (d <= 0 ? 0 : Math.min(Math.sqrt(2 * B_DEC * d), d * 3.2));
+  // the autopilot rides like a person: strong off the line and easing into its cruising speed, brakes that bite in
+  // over a few tenths (at once when it's urgent)
+  function autoSpeed(dt, target, top, acc) {
+    const gap = target - R.v;
+    if (gap > 0.02) {
+      // same average pull as a flat ramp, front-loaded: 1.3× off the line, 0.8× near the top; eases into the cruise
+      const a = acc * (1.3 - 0.5 * Math.min(1, R.v / Math.max(1, top)) ** 2) * Math.min(1, 0.3 + gap / 1.1);
+      R.v = Math.min(target, R.v + a * dt);
+      R.brk = Math.max(0, R.brk - 40 * dt);
+      R.load += ((gap > 0.4 ? 1 : 0.5) - R.load) * Math.min(1, dt * 8);
+    } else if (gap > -0.05) {
+      R.v = Math.max(0, target); R.brk = Math.max(0, R.brk - 40 * dt);
+      R.load += ((R.v > 0.5 ? 0.45 : 0) - R.load) * Math.min(1, dt * 6);
+    } else {
+      R.brk = Math.min(11, R.brk + (gap < -2 ? 70 : 26) * dt);
+      R.v = Math.max(target, R.v - Math.max(R.brk, gap < -2.5 ? 11 : 1.5) * dt);
+      R.load += (0 - R.load) * Math.min(1, dt * 10);
+    }
+  }
   // the rider's pedals: gas, brake or coast; corners taken too fast slide or crash; the bumper and parked cars are real
   function manualSpeed(dt, top, corner, toEnd, acc, hold) {
     const c = R.ctl;
@@ -972,6 +1004,7 @@ export function createRide(ctx) {
     else if (c.brake) a = -9.5;
     else if (c.gas || R.boost) a = R.v < top ? acc * (1 - 0.5 * (R.v / top) ** 2) : -3;
     else a = -(0.8 + 0.01 * R.v * R.v); // rolling resistance and drag
+    R.load += ((hold || c.brake ? 0 : c.gas || R.boost ? 1 : 0.12) - R.load) * Math.min(1, dt * 10);
     R.v = Math.max(0, R.v + a * dt);
     // the last metres to the door brake for you, so a delivery never overshoots
     const endCap = Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4));
@@ -983,6 +1016,7 @@ export function createRide(ctx) {
       if (ar.s0 > R.s + 24) break;
       const vt = Math.sqrt(A_LAT * corner * ar.r);
       if (ar.s0 > R.s) { if (R.v > vt * 1.12) R.cornerWarn = true; continue; }
+      R.slip = R.v / vt;
       if (R.v > vt * 1.55 && R.crash <= 0) { crash('Way too fast for that corner!'); break; }
       if (R.v > vt * 1.2 && R.skidCd <= 0) {
         R.skidCd = 1.2; R.v = vt * 1.05; R.wobble = 0.8; hurtFood(6); flowBreak(); R.stats.skids++;
@@ -1098,7 +1132,11 @@ export function createRide(ctx) {
       R.evCamK = (R.evCamK || 0) + ((R.eventCam ? 1 : 0) - (R.evCamK || 0)) * Math.min(1, dt * 3);
       const ek = R.evCamK;
       const cc = portrait ? CAM.portrait : CAM.landscape;
-      const back = cc.back + ek * 1.8, up = cc.up + ek * 1.5, aheadD = cc.ahead - ek * 5;
+      // the camera hangs off the bike on a soft spring: it drops back when the bike pulls away and closes in under
+      // braking (slower than the bike's own pitch, so the two read separately)
+      R.camG += (R.accS - R.camG) * Math.min(1, dt * 2.5);
+      const surge = THREE.MathUtils.clamp(R.camG * 0.085, -0.45, 0.55);
+      const back = cc.back + ek * 1.8 + surge, up = cc.up + ek * 1.5 - surge * 0.25, aheadD = cc.ahead - ek * 5;
       // the camera swings round behind the bike with a little lag instead of being bolted to it
       if (R.camYaw == null || R.snapCam) R.camYaw = hd;
       let dy = hd - R.camYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
@@ -1112,7 +1150,11 @@ export function createRide(ctx) {
       const yaw = R.camYaw + free.yaw;
       const horiz = back * free.zoom * (1 - 0.22 * side), height = Math.max(1.1, up * free.zoom + free.pitch * 6 + side * 2.2);
       const cx = Math.sin(yaw), cz = Math.cos(yaw);
-      pos = v3.set(b.x - cx * horiz, height + b.y * 0.4, b.z - cz * horiz);
+      // bumps kick the camera down and it springs back; a fine road buzz grows with speed
+      R.camKv += (-95 * R.camKy - 10 * R.camKv) * dt; R.camKy += R.camKv * dt;
+      R.camKy = THREE.MathUtils.clamp(R.camKy, -0.3, 0.3);
+      const buzzA = R.phase === 'ride' ? 0.016 * Math.min(1.3, R.v / Math.max(1, R.vs?.top || 10)) ** 1.5 : 0, tt = R.rideTime;
+      pos = v3.set(b.x - cx * horiz + Math.sin(tt * 41) * buzzA * 0.5, height + b.y * 0.4 + R.camKy + (Math.sin(tt * 37) * 0.6 + Math.sin(tt * 59 + 1.3) * 0.4) * buzzA, b.z - cz * horiz);
       // look at the road ahead (so the view turns into a corner before the bike does)
       let lx2, ly2, lz2;
       if (R.route && R.phase === 'ride') {
@@ -1132,8 +1174,14 @@ export function createRide(ctx) {
     camera.position.copy(camPos);
     if (R.shake > 0) { camera.position.x += (Math.random() - 0.5) * R.shake * 0.35; camera.position.y += (Math.random() - 0.5) * R.shake * 0.35; R.shake = Math.max(0, R.shake - dt * 2.5); }
     camera.lookAt(camLook);
+    // the horizon tips a few degrees with the bike's lean (less as the player swings the view round)
+    if (R.camMode !== 'scene') {
+      const rollT = (R.bike.st?.lean || 0) * 0.15 * (1 - Math.min(1, Math.abs(free.yaw) / 0.5));
+      R.camRoll = (R.camRoll || 0) + (rollT - (R.camRoll || 0)) * Math.min(1, dt * 5);
+      camera.rotateZ(R.camRoll);
+    }
     const fov0 = (portrait ? CAM.portrait : CAM.landscape).fov;
-    const fovT = fov0 + (R.boost ? 9 : 0) + Math.min(6, R.v * 0.25);
+    const fovT = fov0 + (R.boost ? 9 : 0) + Math.min(6, R.v * 0.25) + THREE.MathUtils.clamp(R.camG * 0.55, -1.5, 3.5);
     camera.fov += (fovT - camera.fov) * Math.min(1, dt * 4);
     camera.updateProjectionMatrix();
   }
