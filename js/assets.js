@@ -108,6 +108,7 @@ export async function loadChar(id) {
     return { scene: g.scene, clips: g.animations };
   })();
   charCache.set(id, p);
+  p.catch(() => charCache.delete(id)); // a failed download is tried again next time
   return p;
 }
 export async function makeChar(id) {

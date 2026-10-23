@@ -11,7 +11,7 @@ import { buildRibbon } from './ribbon.js';
 import { createFx } from './fx.js';
 import { makeDog, makeBird, makeBall, makeDoorCar, makePoliceCar, makePerson } from './actors.js';
 import { buzz } from '../haptics.js';
-import { makeChar, loadKit, pieceParts } from '../assets.js';
+import { makeChar, loadChar, loadKit, pieceParts } from '../assets.js';
 import { scoreOrder } from '../orders.js';
 import * as St from '../state.js';
 import { mulberry32 } from '../rng.js';
@@ -83,6 +83,8 @@ export function createRide(ctx) {
     R.job = job; R.leg = 0; R.active = true; R.timeScale = 1; R.fines = 0; R.rideTime = 0;
     R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0; R.accS = 0; R.load = 0; R.slip = 0; R.brk = 0; R.camG = 0; R.camKy = 0; R.camKv = 0;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
+    // the people we'll meet at the doors: fetch them now (phones only preload a few), not when the bike pulls up
+    for (const id of new Set(['female-c', ...job.orders.map((o) => o.char), ...(job.orders.some((o) => o.rest === 'sultan') ? ['male-d'] : [])])) loadChar(id).catch(() => {});
     R.orders = job.orders.map((o) => ({ o, elapsed: 0, heat: 100, integrity: 100, picked: false, done: false, tipMult: 1, ratingAdj: 0, result: null }));
     R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1, hops: 0, horns: 0, boostT: 0, stopT: 0, skids: 0, reroutes: 0 };
     R.flow = { n: 0, t: 0, mult: 1 };
@@ -99,11 +101,12 @@ export function createRide(ctx) {
     const to = legTarget(leg);
     let path = findPath(city, R.curTile, to, { noBack: R.curDir >= 0 ? OPP(R.curDir) : -1 });
     if (!path) path = findPath(city, R.curTile, to);
-    if (path.length < 2) {
-      // already at the door: make a tiny loop-less route by nudging one tile along the road
+    // already at this door (two orders for one building, or a job that starts at the restaurant): the scene plays
+    // right here. A one-tile route still gets built so everything that reads R.route keeps working.
+    R.here = path.length < 2;
+    if (R.here) {
       const t = city.tiles[R.curTile]; const d = [0, 1, 2, 3].find((k) => t.mask & (1 << k));
-      const n = R.curTile + DIRS[d][0] + DIRS[d][1] * city.W;
-      path = [R.curTile, n]; leg.lotDoorOverride = n;
+      path = [R.curTile, R.curTile + DIRS[d][0] + DIRS[d][1] * city.W];
     }
     R.route = buildRoute(city, path, { startDir: R.curDir });
     R.arcs = routeArcs(R.route);
@@ -319,7 +322,8 @@ export function createRide(ctx) {
     if (R.event && !R.event.fired && R.event.ev) {
       if (R.event.prop) { disposeActor(R.event.prop); const i = actors.indexOf(R.event.prop); if (i >= 0) actors.splice(i, 1); R.event.prop = null; }
       R.event.s = Math.min(R.s + 45, route.length * 0.7);
-      if (R.event.ev.pre) prePlace(R.event);
+      if (R.event.s < R.s + 6 || route.length - R.event.s < 30) R.event = null; // too close to come up properly, or to the door
+      else if (R.event.ev.pre) prePlace(R.event);
     }
     setRibbon();
     ctx.ui.routeChanged(R);
@@ -653,7 +657,8 @@ export function createRide(ctx) {
     if (ribbon) ribbon.visible = false;
     ctx.audio?.engine(false);
     const lot = city.lots[leg.lot];
-    R.curTile = R.route.steps[R.route.steps.length - 1].tile; R.curDir = R.route.steps[R.route.steps.length - 1].din;
+    // (a scene at the spot we already stood on keeps the tile and heading we had)
+    if (!R.here) { R.curTile = R.route.steps[R.route.steps.length - 1].tile; R.curDir = R.route.steps[R.route.steps.length - 1].din; }
     // where the NPC comes from: the lot's front tile edge
     const door = city.tiles[lot.doorFrom];
     const f = DIRS[lot.front];
@@ -694,7 +699,9 @@ export function createRide(ctx) {
     else finish();
   }
   async function spawnNpc(char, x, z, bx, bz, carrying) {
-    const c = await makeChar(char);
+    // normally loaded long ago (start() asks for them); on a slow or dropped connection the scene goes on without them
+    const c = await Promise.race([makeChar(char).catch(() => null), new Promise((r) => setTimeout(() => r(null), 2000))]);
+    if (!c) return null;
     c.obj.scale.setScalar(2.2);
     c.obj.position.set(x, 0.2, z);
     scene.add(c.obj);
@@ -785,6 +792,7 @@ export function createRide(ctx) {
   function drive(dt) {
     const route = R.route;
     sampleRoute(route, R.s, R.sampled);
+    if (R.here) { R.v = 0; arrive(); R.here = false; return; } // arrive() reads R.here before its first await
     const st = stepAt();
     agent.tile = st.tile; agent.din = st.din; agent.dout = st.dout; agent.s = R.s - st.s0; agent.v = R.v; agent.curve = st.c;
     agent.off = R.ot && R.ot.t > 0.3 ? -LANE : LANE;
@@ -856,7 +864,12 @@ export function createRide(ctx) {
       ot.time += dt;
       ot.t = Math.max(0, Math.min(1, ot.t + ot.dir * dt / (ot.slow ? 1.0 : 0.42)));
       // the rider keeps the other lane until they steer back (or a corner comes up)
-      if (ot.manual && ot.dir > 0) { for (const a of R.arcs) { if (a.s1 < R.s) continue; if (a.s0 - R.s < 9) ot.dir = -1; break; } if (stepAt().alley) ot.dir = -1; }
+      // a corner coming up sends the rider back to their lane — unless they're getting round something parked in it,
+      // which keeps them out until they're past (as the autopilot does)
+      const passing = R.hazards.some((h) => !h.done && h.lane >= 0 && h.type !== 'ped' && HZ[h.type].block && h.s + (HZ[h.type].len || 2) / 2 + 2 > R.s && h.s - R.s < 14);
+      if (ot.manual && ot.dir > 0 && !passing) { for (const a of R.arcs) { if (a.s1 < R.s) continue; if (a.s0 - R.s < 9) ot.dir = -1; break; } if (stepAt().alley) ot.dir = -1; }
+      // pull in to the kerb for the door, unless something parked still blocks our lane before it
+      if (ot.dir > 0 && !ot.hz && route.length - R.s < 12 && !passing) ot.dir = -1;
       if (ot.dir > 0 && ot.t >= 1 && !ot.manual) {
         let until = R.s + 2;
         if (ot.car && ot.car.tile != null) {
@@ -973,7 +986,7 @@ export function createRide(ctx) {
     if (R.bike.pose) R.bike.pose.tuck = R.boost ? 1 : 0;
     if (R.slowmo > 0) { R.slowmo -= dt / Math.max(0.05, R.timeScale); if (R.slowmo <= 0 && !document.querySelector('.evdock')) R.timeScale = 1; }
     // ---- arrival ----
-    if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0) arrive();
+    if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0 && !R.eventCam && !R.hop) arrive();
   }
   // braking target that eases the last metre in instead of planting the bike on the line
   const stopV = (d) => (d <= 0 ? 0 : Math.min(Math.sqrt(2 * B_DEC * d), d * 3.2));

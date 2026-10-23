@@ -290,6 +290,22 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
 - 2026-10-23: düzeltme: masaüstü manuel sürüşte restoranın birkaç metre önünde durunca alım başlamıyordu (varış
   kapıya 0,6 m kala tetikleniyor, gazsız motor kıpırdamıyordu). Son 9 m'de fren basılı değilse motor kapıya yanaşıyor;
   `tools/manual.mjs` bunu test ediyor.
+- 2026-10-23: alım/teslim bug taraması (`node tools/legs.mjs [touch|desktop|both]`: tek/çoklu sipariş, aynı restoran,
+  üç restoran, aynı kapıya iki sipariş, restoranın önünden başlama, kapıda olay kartı, kapıda zıplama, manuelde karşı
+  şeritte varış, karakter indirmesi yavaş/başarısız). Düzeltilenler:
+  - Telefonda müşteri karakteri (12'den 7'si önceden yüklenmiyor, ~250 KB) kapıya gelince indiriliyordu: kart indirme
+    bitene kadar açılmıyordu, indirme başarısızsa oyun sahnede sonsuza dek takılıyordu (yemek alınamıyor/teslim
+    edilemiyor). Artık işin karakterleri sürüş başında yükleniyor, kapıda 2 s içinde hazır değilse sahne NPC'siz
+    sürüyor; başarısız indirme önbellekte kalmıyor (sonra tekrar denenir).
+  - Zaten kapıdaysan (aynı binaya iki sipariş, restoranın önünden başlama) motor bir karo ileri gidip sahneyi kapıdan
+    11–15 m uzakta yapıyordu; artık sahne olduğu yerde.
+  - Olay kartı açıkken kapıya varınca alım kartı onun üstüne açılıyordu; varış kart kapanana kadar bekliyor. Yeni rota
+    (manuel kavşak/kestirme) olayı son 30 m'ye taşıyorsa olay iptal.
+  - Kapıda zıplayınca sahne motor havadayken başlıyordu; inişi bekliyor.
+  - Manuelde karşı şeritte kapıya varılabiliyordu; son 12 m'de (önünde park etmiş araç yoksa) kendi şeride dönüyor.
+  - Manuelde virajın hemen önüne park etmiş araç varsa A ile dolaşılamıyordu ("viraja 9 m kala şeride dön" kuralı
+    şerit değişimini anında iptal ediyordu) ve motor sonsuza dek arkasında bekliyordu; artık aracı geçene kadar karşı
+    şeritte kalınıyor (otopilot gibi).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
