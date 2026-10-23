@@ -43,6 +43,8 @@ yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanaca�
 | Space · Shift · E · H | zıpla · turbo · olay butonu · korna |
 
 Virajlara fazla hızlı girmek kaydırır (yiyecek hasarı), çok hızlı girmek kaza; hız göstergesi kırmızı yanıp sönerse fren.
+Restorana/kapıya varış: son metreleri motor kendisi ayarlar (fazla hızlıysa frenler, birkaç metre kısa durduysan fren
+basılı değilken kapıya kadar yuvarlanır); alım/teslim sahnesi kapıda başlar.
 Öndeki arabaya çarpmak, park etmiş arabaya/yayaya bindirmek kaza. Şeride park etmiş araç varsa durursun ve "Go round A"
 belirir; karşı şeritten dolaşıp D ile dönersin. Kırmızıda durmazsan ışığı ihlal etmiş sayılırsın. Sollama ve "Go"
 butonları manuel modda gizlenir (iş tuşlarda).
@@ -285,6 +287,9 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   (spor motorda bol); sert frende `brake` sesi + kısa titreşim. Otopilot: kalkışta güçlü, tepe hıza yaklaşınca
   yumuşar (ortalama hız eskisiyle aynı tutuldu: `SEED=n node tools/speed.mjs`), fren birkaç onda birde oturur, son
   metre yumuşak durur. Önce/sonra klibi: `node tools/feelclip.mjs <oyun-kökü> <çıktı.mp4>` (sanal zaman, 360x640).
+- 2026-10-23: düzeltme: masaüstü manuel sürüşte restoranın birkaç metre önünde durunca alım başlamıyordu (varış
+  kapıya 0,6 m kala tetikleniyor, gazsız motor kıpırdamıyordu). Son 9 m'de fren basılı değilse motor kapıya yanaşıyor;
+  `tools/manual.mjs` bunu test ediyor.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 

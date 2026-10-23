@@ -1006,9 +1006,11 @@ export function createRide(ctx) {
     else a = -(0.8 + 0.01 * R.v * R.v); // rolling resistance and drag
     R.load += ((hold || c.brake ? 0 : c.gas || R.boost ? 1 : 0.12) - R.load) * Math.min(1, dt * 10);
     R.v = Math.max(0, R.v + a * dt);
-    // the last metres to the door brake for you, so a delivery never overshoots
+    // the last metres to the door ride themselves: brake so a delivery never overshoots, and roll up to the door if
+    // the rider stopped a little short (unless they're holding the brake)
     const endCap = Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4));
     if (R.v > endCap) R.v = Math.max(endCap, R.v - 11 * dt);
+    if (toEnd < 9 && !c.brake && !hold && R.crash <= 0) R.v = Math.min(endCap, Math.max(R.v, Math.min(2.5, R.v + 4 * dt)));
     R.skidCd = Math.max(0, R.skidCd - dt);
     R.cornerWarn = false;
     for (const ar of R.arcs) {

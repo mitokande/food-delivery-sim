@@ -53,8 +53,13 @@ const chunk = () => R(() => {
     if (Rr.leg !== W.lastLeg) { W.lastLeg = Rr.leg; out.legs++; W.tookTurn = false; }
     const L = Rr.light;
     const redAhead = L && L.state !== 'g' && L.d < 14 && L.d > 0.6;
-    const brake = Rr.cornerWarn || redAhead;
-    r.input('gas', !brake); r.input('brake', !!brake);
+    let brake = Rr.cornerWarn || redAhead;
+    // first leg: pull up a few metres short of the restaurant and let go of everything — the bike should roll to the door
+    const toEnd = Rr.route.length - Rr.s;
+    if (Rr.leg === 0 && toEnd < 4 && toEnd > 1.2 && !W.short) { brake = true; if (Rr.v < 0.05) W.short = { at: toEnd }; }
+    if (W.short && Rr.leg === 0) { r.input('gas', false); r.input('brake', false); out.shortStop = W.short.at; }
+    else { r.input('gas', !brake); r.input('brake', !!brake); }
+    if (Rr.leg === 1 && W.short && out.rolledIn == null) out.rolledIn = true;
     // once: a lane change on a clear stretch (and back further down)
     if (!W.triedLane && !Rr.junc && !Rr.ot && Rr.v > 5) { r.input('left'); W.triedLane = true; out.laneChange = !!(Rr.ot && Rr.ot.manual); }
     // steer round whatever blocks our lane, come back once it's behind us
@@ -84,6 +89,7 @@ console.log(JSON.stringify(report));
 ok(report.junctionSeen, 'a junction choice came up');
 ok(report.reroutes >= 1 && report.sameDest, 'turning off the GPS route re-routes to the same door');
 ok(report.laneChange, 'A moves into the other lane');
+ok(report.rolledIn, `stopping ${(report.shortStop || 0).toFixed(1)} m short of the door, the bike rolls up and the pickup starts`);
 ok(report.finished, `the rider finished the job (${report.t.toFixed(0)} s sim, ${report.crashes} crashes)`);
 await sleep(500);
 await page.screenshot({ path: `${prefix}-end.png` });
