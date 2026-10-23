@@ -33,6 +33,20 @@ yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←
 Motor rotayı A* ile bulur ve kendi sürer: virajda yavaşlar, öndeki arabanın arkasında yavaşlar, kırmızıda durur,
 yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanacağına karar verir.
 
+**Masaüstünde kendin sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı, telefonda hep otomatik):
+
+| Tuş | İş |
+|---|---|
+| W / ↑ | gaz (basılı tut); bırakınca motor yavaşça süzülür |
+| S / ↓ | fren |
+| A / D, ← / → | şerit değiştir (A karşı şeride çık, D geri dön); kavşakta sola/düz/sağ seç → GPS yeni yolu çizer |
+| Space · Shift · E · H | zıpla · turbo · olay butonu · korna |
+
+Virajlara fazla hızlı girmek kaydırır (yiyecek hasarı), çok hızlı girmek kaza; hız göstergesi kırmızı yanıp sönerse fren.
+Öndeki arabaya çarpmak, park etmiş arabaya/yayaya bindirmek kaza. Şeride park etmiş araç varsa durursun ve "Go round A"
+belirir; karşı şeritten dolaşıp D ile dönersin. Kırmızıda durmazsan ışığı ihlal etmiş sayılırsın. Sollama ve "Go"
+butonları manuel modda gizlenir (iş tuşlarda).
+
 | Güç | Tetik | Etki | Risk |
 |---|---|---|---|
 | **Turbo** | basılı tut (her zaman) | hız +%45; enerji barı harcar | virajda/çukurda daha çok sarsıntı |
@@ -250,5 +264,10 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
     son 10 saniyede kronometre sallanır, START butonundan parlama geçer. `prefers-reduced-motion` hepsini kapatır.
 - 2026-10-22: sürüşte yukarı kaydırarak zıplama kaldırıldı (yukarı sürükleyip kamerayı oynatmakla çakışıyordu); zıplama
   artık yalnızca HOP butonu. Sola fiske = sollama duruyor; top olayındaki "yukarı kaydır" görevi de aynen duruyor.
+- 2026-10-22: masaüstünde manuel sürüş: W/S gaz-fren, A/D şerit + kavşakta yön seçimi (GPS aynı kapıya yeniden
+  rota çizer; `replaceRoute` kestirme ile ortak), virajda hız uyarısı/kayma/kaza, öndeki arabaya ve park etmiş araca
+  çarpma, park etmiş araçta "Go round A" ipucu. Ayarlar'da *Auto-drive* anahtarı (yalnızca dokunmatik olmayan cihazda).
+  Test: `node tools/manual.mjs` (1280x720, dokunmasız; bir sürücü işi baştan sona bitirir). Dokunmatik testler
+  (`play`, `onboard`, …) otomatik sürüşte kalır; `sweep`'in masaüstü boyutları artık manuel.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).

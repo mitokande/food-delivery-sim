@@ -1,7 +1,8 @@
-// Delivery ride: the bike drives itself along the route; the player uses powers and answers events.
+// Delivery ride: the bike drives itself along the route (or, in manual mode on desktop, the player rides it: gas,
+// brake, lane changes and the turn at each junction); the player uses powers and answers events.
 import * as THREE from 'three';
 import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT, DPROFILE } from '../data.js';
-import { DIRS, OPP, RIGHT, K } from '../city/gen.js';
+import { DIRS, OPP, RIGHT, LEFT, K } from '../city/gen.js';
 import { findPath, buildRoute, sampleRoute, LANE, laneCurve, dirBetween, routeArcs } from '../city/graph.js';
 import { planHazards, makeHazardMesh, freeHazard, HZ, warmPeds } from './hazards.js';
 import { pickEvent } from './events.js';
@@ -29,6 +30,7 @@ export function createRide(ctx) {
     boost: false, hop: null, ot: null, runLight: -1, wait: 0, crash: 0, hazards: [], event: null, eventDone: false,
     orders: [], legMeters: 0, meters: 0, stats: null, shake: 0, camFov: 60, bike: null, agent: null, offer: null, hornCd: 0,
     lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0, 0], recentEvents: [], arcs: [], blend: null, yawOff: 0, camYaw: null, fines: 0, rideTime: 0,
+    manual: false, ctl: { gas: false, brake: false }, junc: null, cornerWarn: false, skidCd: 0,
   };
   const pfx = createFx(scene); // particles (R.fx is the skill table)
   // ---- Flow: chaining stunts builds a tip multiplier (×2 max) and refills turbo; mistakes break it ----
@@ -76,6 +78,7 @@ export function createRide(ctx) {
     const fx = St.skillFx();
     R.vs = vs; R.fx = fx;
     R.job = job; R.leg = 0; R.active = true; R.timeScale = 1; R.fines = 0; R.rideTime = 0;
+    R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
     R.orders = job.orders.map((o) => ({ o, elapsed: 0, heat: 100, integrity: 100, picked: false, done: false, tipMult: 1, ratingAdj: 0, result: null }));
     R.stats = { overtakes: 0, perfect: 0, shortcuts: 0, crashes: 0, bumps: 0, events: 0, cash: 0, meters: 0, nearMisses: 0, bestFlow: 1 };
@@ -223,6 +226,8 @@ export function createRide(ctx) {
 
   // ---------- input ----------
   function input(what, down = true) {
+    // pedals are held keys: remember them even between legs, so a key released during a scene is not stuck
+    if (what === 'gas' || what === 'brake') { R.ctl[what] = down; return; }
     if (!R.active || R.phase !== 'ride') return;
     if (what === 'boost') {
       const was = R.boost; R.boost = down && R.energy > 4;
@@ -238,6 +243,81 @@ export function createRide(ctx) {
     if (what === 'overtake') return doOvertake();
     if (what === 'go') { const L = nextLight(); if (L) { R.runLight = L.tile; R.runLightState = L.state; ctx.ui.toast(L.state === 'r' ? 'Running the red!' : 'Go go go!', 'warn'); } return; }
     if (what === 'shortcut') return takeShortcut();
+    if (what === 'left' || what === 'right') return steerKey(what === 'left' ? -1 : 1);
+  }
+  // ---------- manual riding: A / D pick the turn at the junction ahead, or change lane between junctions ----------
+  function steerKey(dir) {
+    if (!R.manual || R.crash > 0) return;
+    if (R.junc) { chooseExit(dir); return; }
+    if (stepAt().alley) return;
+    if (dir < 0) {
+      if (R.ot) { R.ot.dir = 1; return; }
+      const L = leaderAhead();
+      R.ot = { t: 0, dir: 1, manual: true, car: L.who && L.gap < 30 && L.who.kind === 'car' ? L.who : null, until: 0, time: 0, clean: true };
+      R.bike?.lookBack?.();
+      ctx.audio?.play('boost', { vol: 0.3, rate: 1.3 });
+    } else if (R.ot) R.ot.dir = -1;
+  }
+  // the next junction where the rider can leave the GPS route: open from a couple of seconds out until the turn starts
+  function updateJunction() {
+    // something parked in our lane comes first: A/D steer round it, the turn choice waits until the lane is clear
+    if (manualBlock()) { R.junc = null; return; }
+    const steps = R.route.steps, k0 = R.sampled[3];
+    const reach = Math.max(18, R.v * 2.4);
+    let J = null;
+    for (let k = k0 + 1; k < Math.min(steps.length - 1, k0 + 5); k++) {
+      const t = city.tiles[steps[k].tile];
+      if (!t.junction) continue;
+      let lock = steps[k].s0 - 1;
+      for (const a of R.arcs) if (a.s0 < lock && a.s1 > steps[k].s0 - 0.1) lock = a.s0 - 0.5;
+      const dist = lock - R.s;
+      if (dist < 0) continue; // already committed to this one
+      if (dist > reach) break;
+      const din = steps[k].din;
+      const rels = [-1, 0, 1].filter((r) => t.mask & (1 << (r < 0 ? LEFT(din) : r > 0 ? RIGHT(din) : din)));
+      if (rels.length < 2) break;
+      const dout = steps[k].dout, cur = dout === din ? 0 : dout === LEFT(din) ? -1 : 1;
+      J = { k, tile: steps[k].tile, din, rels, cur, dist, gps: R.junc && R.junc.tile === steps[k].tile ? R.junc.gps : cur };
+      break;
+    }
+    R.junc = J;
+  }
+  function chooseExit(dir) {
+    const J = R.junc;
+    const i = J.rels.indexOf(J.cur), ni = Math.max(0, Math.min(J.rels.length - 1, i + dir));
+    if (ni === i) return;
+    const rel = J.rels[ni], d = rel < 0 ? LEFT(J.din) : rel > 0 ? RIGHT(J.din) : J.din;
+    // leave the junction that way, then the GPS finds the quickest way on to the same door
+    const steps = R.route.steps, k0 = R.sampled[3];
+    const n = J.tile + DIRS[d][0] + DIRS[d][1] * city.W;
+    const rest = findPath(city, n, steps[steps.length - 1].tile, { noBack: OPP(d) });
+    if (!rest) { ctx.ui.toast('No way through there', 'bad'); return; }
+    const path = [];
+    for (let k = k0; k <= J.k; k++) path.push(steps[k].tile);
+    path.push(...rest);
+    replaceRoute(path);
+    ctx.audio?.play('ui-tap', { vol: 0.6 });
+    updateJunction();
+    if (R.junc && R.junc.cur !== R.junc.gps) ctx.ui.toast('Rerouting…', '');
+  }
+  // swap the route ahead (junction choice, shortcut): keep the bike where it is, re-plan hazards, move an event still to come
+  function replaceRoute(path) {
+    const cur = R.route.steps[R.sampled[3]];
+    const into = R.s - cur.s0;
+    const route = buildRoute(city, path, { startDir: cur.din, firstFull: true });
+    R.route = route; R.s = Math.max(0, Math.min(into, route.steps[1] ? route.steps[1].s0 - 0.5 : into)); R.sampled[3] = 0;
+    R.arcs = routeArcs(route);
+    startBlend();
+    for (const h of R.hazards) freeHazard(h);
+    R.hazards = planHazards(route, city, rng, { startS: R.s + 20 }).filter((h) => h.s > R.s + 15);
+    for (const h of R.hazards) { h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); }
+    if (R.event && !R.event.fired && R.event.ev) {
+      if (R.event.prop) { disposeActor(R.event.prop); const i = actors.indexOf(R.event.prop); if (i >= 0) actors.splice(i, 1); R.event.prop = null; }
+      R.event.s = Math.min(R.s + 45, route.length * 0.7);
+      if (R.event.ev.pre) prePlace(R.event);
+    }
+    setRibbon();
+    ctx.ui.routeChanged(R);
   }
   function doHop() {
     if (R.hop || R.crash > 0) return;
@@ -336,8 +416,8 @@ export function createRide(ctx) {
     if (R.timeScale < 1 || St.S.stats.deliveries > 12) return;
     let want = null;
     if (!seen.c_hop && R.hazards.some((h) => !h.done && HZ[h.type].hop && h.lane >= 0 && h.s - R.s > 4 && h.s - R.s < Math.max(10, R.v * 1.4))) want = 'hop';
-    else if (!seen.c_overtake && canOvertake()?.risk === 0) want = 'overtake';
-    else if (!seen.c_go && R.light && R.light.state === 'r' && R.light.d < 10 && R.v < 2) want = 'go';
+    else if (!R.manual && !seen.c_overtake && canOvertake()?.risk === 0) want = 'overtake';
+    else if (!R.manual && !seen.c_go && R.light && R.light.state === 'r' && R.light.d < 10 && R.v < 2) want = 'go';
     else if (!seen.c_shortcut && R.offer) want = 'shortcut';
     else if (!seen.c_boost && R.v > R.vs.top * 0.9 && !R.boost && R.energy > R.energyMax * 0.8 && St.S.stats.deliveries >= 1) want = 'boost';
     if (!want) return;
@@ -353,21 +433,10 @@ export function createRide(ctx) {
     const path = [];
     for (let k = k0; k <= o.k; k++) path.push(steps[k].tile);
     path.push(...o.tiles, ...o.rest);
-    const cur = steps[k0];
-    const into = R.s - cur.s0;
-    const route = buildRoute(city, path, { startDir: cur.din, firstFull: true });
-    R.route = route; R.s = Math.max(0, Math.min(into, route.steps[1] ? route.steps[1].s0 - 0.5 : into)); R.sampled[3] = 0;
-    R.arcs = routeArcs(route);
-    startBlend();
+    replaceRoute(path);
     R.offer = null; R.stats.shortcuts++; St.goalProgress('shortcut');
     flow('SHORTCUT!');
-    // hazards: drop ones from the old route, plan for the new tail
-    for (const h of R.hazards) freeHazard(h);
-    R.hazards = planHazards(route, city, rng, { startS: R.s + 20 }).filter((h) => h.s > R.s + 15);
-    for (const h of R.hazards) { h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); }
-    setRibbon();
     ctx.ui.toast(`Shortcut! ${o.label}`, 'good');
-    ctx.ui.routeChanged(R);
   }
 
   // ---------- damage ----------
@@ -721,7 +790,8 @@ export function createRide(ctx) {
     const toEnd = route.length - R.s;
     target = Math.min(target, Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4)));
     let blockedBy = null;
-    if (!R.ot) {
+    if (R.manual) updateJunction();
+    if (!R.ot && !R.manual) {
       const L = leaderAhead();
       if (L.gap < 40) { const vt = Math.sqrt(2 * B_DEC * Math.max(0, L.gap - 2.4)); if (vt < target) { target = vt; blockedBy = L.gap < 14 ? 'car' : null; } }
       const B = blockingHazard();
@@ -742,16 +812,20 @@ export function createRide(ctx) {
     }
     const L2 = nextLight();
     R.light = L2;
-    if (L2 && L2.tile !== R.runLight && L2.state !== 'g') {
+    // a rider who doesn't stop at a red simply runs it (cross traffic and the camera still apply)
+    if (R.manual && L2 && L2.state !== 'g' && L2.tile !== R.runLight && L2.d < 0.5 && R.v > 1.5) { R.runLight = L2.tile; R.runLightState = L2.state; if (L2.state === 'r') ctx.ui.toast('Running the red!', 'warn'); }
+    if (!R.manual && L2 && L2.tile !== R.runLight && L2.state !== 'g') {
       if (!(L2.state === 'y' && L2.d < R.v * 0.8)) { target = Math.min(target, Math.sqrt(2 * B_DEC * Math.max(0, L2.d))); if (L2.d < 18) blockedBy = blockedBy || 'light'; }
     }
+    const hold = R.wait > 0 || R.crash > 0;
     if (R.wait > 0) { R.wait -= dt; target = 0; }
     if (R.crash > 0) { R.crash -= dt; target = 0; }
     R.blockedBy = blockedBy;
     // ---- integrate ----
     const vBefore = R.v;
     const acc = R.vs.accel * (R.boost ? 1.7 : 1);
-    if (target > R.v) R.v = Math.min(target, R.v + acc * dt);
+    if (R.manual) manualSpeed(dt, top, corner, toEnd, acc, hold);
+    else if (target > R.v) R.v = Math.min(target, R.v + acc * dt);
     else R.v = Math.max(target, R.v - 11 * dt);
     const ds = R.v * dt;
     R.s += ds; R.meters += ds;
@@ -763,7 +837,9 @@ export function createRide(ctx) {
       const ot = R.ot;
       ot.time += dt;
       ot.t = Math.max(0, Math.min(1, ot.t + ot.dir * dt / (ot.slow ? 1.0 : 0.42)));
-      if (ot.dir > 0 && ot.t >= 1) {
+      // the rider keeps the other lane until they steer back (or a corner comes up)
+      if (ot.manual && ot.dir > 0) { for (const a of R.arcs) { if (a.s1 < R.s) continue; if (a.s0 - R.s < 9) ot.dir = -1; break; } if (stepAt().alley) ot.dir = -1; }
+      if (ot.dir > 0 && ot.t >= 1 && !ot.manual) {
         let until = R.s + 2;
         if (ot.car && ot.car.tile != null) {
           const k = route.steps.findIndex((x, i) => i >= R.sampled[3] && x.tile === ot.car.tile);
@@ -772,7 +848,11 @@ export function createRide(ctx) {
         if (ot.hz) until = ot.hz.s + (HZ[ot.hz.type].len || 2) / 2 + 3;
         if (R.s > until || ot.time > 7) ot.dir = -1;
       }
-      if (ot.dir < 0 && ot.t <= 0) { if (ot.clean && !ot.slow) flow('OVERTAKE!'); R.ot = null; }
+      if (ot.dir < 0 && ot.t <= 0) {
+        if (ot.manual) { if (ot.clean && ot.car && behind(ot.car)) { flow('OVERTAKE!'); R.stats.overtakes++; St.goalProgress('overtake'); } }
+        else if (ot.clean && !ot.slow) flow('OVERTAKE!');
+        R.ot = null;
+      }
       // head-on check
       if (R.ot && R.ot.t > 0.5) { const on = oncoming(); if (on.dist < 1.2) { crash('Head-on! Oops.'); if (on.who) on.who.wait = 2; } }
     }
@@ -877,6 +957,45 @@ export function createRide(ctx) {
     // ---- arrival ----
     if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0) arrive();
   }
+  // the rider's pedals: gas, brake or coast; corners taken too fast slide or crash; the bumper and parked cars are real
+  function manualSpeed(dt, top, corner, toEnd, acc, hold) {
+    const c = R.ctl;
+    let a;
+    if (hold) a = -14;
+    else if (c.brake) a = -9.5;
+    else if (c.gas || R.boost) a = R.v < top ? acc * (1 - 0.5 * (R.v / top) ** 2) : -3;
+    else a = -(0.8 + 0.01 * R.v * R.v); // rolling resistance and drag
+    R.v = Math.max(0, R.v + a * dt);
+    // the last metres to the door brake for you, so a delivery never overshoots
+    const endCap = Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4));
+    if (R.v > endCap) R.v = Math.max(endCap, R.v - 11 * dt);
+    R.skidCd = Math.max(0, R.skidCd - dt);
+    R.cornerWarn = false;
+    for (const ar of R.arcs) {
+      if (ar.s1 < R.s) continue;
+      if (ar.s0 > R.s + 24) break;
+      const vt = Math.sqrt(A_LAT * corner * ar.r);
+      if (ar.s0 > R.s) { if (R.v > vt * 1.12) R.cornerWarn = true; continue; }
+      if (R.v > vt * 1.55 && R.crash <= 0) { crash('Way too fast for that corner!'); break; }
+      if (R.v > vt * 1.2 && R.skidCd <= 0) {
+        R.skidCd = 1.2; R.v = vt * 1.05; R.wobble = 0.8; hurtFood(6); flowBreak();
+        ctx.audio?.play('skid', { vol: 0.6 }); ctx.ui.toast('Too fast! Brake before corners', 'warn');
+        const b = R.bike.root.position, h = R.bike.root.rotation.y;
+        for (let i = 0; i < 4; i++) pfx.skidMark(b.x - Math.sin(h) * i * 0.4, b.z - Math.cos(h) * i * 0.4, h + 0.3);
+      }
+      break;
+    }
+    if (R.crash > 0 || (R.ot && R.ot.t > 0.5)) return;
+    const L = leaderAhead();
+    if (L.who && L.gap < 0.35 && R.v > L.who.v + 2) crash('Rear-ended a car!');
+    else if (L.who && L.gap < 0.8) R.v = Math.min(R.v, L.who.v);
+    const B = blockingHazard();
+    if (B.h && B.d < 0.15 && (B.h.type === 'parked' || B.h.type === 'ped')) {
+      if (R.v > 2) crash(B.h.type === 'ped' ? 'Watch out for pedestrians!' : 'Hit a parked car!');
+      else R.v = 0; // nose to it: steer out (A) to get round
+    }
+  }
+  const behind = (a) => { const b = R.bike.root.position, h = R.bike.root.rotation.y; return (a.pos[0] - b.x) * Math.sin(h) + (a.pos[1] - b.z) * Math.cos(h) < -1.5; };
   // close calls: a car slides past within a lane's width while we're moving fast
   function nearMisses() {
     if (R.crash > 0 || R.v < 6) return;
@@ -1035,6 +1154,15 @@ export function createRide(ctx) {
 
   // test hook: schedule an event a little ahead (props placed like a real one)
   function testEvent(ev, lead = 2) { R.event = { ev, s: R.s + lead }; if (ev.pre) prePlace(R.event); }
-  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
+  // manual riding: something in our lane we have to steer round (a parked car, road works, a crawling car), and how risky
+  function manualBlock() {
+    if (!R.manual || R.ot || stepAt().alley) return null;
+    const B = blockingHazard(), L = leaderAhead();
+    const hz = B.h && B.d < 6 && B.h.type !== 'ped';
+    const car = L.who && L.gap < 5 && L.who.kind === 'car' && L.who.v < 1.5;
+    if (!hz && !car) return null;
+    return { risk: oncoming().dist < 25 };
+  }
+  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, manualBlock, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);

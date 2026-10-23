@@ -25,7 +25,7 @@ const fresh = () => ({
   today: { earned: 0, deliveries: 0, fuel: 0, tips: 0, fleet: 0 },
   goals: null,
   look: { char: 'male-a', helmet: '#e8432f' },
-  settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
+  settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true, autodrive: null }, // autodrive null: by device (phones auto, keyboards ride)
   seen: {}, // one-time tips
   onboard: { step: 0 }, // first-time guide; 99 = finished
   focus: null, // order board: work one district only (id) or all (null)

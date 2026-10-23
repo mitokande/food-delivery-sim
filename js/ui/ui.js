@@ -60,6 +60,7 @@ export function createUI(game) {
       <canvas class="r-map" width="240" height="240"></canvas>
     </div>
     <div class="r-ctx"></div>
+    <div class="r-junc" hidden><span data-j="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-90 12 12)"/></svg></span><span data-j="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(0 12 12)"/></svg></span><span data-j="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 12 12)"/></svg></span><small>A · D</small></div>
     <div class="r-speed"><svg viewBox="0 0 72 40" aria-hidden="true"><path class="trk" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/><path class="val" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/></svg><b>0</b><small>km/h</small></div>
     <button class="r-btn horn" data-ride="horn" aria-label="Horn">${ICON('ui-horn')}</button>
     <button class="r-btn hop" data-ride="hop" aria-label="Hop">${ICON('ui-jump')}<span>HOP</span></button>
@@ -529,6 +530,7 @@ export function createUI(game) {
       <label class="set">Sound<input type="range" min="0" max="1" step="0.05" value="${S.settings.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${S.settings.quality === q ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
       <label class="set">Vibration<input type="checkbox" data-k="haptics" ${S.settings.haptics ? 'checked' : ''}></label>
+      ${game.isTouch ? '' : `<label class="set">Auto-drive <small>(off: you ride with the keyboard)</small><input type="checkbox" data-k="autodrive" ${S.settings.autodrive === true ? 'checked' : ''}></label>`}
       <p class="small">Progress is saved on this device. Use a save code to move it to another phone.</p>
       <div class="set-more"><button class="btn ghost sm" data-x="export">Copy save code</button><button class="btn ghost sm" data-x="import">Load save code</button></div>
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
@@ -608,7 +610,9 @@ export function createUI(game) {
     name: $('.r-name', hud), verb: $('.r-verb', hud), food: $('.r-food', hud), dist: $('.r-dist', hud), timer: $('.r-timer b', hud), timerBox: $('.r-timer', hud),
     cond: $('.r-cond', hud), heat: $('.heat u', hud), integ: $('.integ u', hud), speed: $('.r-speed b', hud), ctx: $('.r-ctx', hud),
     boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud), timerLbl: $('.r-timer small', hud), dial: $('.r-speed .val', hud),
+    speedBox: $('.r-speed', hud), junc: $('.r-junc', hud), keys: $('.r-keys', hud),
   };
+  let juncKey = '';
   let vTop = 9; // the active bike's top speed (m/s), for the speed dial
   const mapCtx = rh.map.getContext('2d');
   const flowEl = $('.r-flow', hud), flowMult = $('.r-flow em', hud), flowBar = $('.r-flow u', hud), pops = $('.r-pops', hud), speedEl = $('#speedlines', hud);
@@ -649,6 +653,8 @@ export function createUI(game) {
     rh.food.innerHTML = leg.kind === 'pickup' ? ICON(FOODS[o.food].icon) : ICON('char-' + o.char);
     rh.cond.hidden = !R.orders.some((x) => x.picked && !x.done);
     vTop = St.vehStats().top || 9;
+    rh.keys.textContent = R.manual ? 'W/↑ gas · S/↓ brake · A/D lanes & turns · Space hop · Shift turbo · E action · H horn · drag to look'
+      : 'Space turbo · W hop · E action · H horn · drag to look';
     routeChanged(R);
   }
   let mapPts = [];
@@ -714,6 +720,14 @@ export function createUI(game) {
     }
     rh.speed.textContent = Math.round(R.v * 3.6);
     rh.dial.style.strokeDasharray = `${Math.min(100, R.v / (vTop * 1.35) * 100).toFixed(1)} 100`;
+    rh.speedBox.classList.toggle('warn', !!R.cornerWarn);
+    // the rider's junction choice: the exits there, the one the route takes now, and the GPS pick
+    const J = R.manual && R.phase === 'ride' ? R.junc : null;
+    const jk = J ? `${J.tile}|${J.rels}|${J.cur}|${J.gps}` : '';
+    if (jk !== juncKey) {
+      juncKey = jk; rh.junc.hidden = !J;
+      if (J) for (const el of rh.junc.querySelectorAll('[data-j]')) { const r = +el.dataset.j; el.hidden = !J.rels.includes(r); el.classList.toggle('on', J.cur === r); el.classList.toggle('gps', J.gps === r); }
+    }
     const F = R.flow;
     if (F) {
       flowEl.hidden = !(F.n > 0);
@@ -728,9 +742,11 @@ export function createUI(game) {
     // context actions
     const acts = [];
     if (R.phase === 'ride' && R.crash <= 0) {
-      const ot = game.canOvertake();
+      const ot = !R.manual && game.canOvertake();
       if (ot) acts.push(['overtake', `${ICON('ui-overtake')}<span>Overtake</span>`, ['safe', 'risky', 'danger'][ot.risk]]);
-      if (R.light && R.light.state !== 'g' && R.light.d < 16 && R.runLight !== R.light.tile) acts.push(['go', `${ICON('ui-traffic-light')}<span>Run it!</span>`, 'risky']);
+      // riding yourself: stuck behind a parked car or a slow one → a nudge to steer round (and which key does it)
+      if (R.manual && !R.ot && R.v < 3) { const g = game.manualBlock?.(); if (g) acts.push(['left', `${ICON('ui-overtake')}<span>Go round <small>A</small></span>`, g.risk ? 'risky' : 'safe']); }
+      if (!R.manual && R.light && R.light.state !== 'g' && R.light.d < 16 && R.runLight !== R.light.tile) acts.push(['go', `${ICON('ui-traffic-light')}<span>Run it!</span>`, 'risky']);
       if (R.offer) acts.push(['shortcut', `${ICON('ui-shortcut')}<span>Shortcut <small>${R.offer.label}</small></span>`, 'safe']);
       if (R.hazards.some((h) => h.type === 'ped' && !h.done && h.walking && h.s - R.s < 28 && h.s > R.s)) acts.push(['horn', `${ICON('ui-horn')}<span>Honk!</span>`, 'safe']);
     }
