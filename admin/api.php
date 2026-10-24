@@ -1,6 +1,7 @@
 <?php
 // Read-only JSON for the admin panel: api.php?q=overview|live|sessions|session|players|player|gameplay|errors
-// Common parameters: from, to (epoch ms), tz (viewer's UTC offset in minutes, for day buckets), dev (1 = include developer devices).
+// Common parameters: from, to (epoch ms), tz (viewer's UTC offset in minutes, for day buckets), dev (1 = include developer devices),
+// bots (1 = include crawler sessions, see bot_reason() in api/lib.php).
 declare(strict_types=1);
 require __DIR__ . '/auth.php';
 
@@ -20,7 +21,10 @@ $from = max(0, (int) ($_GET['from'] ?? 0));
 $to = (int) ($_GET['to'] ?? 0) ?: $NOW + 1;
 $TZS = max(-14 * 3600, min(14 * 3600, (int) ($_GET['tz'] ?? 0) * 60)); // seconds, safe to inline
 $DEV = !empty($_GET['dev']);
-$devS = $DEV ? '1' : 's.dev = 0';
+$BOTS = !empty($_GET['bots']);
+// the traffic every number leaves out by default: developer devices and crawlers (sessions alias s, players alias p)
+$devS = ($DEV ? '1' : 's.dev = 0') . ($BOTS ? '' : ' AND s.bot = 0');
+$devP = ($DEV ? '1' : 'p.dev = 0') . ($BOTS ? '' : ' AND p.bot = 0');
 $day = fn(string $col) => "date($col / 1000 + $TZS, 'unixepoch')";
 $range = ['f' => $from, 't' => $to];
 
@@ -51,6 +55,8 @@ switch ($q) {
     $k = kpis($from, $to);
     $prev = $from > 0 ? kpis($from - ($to - $from), $from) : null;
     $k['online'] = (int) val("SELECT COUNT(*) FROM sessions s WHERE last_seen > ? AND visible = 1 AND $devS", [$NOW - 75000]);
+    // how many crawler sessions the numbers above leave out
+    $k['bots'] = (int) val('SELECT COUNT(*) FROM sessions s WHERE started_at >= :f AND started_at < :t AND bot = 1 AND ' . ($DEV ? '1' : 's.dev = 0'), $range);
 
     $daily = rows("SELECT {$day('started_at')} day, COUNT(DISTINCT player_id) players, SUM(is_new) new_players, COUNT(*) sessions,
         ROUND(SUM(active_ms) / 60000.0, 1) minutes, SUM(deliveries) deliveries
@@ -113,7 +119,7 @@ switch ($q) {
   // ------------------------------------------------------------ who is playing right now
   case 'live': {
     $s = rows("SELECT s.id, s.player_id, p.name, s.started_at, s.last_seen, s.active_ms, s.visible, s.last_where, s.lvl_end, s.cash_end, s.deliveries, s.earned,
-        s.device, s.os, s.os_ver, s.browser, s.browser_ver, s.model, s.ip, s.is_new
+        s.device, s.os, s.os_ver, s.browser, s.browser_ver, s.model, s.ip, s.is_new, s.bot, s.bot_why
       FROM sessions s JOIN players p ON p.id = s.player_id WHERE s.last_seen > ? AND $devS ORDER BY s.last_seen DESC LIMIT 100", [$NOW - 10 * 60000]);
     $feed = rows("SELECT e.session_id, e.player_id, p.name, e.ts, e.name ev, e.props FROM events e JOIN sessions s ON s.id = e.session_id JOIN players p ON p.id = e.player_id
       WHERE e.ts > ? AND e.name NOT IN ('app_show', 'tab') AND $devS ORDER BY e.ts DESC LIMIT 60", [$NOW - 30 * 60000]);
@@ -135,7 +141,7 @@ switch ($q) {
     $page = max(0, (int) ($_GET['page'] ?? 0));
     $w = implode(' AND ', $where);
     $total = (int) val("SELECT COUNT(*) FROM sessions s JOIN players p ON p.id = s.player_id WHERE $w", $args);
-    $list = rows("SELECT s.id, s.player_id, p.name, s.started_at, s.last_seen, s.active_ms, s.visible, s.is_new, s.fresh, s.dev, s.why, s.events, s.jobs, s.jobs_started,
+    $list = rows("SELECT s.id, s.player_id, p.name, s.started_at, s.last_seen, s.active_ms, s.visible, s.is_new, s.fresh, s.dev, s.bot, s.bot_why, s.why, s.events, s.jobs, s.jobs_started,
         s.deliveries, s.earned, s.crashes, s.buys, s.spent, s.errors, s.lvl_start, s.lvl_end, s.cash_start, s.cash_end, s.last_where,
         CASE WHEN s.fps_n > 0 THEN ROUND(s.fps_sum / s.fps_n, 1) END fps, s.device, s.os, s.os_ver, s.browser, s.browser_ver, s.model, s.ip
       FROM sessions s JOIN players p ON p.id = s.player_id WHERE $w ORDER BY $sort $dir, s.started_at DESC LIMIT 50 OFFSET " . ($page * 50), $args);
@@ -158,7 +164,7 @@ switch ($q) {
 
   // ------------------------------------------------------------ players
   case 'players': {
-    $where = [$DEV ? '1' : 'p.dev = 0']; $args = [];
+    $where = [$devP]; $args = [];
     if (empty($_GET['all'])) { $where[] = 'EXISTS (SELECT 1 FROM sessions s WHERE s.player_id = p.id AND s.started_at >= :f AND s.started_at < :t)'; $args += $range; }
     if (!empty($_GET['search'])) { $where[] = '(p.name LIKE :qs OR p.id LIKE :qs OR p.ip LIKE :qs OR p.model LIKE :qs)'; $args['qs'] = '%' . $_GET['search'] . '%'; }
     $sorts = ['last' => 'p.last_seen', 'first' => 'p.first_seen', 'active' => 'p.active_ms', 'lvl' => 'p.lvl', 'deliveries' => 'p.deliveries', 'sessions' => 'p.sessions', 'cash' => 'p.cash', 'earned' => 'p.earned'];
@@ -175,7 +181,7 @@ switch ($q) {
     $id = (string) ($_GET['id'] ?? '');
     $p = row('SELECT * FROM players WHERE id = ?', [$id]);
     if (!$p) { http_response_code(404); out(['error' => 'not found']); }
-    $sessions = rows("SELECT id, started_at, last_seen, active_ms, visible, is_new, why, events, jobs, deliveries, earned, crashes, buys, spent, errors, lvl_start, lvl_end,
+    $sessions = rows("SELECT id, started_at, last_seen, active_ms, visible, is_new, bot, bot_why, why, events, jobs, deliveries, earned, crashes, buys, spent, errors, lvl_start, lvl_end,
         cash_end, last_where, device, os, os_ver, browser, browser_ver, model, ip, CASE WHEN fps_n > 0 THEN ROUND(fps_sum / fps_n, 1) END fps
       FROM sessions WHERE player_id = ? ORDER BY started_at DESC LIMIT 300", [$id]);
     $levels = decode_props(rows("SELECT ts, props FROM events WHERE player_id = ? AND name = 'level_up' ORDER BY ts", [$id]));
@@ -224,7 +230,7 @@ switch ($q) {
     ksort($lv);
     $levels = [];
     foreach ($lv as $l => $x) $levels[] = ['lvl' => $l, 'n' => count($x['pm']), 'pm' => median($x['pm']), 'del' => median($x['del'])];
-    $lvlDist = rows("SELECT p.lvl k, COUNT(*) n FROM players p WHERE " . ($DEV ? '1' : 'p.dev = 0') . " AND EXISTS (SELECT 1 FROM sessions s WHERE s.player_id = p.id AND s.started_at >= :f AND s.started_at < :t) GROUP BY p.lvl ORDER BY p.lvl", $range);
+    $lvlDist = rows("SELECT p.lvl k, COUNT(*) n FROM players p WHERE $devP AND EXISTS (SELECT 1 FROM sessions s WHERE s.player_id = p.id AND s.started_at >= :f AND s.started_at < :t) GROUP BY p.lvl ORDER BY p.lvl", $range);
     $tutorial = $ev('onboard_step', "json_extract(e.props, '$.step') k, COUNT(DISTINCT e.player_id) n", 'k', 'k + 0');
     $tabs = $ev('tab', "json_extract(e.props, '$.tab') k, COUNT(*) n", 'k', 'n DESC');
     $ach = $ev('achievement', "json_extract(e.props, '$.id') k, COUNT(*) n", 'k', 'n DESC');

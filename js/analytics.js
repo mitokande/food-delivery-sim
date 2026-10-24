@@ -81,7 +81,7 @@ function body(ev) {
   return JSON.stringify({ v: 1, pid, sid, now: Date.now(), dev: dev ? 1 : 0, active: Math.round(activeNow()), fps: takeFps(), st: snapshot(), ctx: ctxSent ? undefined : context(), ev });
 }
 async function flush(unloading = false) {
-  if (!enabled || sending) return;
+  if (!enabled || !sid || sending) return;
   const ev = queue.slice(0, BATCH);
   if (!ev.length && Date.now() - lastSend < PING_MS) return;
   sending = true; lastSend = Date.now();
@@ -98,7 +98,7 @@ async function flush(unloading = false) {
 }
 // page is going away (or to the background): hand everything to sendBeacon, which outlives the page
 function flushNow() {
-  if (!enabled) return;
+  if (!enabled || !sid) return;
   store.set('fds_play', String(Math.round(playBase + activeNow())));
   do {
     const ev = queue.slice(0, BATCH);
@@ -110,19 +110,27 @@ function flushNow() {
 
 function newSession(why, extra = {}) {
   playBase += activeNow();
+  const early = sid ? [] : queue.splice(0); // tracked before the page was first shown (boot, errors): part of this visit
   sid = rid('s'); seq = 0; ctxSent = false; activeMs = 0; visSince = performance.now();
   track('session_start', { why, ...extra });
+  for (const e of early) { e.i = seq++; queue.push(e); }
 }
 
 // ---------- wiring ----------
 if (enabled) {
   window.__an = track; // index.html's boot-error guard reports through this when the module loaded
-  newSession('boot', { saved: !!store.get('fds_save_v1') });
+  // a page loaded unseen (link preview, prefetch, prerender) is not a visit: the session starts when it is first shown
+  const saved = !!store.get('fds_save_v1'); // before the game writes its first save
+  const unseen = () => document.hidden || document.prerendering;
+  const begin = (deferred) => newSession('boot', { saved, ...(deferred ? { deferred: 1 } : {}) });
+  if (!unseen()) begin(false);
+  else document.addEventListener('prerenderingchange', () => { if (!sid && !unseen()) { begin(true); flush(); } });
   requestAnimationFrame(countFrame);
   setInterval(closeWindow, 5000);
   setInterval(() => { if (!document.hidden) flush(); }, FLUSH_MS);
   setTimeout(flush, 20000); // ready() sends the first batch; this one covers a boot that never finishes
   document.addEventListener('visibilitychange', () => {
+    if (!sid) { if (!unseen()) { visSince = performance.now(); begin(true); flush(); } return; }
     if (document.hidden) {
       activeMs += performance.now() - visSince; hiddenAt = Date.now();
       closeWindow();
@@ -136,7 +144,7 @@ if (enabled) {
       flush();
     }
   });
-  addEventListener('pagehide', () => { if (!document.hidden) { track('app_hide', { where: safeWhere(), unload: 1 }); flushNow(); } });
+  addEventListener('pagehide', () => { if (sid && !document.hidden) { track('app_hide', { where: safeWhere(), unload: 1 }); flushNow(); } });
   const report = (msg, src, line, col, stack) => {
     const key = String(msg).slice(0, 200);
     if (errSeen.has(key) || errSeen.size >= 15) return;

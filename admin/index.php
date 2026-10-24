@@ -61,6 +61,7 @@ $in = is_admin();
     <button data-r="today">Bugün</button><button data-r="7d">7 gün</button><button data-r="30d">30 gün</button><button data-r="90d">90 gün</button><button data-r="all">Tümü</button>
   </div>
   <label class="chk"><input type="checkbox" id="dev"> Geliştirici cihazları dahil</label>
+  <label class="chk" title="Facebook/Instagram önizleme tarayıcıları, arama motorları, headless tarayıcılar"><input type="checkbox" id="bots"> Botları dahil et</label>
   <span class="muted small" id="stamp"></span>
 </div>
 <main id="view"></main>

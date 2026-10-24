@@ -335,6 +335,11 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
   `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
   `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,
   `save_export` / `save_import` / `save_reset`. Her pakette kaydın özeti de gider (seviye, para, teslimat, bölgeler, bulunulan ekran).
+- **Botlar:** önizleme/tarama tarayıcıları oturum açar ama oynamaz; `api/lib.php` `bot_reason()` her pakette oturumu yeniden
+  değerlendirir (`sessions.bot`, `bot_why`): bot user agent (`ua`), Meta'nın IP aralığı (`meta-ip`), cihaz taklidi — 2000×2000
+  "ekran" (`screen`) ya da 1× piksel oranlı, WebGL'i hiç açılmayan "telefon" (`nogpu`) — ve yazılım GPU (`softgpu`, headless).
+  Bütün oturumları bot olan oyuncu da bot. Panel bunları varsayılan olarak sayılara katmaz ("Botları dahil et" ile görünür).
+  Arka planda yüklenen sayfa (link önizleme, prefetch, prerender) ilk kez görünene kadar oturum başlatmaz.
 - **Geliştirici cihazı:** oyunu bir kez `?an=dev` ile aç → o cihazın oturumları istatistiklere girmez (panelde "Geliştirici
   cihazları dahil" ile görünür). `?an=off` göndermeyi kapatır, `?an=on` sıfırlar. Headless testler (`navigator.webdriver`)
   hiçbir şey göndermez; `?an=force` ile açılır.

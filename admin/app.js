@@ -46,6 +46,10 @@ const DEVICE_TR = { mobile: 'Telefon', tablet: 'Tablet', desktop: 'Masaüstü' }
 const devLine = (s) => [s.model || DEVICE_TR[s.device] || s.device, s.os && s.os + (s.os_ver ? ' ' + s.os_ver : ''), s.browser && s.browser + (s.browser_ver ? ' ' + s.browser_ver : '')].filter(Boolean).join(' · ');
 const ipCell = (ip) => (ip ? `<span class="mono small">${esc(ip)}</span>` : '<span class="muted">–</span>');
 const ipLink = (ip) => (ip ? `<span class="mono">${esc(ip)}</span> <a href="https://ipinfo.io/${encodeURIComponent(ip)}" target="_blank" rel="noopener noreferrer">konum ↗</a>` : '<span class="muted">kaydedilmemiş</span>');
+// crawler sessions (api/lib.php bot_reason): a badge that says why
+const BOT_TR = { ua: 'bot / tarayıcı otomasyonu (user agent)', 'meta-ip': 'Meta’nın IP aralığı (Facebook/Instagram tarayıcısı)', screen: 'sahte 2000×2000 ekran (cihaz taklidi)',
+  nogpu: '1× ekranlı “telefon”, WebGL yok (cihaz taklidi)', softgpu: 'yazılım GPU (headless tarayıcı)' };
+const botBadge = (x) => (+x.bot ? `<span class="badge bad" title="${esc(BOT_TR[x.bot_why] || x.bot_why || '')}">bot</span>` : '');
 const stars = (n) => `<span class="stars" title="${n} yıldız">${'★'.repeat(n)}<i>${'★'.repeat(Math.max(0, 5 - n))}</i></span>`;
 
 // ---------------------------------------------------------------- game vocabulary
@@ -151,7 +155,7 @@ function fmtEvent(e) {
 }
 
 // ---------------------------------------------------------------- filters, api, routing
-const F = (() => { try { return { range: '7d', dev: false, metric: 'players', ...JSON.parse(localStorage.getItem('fds_admin') || '{}') }; } catch { return { range: '7d', dev: false, metric: 'players' }; } })();
+const F = (() => { try { return { range: '7d', dev: false, bots: false, metric: 'players', ...JSON.parse(localStorage.getItem('fds_admin') || '{}') }; } catch { return { range: '7d', dev: false, bots: false, metric: 'players' }; } })();
 const saveF = () => { try { localStorage.setItem('fds_admin', JSON.stringify(F)); } catch { /* fine */ } };
 const RANGE_TR = { today: 'bugün', '7d': 'son 7 gün', '30d': 'son 30 gün', '90d': 'son 90 gün', all: 'tüm zamanlar' };
 function span() {
@@ -161,7 +165,7 @@ function span() {
   return d.getTime();
 }
 async function api(q, params = {}) {
-  const u = new URLSearchParams({ q, from: span(), tz: -new Date().getTimezoneOffset(), dev: F.dev ? 1 : 0 });
+  const u = new URLSearchParams({ q, from: span(), tz: -new Date().getTimezoneOffset(), dev: F.dev ? 1 : 0, bots: F.bots ? 1 : 0 });
   for (const [k, v] of Object.entries(params)) if (v != null && v !== '') u.set(k, v);
   const r = await fetch('api.php?' + u, { credentials: 'same-origin' });
   if (r.status === 401) { location.reload(); throw new Error('oturum kapandı'); }
@@ -187,7 +191,7 @@ async function render(quiet = false) {
   const r = route(), my = ++gen;
   for (const a of $$('#nav a')) a.classList.toggle('on', a.dataset.v.split(' ').includes(r.name));
   for (const b of $$('#range button')) b.classList.toggle('on', b.dataset.r === F.range);
-  $('#dev').checked = F.dev;
+  $('#dev').checked = F.dev; $('#bots').checked = F.bots;
   if (!quiet) view.classList.add('loading');
   try {
     const v = await VIEWS[r.name](r);
@@ -376,7 +380,7 @@ const VIEWS = {
     const fps = FPSB.map((b) => ({ label: b, value: +(d.fps.find((x) => x.k === b)?.n || 0) }));
     const gpus = table([{ label: 'GPU', wrap: 1, f: (r) => esc(r.gpu) }, { label: 'Oturum', n: 1, f: (r) => num(r.n) }, { label: 'Ort. FPS', n: 1, f: (r) => num1(r.fps) }, { label: 'En kötü 5 sn', n: 1, f: (r) => num1(r.worst) }], d.gpus);
     return {
-      html: `<div class="pagehead"><h1>Genel bakış</h1><span class="meta">${esc(RANGE_TR[F.range])}</span></div>
+      html: `<div class="pagehead"><h1>Genel bakış</h1><span class="meta">${esc(RANGE_TR[F.range])}${!F.bots && k.bots ? ` · ${num(k.bots)} bot oturumu hariç` : ''}</span></div>
         <div class="tiles">${tiles}</div>
         ${card('Günlük', `<div class="chart" data-chart="daily"></div><div class="daily-table" hidden>${dailyTable}</div>`, { right: `<div class="metric-tabs">${metricBtns}<button data-toggle="daily-table">Tablo</button></div>` })}
         <div class="grid g2" style="margin-top:16px">
@@ -421,7 +425,7 @@ const VIEWS = {
     const now = d.now;
     const st = (s) => (isOnline(s, now) ? '<span class="dot on"></span> Oynuyor' : now - s.last_seen < ONLINE_MS ? '<span class="dot bg"></span> Arka planda' : `<span class="dot"></span> ${esc(ago(s.last_seen, now))}`);
     const list = table([
-      { label: 'Oyuncu', f: (s) => who(s.name, s.player_id) + (+s.is_new ? '<span class="badge new">yeni</span>' : '') },
+      { label: 'Oyuncu', f: (s) => who(s.name, s.player_id) + (+s.is_new ? '<span class="badge new">yeni</span>' : '') + botBadge(s) },
       { label: 'Durum', f: st },
       { label: 'Nerede', f: (s) => esc(whereName(s.last_where)) },
       { label: 'Seviye', n: 1, f: (s) => num(s.lvl_end) },
@@ -451,7 +455,7 @@ const VIEWS = {
     const now = d.now;
     const cols = [
       { label: 'Başladı', sort: 'started', f: (s) => `${sessionDot(s, now)} ${esc(when(s.started_at))}` },
-      { label: 'Oyuncu', f: (s) => who(s.name, s.player_id) + (+s.is_new ? '<span class="badge new">yeni</span>' : '') + (+s.dev ? '<span class="badge">dev</span>' : '') },
+      { label: 'Oyuncu', f: (s) => who(s.name, s.player_id) + (+s.is_new ? '<span class="badge new">yeni</span>' : '') + (+s.dev ? '<span class="badge">dev</span>' : '') + botBadge(s) },
       { label: 'Süre', n: 1, sort: 'active', f: (s) => dur(s.active_ms) },
       { label: 'Teslimat', n: 1, sort: 'deliveries', f: (s) => num(s.deliveries) + (+s.jobs_started > +s.jobs ? ` <span class="muted small" title="yarım kalan sürüş">+${s.jobs_started - s.jobs}</span>` : '') },
       { label: 'Kazanç', n: 1, sort: 'earned', f: (s) => money(s.earned) },
@@ -496,6 +500,7 @@ const VIEWS = {
     const total = +s.last_seen - t0;
     const status = isOnline(s, now) ? '<span class="badge good">şu an oynuyor</span>' : now - s.last_seen < ONLINE_MS ? '<span class="badge">arka planda</span>' : '';
     const kv = [
+      ...(+s.bot ? [['Bot', `${BOT_TR[s.bot_why] || s.bot_why} — istatistiklere girmiyor`]] : []),
       ['IP', { html: ipLink(s.ip) }], ['Cihaz', devLine(s)],
       ['Model', s.model ? (s.model.startsWith('≈') ? `${s.model} (ekran boyutundan tahmin)` : s.model) : 'bilinmiyor (tarayıcı söylemedi)'], ['Ekran', `${s.screen || '?'} · pencere ${s.viewport || '?'} · DPR ${s.dpr ?? '?'}`], ['GPU', s.gpu],
       ['Donanım', s.mem || s.cores ? `${s.mem ? s.mem + ' GB bellek' : ''}${s.mem && s.cores ? ' · ' : ''}${s.cores ? s.cores + ' çekirdek' : ''}` : null],
@@ -503,7 +508,7 @@ const VIEWS = {
       ['Başlangıç', `${s.why === 'resume' ? 'arka plandan döndü' : 'sayfa açıldı'}${+s.fresh ? ' · cihazda kayıt yoktu' : ''}`], ['Son ekran', whereName(s.last_where)], ['User agent', s.ua],
     ].filter(([, v]) => v);
     return {
-      html: `<div class="pagehead"><h1>${who(p.name, p.id)} · ${num(d.nth)}. oturum</h1>${+s.is_new ? '<span class="badge new">ilk oturum</span>' : ''}${+s.dev ? '<span class="badge">dev</span>' : ''}${status}
+      html: `<div class="pagehead"><h1>${who(p.name, p.id)} · ${num(d.nth)}. oturum</h1>${+s.is_new ? '<span class="badge new">ilk oturum</span>' : ''}${+s.dev ? '<span class="badge">dev</span>' : ''}${botBadge(s)}${status}
           <span class="meta">${esc(when(t0))} · <span class="mono small">${esc(s.id)}</span></span>
           <span class="meta">${d.nav.prev ? `<a href="#/session/${encodeURIComponent(d.nav.prev)}">‹ önceki oturum</a>` : ''} ${d.nav.next ? `· <a href="#/session/${encodeURIComponent(d.nav.next)}">sonraki ›</a>` : ''}</span></div>
         <div class="tiles">
@@ -529,7 +534,7 @@ const VIEWS = {
     const d = await api('players', { page: P.get('page'), sort: P.get('sort'), dir: P.get('dir'), search: P.get('search'), all: P.get('all') });
     const now = d.now;
     const cols = [
-      { label: 'Oyuncu', f: (x) => who(x.name, x.id) + (+x.dev ? '<span class="badge">dev</span>' : '') },
+      { label: 'Oyuncu', f: (x) => who(x.name, x.id) + (+x.dev ? '<span class="badge">dev</span>' : '') + (+x.bot ? '<span class="badge bad" title="Bütün oturumları bot">bot</span>' : '') },
       { label: 'İlk görülme', sort: 'first', f: (x) => esc(when(x.first_seen)) },
       { label: 'Son görülme', sort: 'last', f: (x) => `${now - x.last_seen < ONLINE_MS ? '<span class="dot on"></span> ' : ''}${esc(ago(x.last_seen, now))}` },
       { label: 'Oturum', n: 1, sort: 'sessions', f: (x) => num(x.sessions) },
@@ -561,7 +566,7 @@ const VIEWS = {
     const d = await api('player', { id: r.id });
     const p = d.player, now = d.now;
     const sess = table([
-      { label: 'Başladı', f: (s) => `${sessionDot(s, now)} ${esc(when(s.started_at))}` },
+      { label: 'Başladı', f: (s) => `${sessionDot(s, now)} ${esc(when(s.started_at))}${botBadge(s)}` },
       { label: 'Süre', n: 1, f: (s) => dur(s.active_ms) },
       { label: 'Teslimat', n: 1, f: (s) => num(s.deliveries) },
       { label: 'Kazanç', n: 1, f: (s) => money(s.earned) },
@@ -576,7 +581,7 @@ const VIEWS = {
     const levels = d.levels.map((e) => ({ label: String(e.props?.lvl), value: +e.props?.pm || 0, e }));
     const dists = d.districts.map((x) => ({ label: distName(x.d), value: +x.n, stars: x.stars }));
     return {
-      html: `<div class="pagehead"><h1>${p.name ? esc(p.name) : 'İsimsiz kurye'}</h1>${+p.dev ? '<span class="badge">dev</span>' : ''}${now - p.last_seen < ONLINE_MS ? '<span class="badge good">şu an oynuyor</span>' : ''}
+      html: `<div class="pagehead"><h1>${p.name ? esc(p.name) : 'İsimsiz kurye'}</h1>${+p.dev ? '<span class="badge">dev</span>' : ''}${+p.bot ? '<span class="badge bad" title="Bütün oturumları bot">bot</span>' : ''}${now - p.last_seen < ONLINE_MS ? '<span class="badge good">şu an oynuyor</span>' : ''}
           <span class="meta mono small">${esc(p.id)}</span><span class="meta">ilk: ${esc(when(p.first_seen))} · son: ${esc(ago(p.last_seen, now))} · ${esc(devLine(p))} · ${ipLink(p.ip)}</span></div>
         <div class="tiles">
           ${tile('Seviye', num(p.lvl), `${num(p.xp)} XP`, true)}
@@ -721,6 +726,7 @@ view.addEventListener('change', (e) => {
 });
 $('#range').addEventListener('click', (e) => { const b = e.target.closest('[data-r]'); if (!b) return; F.range = b.dataset.r; saveF(); render(); });
 $('#dev').addEventListener('change', (e) => { F.dev = e.target.checked; saveF(); render(); });
+$('#bots').addEventListener('change', (e) => { F.bots = e.target.checked; saveF(); render(); });
 addEventListener('hashchange', () => { hideTip(); render(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && route().name === 'live') render(true); });
 render();

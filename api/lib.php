@@ -81,6 +81,16 @@ function migrate(PDO $pdo): void {
       foreach (['device', 'os', 'browser', 'model'] as $col)
         $pdo->exec("UPDATE players SET $col = (SELECT s.$col FROM sessions s WHERE s.player_id = players.id ORDER BY s.started_at DESC LIMIT 1)");
     },
+    4 => <<<SQL
+      ALTER TABLE sessions ADD COLUMN bot INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN bot_why TEXT;
+      ALTER TABLE players ADD COLUMN bot INTEGER NOT NULL DEFAULT 0;
+    SQL,
+    5 => function (PDO $pdo): void {
+      $up = $pdo->prepare('UPDATE sessions SET bot = ?, bot_why = ? WHERE id = ?');
+      foreach ($pdo->query('SELECT id, ua, screen, dpr, gpu, device, ip FROM sessions')->fetchAll() as $r) { $why = bot_reason($r); $up->execute([$why ? 1 : 0, $why, $r['id']]); }
+      $pdo->exec('UPDATE players SET bot = NOT EXISTS (SELECT 1 FROM sessions s WHERE s.player_id = players.id AND s.bot = 0)');
+    },
   ];
   $v = (int) $pdo->query('PRAGMA user_version')->fetchColumn();
   foreach ($steps as $n => $sql) {
@@ -169,6 +179,33 @@ function describe_device(string $ua, array $c = []): array {
   return ['device' => $device, 'os' => $os, 'os_ver' => $osv ?: null, 'browser' => $browser, 'browser_ver' => $bv ?: null, 'model' => $model];
 }
 
+// ---------------------------------------------------------------- crawlers
+// Link previews, ad review, uptime checks and headless test rigs open the game but never play it; their sessions are
+// flagged (sessions.bot + a reason code) and left out of the stats. Re-checked on every batch, since the GPU name
+// (and so the verdict) can arrive after the first one.
+const BOT_UA = '/(?<!cu)bot\b|crawler|spider|slurp|facebookexternalhit|facebookcatalog|meta-externalagent|HeadlessChrome|Lighthouse|PTST|GTmetrix|Pingdom|UptimeRobot|Google-InspectionTool|Mediapartners|python-requests|python-urllib|curl\/|wget|Go-http-client|okhttp|node-fetch|axios/i';
+const META_NETS = ['31.13.24.0/21', '31.13.64.0/18', '45.64.40.0/22', '57.141.0.0/16', '57.144.0.0/14', '66.220.144.0/20', '69.63.176.0/20', '69.171.224.0/19',
+  '74.119.76.0/22', '102.132.96.0/20', '103.4.96.0/22', '129.134.0.0/16', '157.240.0.0/16', '163.70.128.0/17', '173.252.64.0/18', '179.60.192.0/22',
+  '185.60.216.0/22', '185.89.216.0/22', '204.15.20.0/22', '2a03:2880::/29']; // Meta (AS32934): its crawlers, never its users' phones
+function ip_in(string $ip, string $cidr): bool {
+  [$net, $bits] = explode('/', $cidr);
+  $a = @inet_pton($ip); $b = @inet_pton($net);
+  if ($a === false || $b === false || strlen($a) !== strlen($b)) return false;
+  $bytes = intdiv((int) $bits, 8); $rest = (int) $bits % 8;
+  if (substr($a, 0, $bytes) !== substr($b, 0, $bytes)) return false;
+  return $rest === 0 || ((ord($a[$bytes]) ^ ord($b[$bytes])) & (0xFF << (8 - $rest)) & 0xFF) === 0;
+}
+// null for a person, else why not: ua | meta-ip | screen | nogpu | softgpu.  $s: a sessions row (ua, screen, dpr, gpu, device, ip)
+function bot_reason(array $s): ?string {
+  if (preg_match(BOT_UA, (string) ($s['ua'] ?? ''))) return 'ua';
+  if (!empty($s['ip'])) foreach (META_NETS as $n) if (ip_in($s['ip'], $n)) return 'meta-ip';
+  // device emulation (seen from Meta): a 2000×2000 "screen", or a phone at 1× pixel ratio whose WebGL never came up
+  if (($s['screen'] ?? '') === '2000x2000') return 'screen';
+  if (empty($s['gpu']) && ($s['device'] ?? '') !== 'desktop' && $s['dpr'] !== null && (float) $s['dpr'] <= 1) return 'nogpu';
+  if (preg_match('/SwiftShader|llvmpipe|softpipe|Software Rasterizer/i', (string) ($s['gpu'] ?? ''))) return 'softgpu';
+  return null;
+}
+
 // the visitor's address: REMOTE_ADDR, or the header a proxy / CDN in front puts it in (config ip_header)
 function client_ip(): ?string {
   $h = (string) cfg('ip_header');
@@ -211,6 +248,7 @@ function ingest(array $b, string $ua, ?string $ip = null): int {
     $s = $pdo->prepare('SELECT * FROM sessions WHERE id = ?');
     $s->execute([$sid]);
     $sess = $s->fetch();
+    $created = !$sess;
     if ($sess && $sess['player_id'] !== $pid) throw new InvalidArgumentException('session belongs to another player');
     if (!$sess) {
       $c = $ctx ?? [];
@@ -297,6 +335,13 @@ function ingest(array $b, string $ua, ?string $ip = null): int {
       $pargs[":$col"] = $type === 'str' ? str_or_null($st[$k], 60) : ($type === 'int' ? (int) num($st[$k]) : num($st[$k]));
     }
     $pdo->prepare('UPDATE players SET ' . implode(', ', $pset) . ' WHERE id = :id')->execute($pargs);
+    $q = $pdo->prepare('SELECT ua, screen, dpr, gpu, device, ip, bot, bot_why FROM sessions WHERE id = ?'); $q->execute([$sid]);
+    $row = $q->fetch();
+    $why = bot_reason($row);
+    if ($why !== $row['bot_why'] || $created) {
+      $pdo->prepare('UPDATE sessions SET bot = ?, bot_why = ? WHERE id = ?')->execute([$why ? 1 : 0, $why, $sid]);
+      $pdo->prepare('UPDATE players SET bot = NOT EXISTS (SELECT 1 FROM sessions s WHERE s.player_id = :p AND s.bot = 0) WHERE id = :p')->execute([':p' => $pid]);
+    }
     $pdo->exec('COMMIT');
     return $agg['events'];
   } catch (Throwable $e) {
