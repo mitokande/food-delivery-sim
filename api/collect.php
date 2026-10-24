@@ -24,7 +24,7 @@ $b = json_decode($raw, true);
 if (!is_array($b) || ($b['v'] ?? null) !== 1) reply(400, ['ok' => false]);
 
 try {
-  $n = ingest($b, $_SERVER['HTTP_USER_AGENT'] ?? '');
+  $n = ingest($b, $_SERVER['HTTP_USER_AGENT'] ?? '', client_ip());
   reply(200, ['ok' => true, 'n' => $n]);
 } catch (InvalidArgumentException $e) {
   reply(400, ['ok' => false]);

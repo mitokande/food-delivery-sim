@@ -27,7 +27,9 @@ if (!pid) { pid = rid('p'); store.set('fds_pid', pid); }
 let sid = '', seq = 0, queue = [], ctxSent = false, sending = false, lastSend = 0;
 let activeMs = 0, visSince = performance.now(), hiddenAt = 0;
 let playBase = +store.get('fds_play') || 0; // this device's visible play time before this session (ms)
-let where = () => 'boot', gpu = '';
+let where = () => 'boot', gpu = '', hints = {};
+// Chromium hides the phone model and real OS version from the user agent; it still tells the page when asked
+navigator.userAgentData?.getHighEntropyValues?.(['model', 'platformVersion']).then((h) => { hints = h; }).catch(() => { /* not offered */ });
 const errSeen = new Set();
 
 const activeNow = () => activeMs + (document.hidden ? 0 : performance.now() - visSince);
@@ -55,7 +57,7 @@ function context() {
     ua: navigator.userAgent, lang: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
     scr: `${screen.width}x${screen.height}`, vp: `${innerWidth}x${innerHeight}`, dpr: devicePixelRatio,
     touch: matchMedia('(pointer: coarse)').matches ? 1 : 0, pwa: matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 1 : 0,
-    ref, gpu, mem: navigator.deviceMemory, cores: navigator.hardwareConcurrency,
+    ref, gpu, mem: navigator.deviceMemory, cores: navigator.hardwareConcurrency, model: hints.model || undefined, osv: hints.platformVersion || undefined,
   };
 }
 

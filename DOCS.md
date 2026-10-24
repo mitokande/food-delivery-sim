@@ -320,8 +320,12 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
 
 ## 10. Analitik
 
-Oyun anonim olaylar yollar; panel `mithatck.com/food-delivery-sim/admin/` (tek şifre). Kişisel veri yok: IP saklanmaz,
-oyuncu = cihazdaki rastgele `fds_pid`, isim = oyuncunun oyunda girdiği kurye adı.
+Oyun olaylar yollar; panel `mithatck.com/food-delivery-sim/admin/` (tek şifre). Oyuncu = cihazdaki rastgele `fds_pid`,
+isim = oyuncunun oyunda girdiği kurye adı. Her oturumla **IP adresi** (oturumun ilk adresi; oyuncuda son adres) ve cihaz bilgisi
+saklanır: tür, model, OS ve tarayıcı sürümü. Model önce tarayıcının client hint'inden (`navigator.userAgentData`, Android
+Chrome), sonra uygulama içi tarayıcı etiketlerinden (Instagram, Facebook `FBDV`), sonra Android UA'dan; iPhone'da ekran
+boyutu + piksel oranından tahmin (`≈`). IP kişisel veridir (KVKK/GDPR): oyunda bir gizlilik notu olması iyi olur.
+Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarlanmalı (ör. Cloudflare: `HTTP_CF_CONNECTING_IP`).
 
 - **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
   Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.

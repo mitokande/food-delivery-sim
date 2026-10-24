@@ -18,7 +18,7 @@ Useful URL flags: `?fps` (frame-rate meter), `?clock=1260` (sky time), `?noti` (
 
 ## Analytics
 
-The game reports anonymous gameplay events to `api/collect.php` (PHP + SQLite); the password-protected panel is at `admin/`.
+The game reports gameplay events (with the session's IP address and device) to `api/collect.php` (PHP + SQLite); the password-protected panel is at `admin/`.
 Server setup: `php api/cli.php init <data dir outside the web root>` writes `api/config.local.php` and prints the panel password.
 Locally: `php -S 127.0.0.1:8000` from the repo root (static server alone has no backend; events are then simply dropped).
 

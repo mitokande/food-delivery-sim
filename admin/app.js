@@ -41,6 +41,11 @@ function ago(ms, now = Date.now()) {
 const ONLINE_MS = 75000;
 const isOnline = (s, now) => now - s.last_seen < ONLINE_MS && +s.visible === 1;
 const who = (name, id) => `<a href="#/player/${encodeURIComponent(id)}">${name ? esc(name) : `<span class="mono">#${esc(String(id).slice(1, 7))}</span>`}</a>`;
+// "Samsung SM-S711B · Android 16 · Instagram 453": model (or device type), OS and browser with their versions
+const DEVICE_TR = { mobile: 'Telefon', tablet: 'Tablet', desktop: 'Masaüstü' };
+const devLine = (s) => [s.model || DEVICE_TR[s.device] || s.device, s.os && s.os + (s.os_ver ? ' ' + s.os_ver : ''), s.browser && s.browser + (s.browser_ver ? ' ' + s.browser_ver : '')].filter(Boolean).join(' · ');
+const ipCell = (ip) => (ip ? `<span class="mono small">${esc(ip)}</span>` : '<span class="muted">–</span>');
+const ipLink = (ip) => (ip ? `<span class="mono">${esc(ip)}</span> <a href="https://ipinfo.io/${encodeURIComponent(ip)}" target="_blank" rel="noopener noreferrer">konum ↗</a>` : '<span class="muted">kaydedilmemiş</span>');
 const stars = (n) => `<span class="stars" title="${n} yıldız">${'★'.repeat(n)}<i>${'★'.repeat(Math.max(0, 5 - n))}</i></span>`;
 
 // ---------------------------------------------------------------- game vocabulary
@@ -364,7 +369,8 @@ const VIEWS = {
       ${d.retention.map((r) => `<tr><td>${esc(dayLabel(r.d0))}</td><td class="n">${num(r.n)}</td>${[1, 3, 7, 14, 30].map((n) => r.age < n ? '<td class="h na">·</td>'
         : `<td class="h" style="${heat(r['d' + n] / r.n)}" title="${num(r['d' + n])} / ${num(r.n)} oyuncu">${pct(r['d' + n] / r.n)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : empty();
     const lab = (rows, fn = (x) => x) => rows.map((r) => ({ label: fn(r.k), value: +r.n }));
-    const quit = lab(d.quit, whereName), dev = lab(d.devices, (x) => ({ mobile: 'Telefon', tablet: 'Tablet', desktop: 'Masaüstü' }[x] || x));
+    const quit = lab(d.quit, whereName), dev = lab(d.devices, (x) => DEVICE_TR[x] || x);
+    const models = lab(d.models, (x) => (x === '?' ? 'Bilinmiyor' : x));
     const hours = Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, '0'), value: +(d.hours.find((x) => +x.h === h)?.n || 0) }));
     const FPSB = ['<20', '20–30', '30–45', '45–55', '55+'];
     const fps = FPSB.map((b) => ({ label: b, value: +(d.fps.find((x) => x.k === b)?.n || 0) }));
@@ -386,6 +392,8 @@ const VIEWS = {
           ${card('İşletim sistemi', bars(lab(d.os), { note: share(lab(d.os)) }))}
           ${card('Tarayıcı', bars(lab(d.browsers), { note: share(lab(d.browsers)) }))}
         </div>
+        ${card('Cihaz modelleri', bars(models, { note: share(models) }), { sub: 'Telefon modeli: tarayıcının söylediği, iPhone’larda ekran boyutundan tahmin (≈). Android’de Chrome modeli yalnızca yeni oturumlarda gönderiyor.' })}
+        <div style="height:16px"></div>
         <div class="grid g2">
           ${card('FPS dağılımı', '<div class="chart" data-chart="fps"></div>', { sub: 'Oturum başına ortalama kare hızı.' })}
           ${card('GPU’ya göre performans', gpus)}
@@ -420,7 +428,8 @@ const VIEWS = {
       { label: 'Para', n: 1, f: (s) => money(s.cash_end) },
       { label: 'Oturum', n: 1, f: (s) => dur(s.active_ms) },
       { label: 'Teslimat', n: 1, f: (s) => num(s.deliveries) },
-      { label: 'Cihaz', f: (s) => esc(`${s.os} · ${s.browser}`) },
+      { label: 'Cihaz', f: (s) => esc(devLine(s)) },
+      { label: 'IP', f: (s) => ipCell(s.ip) },
     ], d.sessions, { href: (s) => `#/session/${encodeURIComponent(s.id)}`, emptyMsg: 'Son 10 dakikada kimse oynamadı.' });
     const feed = d.feed.length ? `<div class="tl feed">${d.feed.map((e) => {
       const f = fmtEvent({ name: e.ev, props: e.props });
@@ -451,7 +460,8 @@ const VIEWS = {
       { label: 'Kaza', n: 1, f: (s) => num(s.crashes) },
       { label: 'Hata', n: 1, sort: 'errors', f: (s) => (+s.errors ? `<span class="badge bad">${num(s.errors)}</span>` : '–') },
       { label: 'FPS', n: 1, f: (s) => num(s.fps) },
-      { label: 'Cihaz', f: (s) => esc(`${s.os} · ${s.browser}`) },
+      { label: 'Cihaz', f: (s) => esc(devLine(s)) },
+      { label: 'IP', f: (s) => ipCell(s.ip) },
       { label: 'Son ekran', f: (s) => esc(whereName(s.last_where)) },
     ];
     const mins = [['', 'Her süre'], ['1', '≥ 1 dk'], ['5', '≥ 5 dk'], ['15', '≥ 15 dk'], ['30', '≥ 30 dk']];
@@ -459,7 +469,7 @@ const VIEWS = {
       html: `<div class="pagehead"><h1>Oturumlar</h1><span class="meta">${esc(RANGE_TR[F.range])}</span></div>
         <section class="card">
           <div class="toolbar">
-            <input type="search" placeholder="İsim veya id ara" value="${esc(P.get('search') || '')}" data-param="search">
+            <input type="search" placeholder="İsim, id, IP veya model ara" value="${esc(P.get('search') || '')}" data-param="search">
             <label class="chk"><input type="checkbox" data-param="new" ${P.get('new') ? 'checked' : ''}> Sadece ilk oturumlar</label>
             <label class="chk"><input type="checkbox" data-param="err" ${P.get('err') ? 'checked' : ''}> Hatalı</label>
             <select data-param="min">${mins.map(([v, l]) => `<option value="${v}" ${(P.get('min') || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -486,7 +496,8 @@ const VIEWS = {
     const total = +s.last_seen - t0;
     const status = isOnline(s, now) ? '<span class="badge good">şu an oynuyor</span>' : now - s.last_seen < ONLINE_MS ? '<span class="badge">arka planda</span>' : '';
     const kv = [
-      ['Cihaz', `${s.device} · ${s.os} · ${s.browser}`], ['Ekran', `${s.screen || '?'} · pencere ${s.viewport || '?'} · DPR ${s.dpr ?? '?'}`], ['GPU', s.gpu],
+      ['IP', { html: ipLink(s.ip) }], ['Cihaz', devLine(s)],
+      ['Model', s.model ? (s.model.startsWith('≈') ? `${s.model} (ekran boyutundan tahmin)` : s.model) : 'bilinmiyor (tarayıcı söylemedi)'], ['Ekran', `${s.screen || '?'} · pencere ${s.viewport || '?'} · DPR ${s.dpr ?? '?'}`], ['GPU', s.gpu],
       ['Donanım', s.mem || s.cores ? `${s.mem ? s.mem + ' GB bellek' : ''}${s.mem && s.cores ? ' · ' : ''}${s.cores ? s.cores + ' çekirdek' : ''}` : null],
       ['Dil / saat dilimi', `${s.lang || '?'} · ${s.tz || '?'}`], ['Geldiği yer', s.ref || 'doğrudan'], ['Ana ekrandan (PWA)', +s.pwa ? 'evet' : 'hayır'],
       ['Başlangıç', `${s.why === 'resume' ? 'arka plandan döndü' : 'sayfa açıldı'}${+s.fresh ? ' · cihazda kayıt yoktu' : ''}`], ['Son ekran', whereName(s.last_where)], ['User agent', s.ua],
@@ -508,7 +519,7 @@ const VIEWS = {
         </div>
         <div class="grid g21">
           ${card(`Zaman çizelgesi <span class="muted small">${num(ev.length)} olay</span>`, ev.length ? `<div class="tl">${html}</div>` : empty('Olay yok.'), { sub: 'Bir satıra tıklayınca ham veriyi gösterir.' })}
-          ${card('Cihaz ve oturum', `<dl class="kv">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`)}
+          ${card('Cihaz ve oturum', `<dl class="kv">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v.html ?? esc(v)}</dd>`).join('')}</dl>`)}
         </div>`,
     };
   },
@@ -530,13 +541,14 @@ const VIEWS = {
       { label: 'Araç', f: (x) => esc(vehName(x.veh)) },
       { label: 'Bölgeler', f: (x) => esc((x.districts || '').split(',').filter(Boolean).map(distName).join(', ')) },
       { label: 'Tutorial', f: (x) => esc(x.onboard == null ? '–' : +x.onboard >= 99 ? 'bitti' : STEP_TR[x.onboard] || x.onboard) },
-      { label: 'Cihaz', f: (x) => esc(`${x.os || '?'} · ${x.browser || '?'}`) },
+      { label: 'Cihaz', f: (x) => esc(devLine(x)) },
+      { label: 'Son IP', f: (x) => ipCell(x.ip) },
     ];
     return {
       html: `<div class="pagehead"><h1>Oyuncular</h1><span class="meta">${P.get('all') ? 'tüm zamanlar' : esc(RANGE_TR[F.range]) + ' içinde oynayanlar'}</span></div>
         <section class="card">
           <div class="toolbar">
-            <input type="search" placeholder="İsim veya id ara" value="${esc(P.get('search') || '')}" data-param="search">
+            <input type="search" placeholder="İsim, id, IP veya model ara" value="${esc(P.get('search') || '')}" data-param="search">
             <label class="chk"><input type="checkbox" data-param="all" ${P.get('all') ? 'checked' : ''}> Tarih aralığını yok say</label>
           </div>
           ${table(cols, d.rows, { sort: P.get('sort') || 'last', dir: P.get('dir') || 'desc', href: (x) => `#/player/${encodeURIComponent(x.id)}`, emptyMsg: 'Oyuncu yok.' })}
@@ -556,7 +568,8 @@ const VIEWS = {
       { label: 'Seviye', n: 1, f: (s) => (s.lvl_start != null && s.lvl_start !== s.lvl_end ? `${num(s.lvl_start)} → ${num(s.lvl_end)}` : num(s.lvl_end)) },
       { label: 'Harcama', n: 1, f: (s) => money(s.spent) },
       { label: 'Hata', n: 1, f: (s) => (+s.errors ? `<span class="badge bad">${num(s.errors)}</span>` : '–') },
-      { label: 'Cihaz', f: (s) => esc(`${s.os} · ${s.browser}`) },
+      { label: 'Cihaz', f: (s) => esc(devLine(s)) },
+      { label: 'IP', f: (s) => ipCell(s.ip) },
       { label: 'Son ekran', f: (s) => esc(whereName(s.last_where)) },
     ], d.sessions, { href: (s) => `#/session/${encodeURIComponent(s.id)}` });
     const buys = d.buys.length ? `<div class="tl">${d.buys.map((e) => { const f = fmtEvent(e); return `<div class="ev c-${f.c}"><span class="tm">${esc(when(e.ts))}</span><span class="off"></span><span class="c"></span><div class="tx">${f.t}</div></div>`; }).join('')}</div>` : empty('Henüz satın alma yok.');
@@ -564,7 +577,7 @@ const VIEWS = {
     const dists = d.districts.map((x) => ({ label: distName(x.d), value: +x.n, stars: x.stars }));
     return {
       html: `<div class="pagehead"><h1>${p.name ? esc(p.name) : 'İsimsiz kurye'}</h1>${+p.dev ? '<span class="badge">dev</span>' : ''}${now - p.last_seen < ONLINE_MS ? '<span class="badge good">şu an oynuyor</span>' : ''}
-          <span class="meta mono small">${esc(p.id)}</span><span class="meta">ilk: ${esc(when(p.first_seen))} · son: ${esc(ago(p.last_seen, now))} · ${esc(`${p.device || '?'} · ${p.os || '?'} · ${p.browser || '?'}`)}</span></div>
+          <span class="meta mono small">${esc(p.id)}</span><span class="meta">ilk: ${esc(when(p.first_seen))} · son: ${esc(ago(p.last_seen, now))} · ${esc(devLine(p))} · ${ipLink(p.ip)}</span></div>
         <div class="tiles">
           ${tile('Seviye', num(p.lvl), `${num(p.xp)} XP`, true)}
           ${tile('Teslimat', num(p.deliveries), d.rides.n ? `ort. ${num1(d.rides.stars)} ★ · erken ${pct(d.rides.early)} · geç ${pct(d.rides.late)}` : '')}

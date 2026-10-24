@@ -10,6 +10,9 @@ $cfg = [
   'admin_password_hash' => '',
   // extra page origins allowed to post events (the game's own host is always allowed), e.g. 'https://example.com'
   'allowed_origins' => [],
+  // where the visitor's IP comes from: '' = REMOTE_ADDR (the site is reached directly); behind a proxy or CDN name the
+  // $_SERVER key it sets, e.g. 'HTTP_CF_CONNECTING_IP' for Cloudflare (only then — a client can send any header)
+  'ip_header' => '',
   // a session stops accepting events after this many (runaway loops, abuse)
   'max_events_per_session' => 20000,
 ];
