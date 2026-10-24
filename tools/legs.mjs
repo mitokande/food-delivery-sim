@@ -113,7 +113,18 @@ for (const mode of MODES) {
             else if (R.ot && R.ot.manual && R.ot.t >= 1 && !blockAhead && !(window.__otherLane && toEnd < 30)) r.input('right');
           }
           for (let i = 0; i < 20 && R.phase === 'ride'; i++) game.sim(0.05);
-        } else if (R.active) game.sim(0.1);
+        } else if (R.active) {
+          // a person who moves must be walking: how far each one slides with no walk cycle playing
+          for (let i = 0; i < 4; i++) {
+            const n = r.npc, p0 = n && n.c.obj.position.clone();
+            game.sim(0.025);
+            if (!n || n !== r.npc) continue;
+            const mv = Math.hypot(n.c.obj.position.x - p0.x, n.c.obj.position.z - p0.z);
+            const w = (a) => (a && a.isRunning() ? a.getEffectiveWeight() : 0), walkW = w(n.c.actions.walk) + w(n.c.actions['walk-hold']);
+            if (mv > 0.001 && walkW < 0.5) { n.slid = (n.slid || 0) + mv; T.slide = Math.max(T.slide || 0, n.slid);
+              T.slideAnim = Object.entries(n.c.actions).filter(([, a]) => w(a) > 0.5).map(([k]) => k).join('+') || 'bind pose'; }
+          }
+        }
         return { mode: game.mode, active: R.active, phase: R.phase, leg: R.leg, receipt: !!T.receipt };
       });
       if (st.receipt && st.mode === 'hub') break;
@@ -151,6 +162,7 @@ for (const mode of MODES) {
     ok(!slow.length, `the card shows within ~2 s of stopping${slow.length ? ' — waited ' + slow.map((s) => (s.wait / 1000).toFixed(1) + ' s').join(', ') : ''}`);
     ok(res.del1 - res.del0 === setup.n, `deliveries +${res.del1 - res.del0} (want +${setup.n})`);
     ok(res.receipt && res.receipt.lines >= setup.n, `receipt lists every order (${res.receipt?.lines} lines)`);
+    ok(!(res.slide > 0.6), `nobody slides along without walking${res.slide > 0.6 ? ` — slid ${res.slide.toFixed(1)} m playing ${res.slideAnim}` : ''}`);
     ok(res.npcs.length <= res.chars0.length, `no NPC left in the scene (${res.chars0.length} people before, ${res.npcs.length} after)`);
     ok(!res.modals, `no modal left open${res.modals ? ': ' + res.modals : ''}`);
     ok(errs.length === e0, `no errors${errs.length > e0 ? ': ' + errs.slice(e0).join(' | ') : ''}`);

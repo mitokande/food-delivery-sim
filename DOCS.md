@@ -306,6 +306,12 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   - Manuelde virajın hemen önüne park etmiş araç varsa A ile dolaşılamıyordu ("viraja 9 m kala şeride dön" kuralı
     şerit değişimini anında iptal ediyordu) ve motor sonsuza dek arkasında bekliyordu; artık aracı geçene kadar karşı
     şeritte kalınıyor (otopilot gibi).
+- 2026-10-23: düzeltme: müşteri motora yürürken "Complete Delivery"ye basılınca sevinme/üzülme animasyonu hemen
+  başlıyor, karakter yürümeden kayarak geliyordu; artık yürümeye devam edip motora varınca tepki veriyor. Restoran
+  çalışanı poşeti taşırken de kayıyordu ('holding-both' yalnızca kol pozu); yükleme sırasında üretilen 'walk-hold'
+  klibiyle bacaklar yürüyor, kollar poşeti tutuyor. Poşet de hiç görünmüyordu (food kiti yüklenmiyordu): sürüş başında
+  arka planda yükleniyor (~390 KB), hazır değilse çalışan poşetsiz geliyor. `tools/legs.mjs` artık yürüme animasyonu
+  olmadan 0,6 m'den fazla kayan karakteri hata sayıyor.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 

@@ -105,6 +105,12 @@ export async function loadChar(id) {
     let g;
     try { g = await loader.loadAsync(CHAR_URL(id)); } catch { g = await loader.loadAsync(CHAR_RAW(id)); }
     g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    // walking with something in both hands: legs from 'walk', arms from the 'holding-both' pose
+    const walk = g.animations.find((a) => a.name === 'walk'), hold = g.animations.find((a) => a.name === 'holding-both');
+    if (walk && hold) {
+      const arms = new Set(hold.tracks.map((t) => t.name));
+      g.animations.push(new THREE.AnimationClip('walk-hold', walk.duration, [...walk.tracks.filter((t) => !arms.has(t.name)), ...hold.tracks]));
+    }
     return { scene: g.scene, clips: g.animations };
   })();
   charCache.set(id, p);

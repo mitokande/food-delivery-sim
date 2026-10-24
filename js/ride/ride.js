@@ -11,7 +11,7 @@ import { buildRibbon } from './ribbon.js';
 import { createFx } from './fx.js';
 import { makeDog, makeBird, makeBall, makeDoorCar, makePoliceCar, makePerson } from './actors.js';
 import { buzz } from '../haptics.js';
-import { makeChar, loadChar, loadKit, pieceParts } from '../assets.js';
+import { makeChar, loadChar, loadKit, hasKit, pieceParts } from '../assets.js';
 import { scoreOrder } from '../orders.js';
 import * as St from '../state.js';
 import { mulberry32 } from '../rng.js';
@@ -77,6 +77,7 @@ export function createRide(ctx) {
   // ---------- job flow ----------
   async function start(job, fromTile, fromDir) {
     await Promise.all([ensureBike(), warmPeds(), loadKit('roads')]);
+    loadKit('food').catch(() => {}); // the takeaway bag the restaurant hands over; ready long before the first door
     const vs = St.vehStats();
     const fx = St.skillFx();
     R.vs = vs; R.fx = fx;
@@ -686,8 +687,9 @@ export function createRide(ctx) {
       x.flow = R.flow.mult;
       x.result = scoreOrder(x.o, { elapsed: x.elapsed, heat: x.heat, integrity: x.integrity, tipMult: x.tipMult * R.flow.mult, ratingAdj: x.ratingAdj });
       x.result.flow = R.flow.mult;
-      if (npc) npc.c.play(x.result.stars >= 4 ? 'emote-yes' : 'emote-no', 0.2, { once: true });
-      if (x.result.stars >= 4) { const at = npc ? npc.c.obj.position : R.bike.root.position; pfx.celebrate(at.x, at.z, { stars: x.result.stars, tip: x.result.tip }); }
+      // a customer still on the way keeps walking and reacts once they reach the bike
+      if (npc) { npc.emote = x.result.stars >= 4 ? 'emote-yes' : 'emote-no'; if (!npc.walking) npc.c.play(npc.emote, 0.2, { once: true }); }
+      if (x.result.stars >= 4) { const at = npc ? { x: npc.tx, z: npc.tz } : R.bike.root.position; pfx.celebrate(at.x, at.z, { stars: x.result.stars, tip: x.result.tip }); }
       ctx.audio?.play(x.result.stars >= 3 ? 'order-complete' : 'order-late');
       await ctx.ui.rated(x.o, x.result, R);
       R.bike.openLid(false);
@@ -706,16 +708,15 @@ export function createRide(ctx) {
     c.obj.position.set(x, 0.2, z);
     scene.add(c.obj);
     let bag = null;
-    if (carrying) {
+    if (carrying && hasKit('food')) {
       const parts = pieceParts('food', 'bag');
-      if (parts.length) { bag = new THREE.Mesh(parts[0].geometry, parts[0].material); bag.scale.setScalar(0.55); bag.position.set(0, 0.25, 0.14); c.obj.add(bag); }
-      c.play('holding-both');
-    } else c.play('walk');
+      if (parts.length) { bag = new THREE.Mesh(parts[0].geometry, parts[0].material); bag.scale.setScalar(0.45); bag.position.set(0, 0.16, 0.16); c.obj.add(bag); }
+    }
     const n = { c, bag, tx: bx, tz: bz, walking: true };
     // walk to ~1.4 m from the bike
     const d = Math.hypot(bx - x, bz - z);
     n.tx = x + (bx - x) * Math.max(0, (d - 1.5) / d); n.tz = z + (bz - z) * Math.max(0, (d - 1.5) / d);
-    c.play(carrying ? 'holding-both' : 'walk');
+    c.play(carrying ? 'walk-hold' : 'walk');
     return n;
   }
   function walkAway(n, x, z) {
@@ -726,7 +727,12 @@ export function createRide(ctx) {
     const o = npc.c.obj;
     const dx = npc.tx - o.position.x, dz = npc.tz - o.position.z, d = Math.hypot(dx, dz);
     if (npc.walking) {
-      if (d < 0.15) { npc.walking = false; npc.c.play(npc.bag && npc.bag.visible ? 'holding-both' : 'idle'); const cb = npc.onArrive; npc.onArrive = null; cb?.(); }
+      if (d < 0.15) {
+        npc.walking = false;
+        if (npc.emote) npc.c.play(npc.emote, 0.2, { once: true });
+        else npc.c.play(npc.bag && npc.bag.visible ? 'holding-both' : 'idle');
+        const cb = npc.onArrive; npc.onArrive = null; cb?.();
+      }
       else { const sp = Math.min(d, 2.6 * dt); o.position.x += dx / d * sp; o.position.z += dz / d * sp; o.rotation.y = Math.atan2(dx, dz); }
     } else {
       const bx = R.bike.root.position.x - o.position.x, bz = R.bike.root.position.z - o.position.z; o.rotation.y = Math.atan2(bx, bz);
@@ -1233,6 +1239,6 @@ export function createRide(ctx) {
     if (!hz && !car) return null;
     return { risk: oncoming().dist < 25 };
   }
-  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, manualBlock, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; } };
+  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, manualBlock, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; }, get npc() { return npc; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);
