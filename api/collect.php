@@ -1,6 +1,7 @@
 <?php
-// Analytics collector: the game POSTs batches of events here (fetch keepalive, or sendBeacon when the page hides).
-// Body is JSON sent as text/plain so the browser needs no preflight. See js/analytics.js for the format.
+// Analytics collector: the game POSTs batches of events here (fetch, or sendBeacon when the page hides).
+// Body is JSON, sent as application/json (old Chrome's beacon falls back to text/plain; both are read the same way).
+// See js/analytics.js for the format.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 
@@ -10,13 +11,21 @@ header('X-Content-Type-Options: nosniff');
 
 function reply(int $code, array $body): never { http_response_code($code); echo json_encode($body); exit; }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') reply(405, ['ok' => false]);
 // only pages of this site (plus any configured embed hosts) may post
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin !== '' && $origin !== 'null') {
   $self = explode(':', $_SERVER['HTTP_HOST'] ?? '')[0];
-  if (parse_url($origin, PHP_URL_HOST) !== $self && !in_array($origin, (array) cfg('allowed_origins'), true)) reply(403, ['ok' => false]);
+  if (parse_url($origin, PHP_URL_HOST) !== $self) {
+    if (!in_array($origin, (array) cfg('allowed_origins'), true)) reply(403, ['ok' => false]);
+    // an embed host: a JSON body makes its browser ask first (preflight)
+    header("Access-Control-Allow-Origin: $origin");
+    header('Access-Control-Allow-Methods: POST');
+    header('Access-Control-Allow-Headers: Content-Type');
+    header('Vary: Origin');
+  }
 }
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') reply(405, ['ok' => false]);
 $raw = file_get_contents('php://input', false, null, 0, 262145);
 if ($raw === false || $raw === '') reply(400, ['ok' => false]);
 if (strlen($raw) > 262144) reply(413, ['ok' => false]);

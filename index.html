@@ -45,9 +45,12 @@
       if (navigator.webdriver || an === 'off' || !navigator.sendBeacon || document.visibilityState !== 'visible') return; // unseen = no visit
       var id = function (p) { return p + Math.random().toString(36).slice(2) + Date.now().toString(36); };
       var pid = localStorage.getItem('fds_pid'); if (!pid) { pid = id('p'); localStorage.setItem('fds_pid', pid); }
-      navigator.sendBeacon('api/collect.php', new Blob([JSON.stringify({ v: 1, pid: pid, sid: id('s'), now: Date.now(), dev: an === 'dev' ? 1 : 0,
+      var data = JSON.stringify({ v: 1, pid: pid, sid: id('s'), now: Date.now(), dev: an === 'dev' ? 1 : 0,
         ctx: { ua: navigator.userAgent, lang: navigator.language, scr: screen.width + 'x' + screen.height, touch: matchMedia('(pointer: coarse)').matches ? 1 : 0 },
-        ev: [{ i: 0, t: Date.now(), n: 'boot_fail', p: { msg: msg } }] })], { type: 'text/plain' }));
+        ev: [{ i: 0, t: Date.now(), n: 'boot_fail', p: { msg: msg } }] });
+      // JSON like js/analytics.js; Chrome 59–80 threw on that Blob type, so retry as plain text
+      try { navigator.sendBeacon('api/collect.php', new Blob([data], { type: 'application/json' })); }
+      catch (e) { navigator.sendBeacon('api/collect.php', new Blob([data], { type: 'text/plain' })); }
     } catch (e) { /* private mode: nothing to do */ }
   };
   window.addEventListener('error', function (e) { if (!window.ready) window.__bootErr(e.message || 'script error'); });

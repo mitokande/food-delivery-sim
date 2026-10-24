@@ -89,7 +89,7 @@ async function flush(unloading = false) {
   try {
     const b = body(ev);
     // keepalive only when the page is going away (it has a small shared quota, and it is what sendBeacon falls back to)
-    const r = await fetch(ENDPOINT, { method: 'POST', body: b, keepalive: unloading && b.length < 60000, headers: { 'Content-Type': 'text/plain' } });
+    const r = await fetch(ENDPOINT, { method: 'POST', body: b, keepalive: unloading && b.length < 60000, headers: { 'Content-Type': 'application/json' } });
     // 4xx = the server will never take this batch: drop it rather than retry forever
     if (r.ok || (r.status >= 400 && r.status < 500)) { queue.splice(0, ev.length); ctxSent ||= r.ok; }
   } catch { /* offline: keep the queue, try again next tick */ }
@@ -97,12 +97,19 @@ async function flush(unloading = false) {
   if (queue.length >= BATCH) setTimeout(flush, 500);
 }
 // page is going away (or to the background): hand everything to sendBeacon, which outlives the page
+// sent as JSON: the host's firewall (ModSecurity) flags text/plain bodies. Chrome 59–80 threw on a non-form Blob type
+// in sendBeacon, so those retry as text/plain (the collector reads either).
+function beacon(b) {
+  if (!navigator.sendBeacon) return false;
+  try { return navigator.sendBeacon(ENDPOINT, new Blob([b], { type: 'application/json' })); } catch { /* old Chrome */ }
+  try { return navigator.sendBeacon(ENDPOINT, new Blob([b], { type: 'text/plain' })); } catch { return false; }
+}
 function flushNow() {
   if (!enabled || !sid) return;
   store.set('fds_play', String(Math.round(playBase + activeNow())));
   do {
     const ev = queue.slice(0, BATCH);
-    const ok = navigator.sendBeacon?.(ENDPOINT, new Blob([body(ev)], { type: 'text/plain' }));
+    const ok = beacon(body(ev));
     if (!ok) { flush(true); return; }
     queue.splice(0, ev.length); ctxSent = true; lastSend = Date.now();
   } while (queue.length);
