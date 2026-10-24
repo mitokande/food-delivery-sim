@@ -162,6 +162,9 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
 `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (otomatik pilotun gerçek ortalama hızı; `BOOST=1` turbo ile — süre kalibrasyonu için). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
+Reklam klibi: `node tools/fleetclip.mjs [oyun-kökü] [çıktı.mp4]` — 9:16 filo timelapse'i (külüstürdeki tek kuryeden dört bölgede 10 kuryeye,
+gün batımı, oyunun kendi "Your drivers kept working!" ekranı, bitiş kartı), sanal zamanda kare kare; ekrandaki sayılar oyunun formüllerinden
+(`fleetPerMin`, `ui.offline`), ses hub müziği + UI sesleri. `SCALE=3` 1080x1920, `STILLS=30,300` yalnız o kareler (hızlı bakış), `AUDIO=0` sessiz.
 
 ## 9. Durum
 
