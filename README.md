@@ -29,3 +29,4 @@ Locally: `php -S 127.0.0.1:8000` from the repo root (static server alone has no 
 - `tools/` — asset build scripts (Blender, gltf-transform, audio) and headless test tools (`play.mjs`, `sweep.mjs`, `tabs.mjs`).
 - `api/`, `admin/` — analytics collector and admin panel (PHP 8 + SQLite, no dependencies).
 - `DOCS.md` — design document and code map (Turkish).
+- `design/ad-research.md` — ad research: competitor ad teardowns, idle ad formats, ideas for our own ads (Turkish).
