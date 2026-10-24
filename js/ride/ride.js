@@ -671,6 +671,7 @@ export function createRide(ctx) {
       npc = await spawnNpc(orders[0].o.rest === 'sultan' ? 'male-d' : 'female-c', dx, dz, bx, bz, true);
       sceneCam(dx, dz);
       await ctx.ui.pickup(orders.map((x) => x.o), R);
+      await reachBike(npc); // the bag changes hands at the bike, even when Confirm Pickup came early
       R.bike.openLid(true); ctx.audio?.play('bag-rustle');
       for (const x of orders) x.picked = true;
       await walkAway(npc, dx, dz);
@@ -719,6 +720,10 @@ export function createRide(ctx) {
     c.play(carrying ? 'walk-hold' : 'walk');
     return n;
   }
+  // in game time, not wall time: on a slow phone the walk takes longer and the bag still changes hands at the bike
+  function reachBike(n) {
+    return new Promise((res) => { if (!n || !n.walking) return res(); n.onArrive = res; });
+  }
   function walkAway(n, x, z) {
     return new Promise((res) => { if (!n) return res(); if (n.bag) n.bag.visible = false; n.tx = x; n.tz = z; n.walking = true; n.c.play('walk'); n.onArrive = () => { n.c.obj.removeFromParent(); res(); }; setTimeout(() => { n.onArrive?.(); }, 2500); });
   }
@@ -727,7 +732,7 @@ export function createRide(ctx) {
     const o = npc.c.obj;
     const dx = npc.tx - o.position.x, dz = npc.tz - o.position.z, d = Math.hypot(dx, dz);
     if (npc.walking) {
-      if (d < 0.15) {
+      if (!(d >= 0.15)) { // (a target that came out NaN counts as reached, so nothing waits on it forever)
         npc.walking = false;
         if (npc.emote) npc.c.play(npc.emote, 0.2, { once: true });
         else npc.c.play(npc.bag && npc.bag.visible ? 'holding-both' : 'idle');

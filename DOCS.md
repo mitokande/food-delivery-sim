@@ -312,6 +312,9 @@ Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render's
   klibiyle bacaklar yürüyor, kollar poşeti tutuyor. Poşet de hiç görünmüyordu (food kiti yüklenmiyordu): sürüş başında
   arka planda yükleniyor (~390 KB), hazır değilse çalışan poşetsiz geliyor. `tools/legs.mjs` artık yürüme animasyonu
   olmadan 0,6 m'den fazla kayan karakteri hata sayıyor.
+- 2026-10-24: "Confirm Pickup"a erken basılınca çalışan motora varmadan dönüyor, poşet elinden yolda kayboluyordu;
+  artık önce motora geliyor, poşet orada bagaja giriyor. Bekleme oyun zamanıyla ölçülüyor, yavaş telefonda da poşet
+  motorun yanında veriliyor. `tools/legs.mjs` poşetin motordan 2,4 m'den uzakta verilmesini hata sayıyor.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 

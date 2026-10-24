@@ -117,6 +117,11 @@ for (const mode of MODES) {
           // a person who moves must be walking: how far each one slides with no walk cycle playing
           for (let i = 0; i < 4; i++) {
             const n = r.npc, p0 = n && n.c.obj.position.clone();
+            // the cook's bag changes hands at the bike: how far from it they were when it left their hands
+            if (n && n.bag && !n.bag.visible && n.handAt == null) {
+              n.handAt = Math.hypot(n.c.obj.position.x - R.bike.root.position.x, n.c.obj.position.z - R.bike.root.position.z);
+              T.handAt = Math.max(T.handAt || 0, n.handAt);
+            }
             game.sim(0.025);
             if (!n || n !== r.npc) continue;
             const mv = Math.hypot(n.c.obj.position.x - p0.x, n.c.obj.position.z - p0.z);
@@ -163,6 +168,7 @@ for (const mode of MODES) {
     ok(res.del1 - res.del0 === setup.n, `deliveries +${res.del1 - res.del0} (want +${setup.n})`);
     ok(res.receipt && res.receipt.lines >= setup.n, `receipt lists every order (${res.receipt?.lines} lines)`);
     ok(!(res.slide > 0.6), `nobody slides along without walking${res.slide > 0.6 ? ` — slid ${res.slide.toFixed(1)} m playing ${res.slideAnim}` : ''}`);
+    ok(!(res.handAt > 2.4), `the bag is handed over at the bike${res.handAt != null ? ` (${res.handAt.toFixed(1)} m away)` : ' (no bag seen)'}`);
     ok(res.npcs.length <= res.chars0.length, `no NPC left in the scene (${res.chars0.length} people before, ${res.npcs.length} after)`);
     ok(!res.modals, `no modal left open${res.modals ? ': ' + res.modals : ''}`);
     ok(errs.length === e0, `no errors${errs.length > e0 ? ': ' + errs.slice(e0).join(' | ') : ''}`);
