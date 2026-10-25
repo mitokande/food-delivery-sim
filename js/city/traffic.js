@@ -143,10 +143,24 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
     return remain;
   }
 
+  // things off the road graph (the player riding freely): a car brakes for one that's in its path
+  const blockers = [];
+  function blockerGap(a) {
+    let best = Infinity;
+    const h = a.pos[2], fx = Math.sin(h), fz = Math.cos(h);
+    for (const b of blockers) {
+      const dx = b.x - a.pos[0], dz = b.z - a.pos[1];
+      const lon = dx * fx + dz * fz;
+      if (lon < 0 || lon > 40 || Math.abs(dx * fz - dz * fx) > 1.15 + b.r) continue;
+      best = Math.min(best, lon - a.len / 2 - b.r);
+    }
+    return best;
+  }
+
   function stepAgent(a, dt) {
     if (a.kind === 'player' || a.kind === 'parked') return; // the ride controller moves the player
     const { gap } = leaderGap(a);
-    const sd = stopDist(a);
+    const sd = Math.min(stopDist(a), blockers.length ? blockerGap(a) - 1.2 : Infinity);
     let target = a.vmax;
     if (a.curve.turn) target = Math.min(target, Math.sqrt(7 * a.curve.radius));
     else {
@@ -206,7 +220,7 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
   }
 
   return {
-    agents, byTile, update, lightAt, placeAgent, leaderGap, meshes,
+    agents, byTile, update, lightAt, placeAgent, leaderGap, meshes, blockers,
     get time() { return time; },
     light: (tile, dir) => { const L = lightAt.get(tile); return L ? lightState(L, time, dir) : 'g'; },
     addAgent(a) { agents.push(a); return a; },

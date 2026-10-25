@@ -61,7 +61,6 @@ export function createUI(game) {
       <canvas class="r-map" width="240" height="240"></canvas>
     </div>
     <div class="r-ctx"></div>
-    <div class="r-junc" hidden><span data-j="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-90 12 12)"/></svg></span><span data-j="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(0 12 12)"/></svg></span><span data-j="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V6M6 11.5 12 5.5l6 6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 12 12)"/></svg></span><small>A · D</small></div>
     <div class="r-speed"><svg viewBox="0 0 72 40" aria-hidden="true"><path class="trk" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/><path class="val" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/></svg><b>0</b><small>km/h</small></div>
     <button class="r-btn horn" data-ride="horn" aria-label="Horn">${ICON('ui-horn')}</button>
     <button class="r-btn hop" data-ride="hop" aria-label="Hop">${ICON('ui-jump')}<span>HOP</span></button>
@@ -613,9 +612,8 @@ export function createUI(game) {
     name: $('.r-name', hud), verb: $('.r-verb', hud), food: $('.r-food', hud), dist: $('.r-dist', hud), timer: $('.r-timer b', hud), timerBox: $('.r-timer', hud),
     cond: $('.r-cond', hud), heat: $('.heat u', hud), integ: $('.integ u', hud), speed: $('.r-speed b', hud), ctx: $('.r-ctx', hud),
     boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud), timerLbl: $('.r-timer small', hud), dial: $('.r-speed .val', hud),
-    speedBox: $('.r-speed', hud), junc: $('.r-junc', hud), keys: $('.r-keys', hud),
+    speedBox: $('.r-speed', hud), keys: $('.r-keys', hud),
   };
-  let juncKey = '';
   let vTop = 9; // the active bike's top speed (m/s), for the speed dial
   const mapCtx = rh.map.getContext('2d');
   const flowEl = $('.r-flow', hud), flowMult = $('.r-flow em', hud), flowBar = $('.r-flow u', hud), pops = $('.r-pops', hud), speedEl = $('#speedlines', hud);
@@ -656,7 +654,7 @@ export function createUI(game) {
     rh.food.innerHTML = leg.kind === 'pickup' ? ICON(FOODS[o.food].icon) : ICON('char-' + o.char);
     rh.cond.hidden = !R.orders.some((x) => x.picked && !x.done);
     vTop = St.vehStats().top || 9;
-    rh.keys.textContent = R.manual ? 'W/↑ gas · S/↓ brake · A/D lanes & turns · Space hop · Shift turbo · E action · H horn · drag to look'
+    rh.keys.textContent = R.manual ? 'W/↑ gas · S/↓ brake & reverse · A/D steer · Space hop · Shift turbo · E action · H horn · drag to look'
       : 'Space turbo · W hop · E action · H horn · drag to look';
     routeChanged(R);
   }
@@ -724,13 +722,6 @@ export function createUI(game) {
     rh.speed.textContent = Math.round(R.v * 3.6);
     rh.dial.style.strokeDasharray = `${Math.min(100, R.v / (vTop * 1.35) * 100).toFixed(1)} 100`;
     rh.speedBox.classList.toggle('warn', !!R.cornerWarn);
-    // the rider's junction choice: the exits there, the one the route takes now, and the GPS pick
-    const J = R.manual && R.phase === 'ride' ? R.junc : null;
-    const jk = J ? `${J.tile}|${J.rels}|${J.cur}|${J.gps}` : '';
-    if (jk !== juncKey) {
-      juncKey = jk; rh.junc.hidden = !J;
-      if (J) for (const el of rh.junc.querySelectorAll('[data-j]')) { const r = +el.dataset.j; el.hidden = !J.rels.includes(r); el.classList.toggle('on', J.cur === r); el.classList.toggle('gps', J.gps === r); }
-    }
     const F = R.flow;
     if (F) {
       flowEl.hidden = !(F.n > 0);
@@ -747,11 +738,10 @@ export function createUI(game) {
     if (R.phase === 'ride' && R.crash <= 0) {
       const ot = !R.manual && game.canOvertake();
       if (ot) acts.push(['overtake', `${ICON('ui-overtake')}<span>Overtake</span>`, ['safe', 'risky', 'danger'][ot.risk]]);
-      // riding yourself: stuck behind a parked car or a slow one → a nudge to steer round (and which key does it)
-      if (R.manual && !R.ot && R.v < 3) { const g = game.manualBlock?.(); if (g) acts.push(['left', `${ICON('ui-overtake')}<span>Go round <small>A</small></span>`, g.risk ? 'risky' : 'safe']); }
       if (!R.manual && R.light && R.light.state !== 'g' && R.light.d < 16 && R.runLight !== R.light.tile) acts.push(['go', `${ICON('ui-traffic-light')}<span>Run it!</span>`, 'risky']);
-      if (R.offer) acts.push(['shortcut', `${ICON('ui-shortcut')}<span>Shortcut <small>${R.offer.label}</small></span>`, 'safe']);
-      if (R.hazards.some((h) => h.type === 'ped' && !h.done && h.walking && h.s - R.s < 28 && h.s > R.s)) acts.push(['horn', `${ICON('ui-horn')}<span>Honk!</span>`, 'safe']);
+      // riding yourself, the shortcut button puts the alley on the GPS
+      if (R.offer) acts.push(['shortcut', `${ICON('ui-shortcut')}<span>${R.manual ? 'GPS shortcut' : 'Shortcut'} <small>${R.offer.label}</small></span>`, 'safe']);
+      if (R.hazards.some((h) => h.type === 'ped' && !h.done && h.walking && h.ahead > 0 && h.ahead < 28)) acts.push(['horn', `${ICON('ui-horn')}<span>Honk!</span>`, 'safe']);
     }
     const key = acts.map((a) => a[0] + a[2]).join();
     if (key !== ctxKey) {
@@ -759,9 +749,9 @@ export function createUI(game) {
       rh.ctx.innerHTML = acts.map(([k, html, cls]) => `<button class="ctx ${cls}" data-ride="${k}">${html}</button>`).join('');
     }
     // hop hint: glow when a hoppable hazard is ahead
-    const hz = R.hazards.find((h) => !h.done && HZ[h.type].hop && h.lane >= 0 && h.s - R.s > 0 && h.s - R.s < Math.max(8, R.v * 1.3));
+    const hz = R.hazards.find((h) => !h.done && HZ[h.type].hop && h.inPath && h.ahead > 0 && h.ahead < Math.max(8, R.v * 1.3));
     rh.hop.classList.toggle('hint', !!hz);
-    if (hz) { const d = hz.s - R.s; rh.hop.classList.toggle('perfect', d > R.v * 0.16 && d < R.v * 0.38); } else rh.hop.classList.remove('perfect');
+    if (hz) { const d = hz.ahead; rh.hop.classList.toggle('perfect', d > R.v * 0.16 && d < R.v * 0.38); } else rh.hop.classList.remove('perfect');
     mapT += 1; if (mapT % 2 === 0) drawMap(R);
   }
   let coachEl = null;

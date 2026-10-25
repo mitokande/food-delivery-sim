@@ -1,6 +1,6 @@
 // Pickup / drop-off scenarios: single and batched jobs (same restaurant, several restaurants, two orders to one door,
 // starting at the restaurant), an event card left open at the door, a hop at the door, and the same on a keyboard
-// (manual riding, arriving in the other lane). Every job must reach the receipt with each order picked up at its
+// (riding freely: stopping in the far lane, or up on the sidewalk in front of the door). Every job must reach the receipt with each order picked up at its
 // restaurant and delivered at its door, paid once, with nothing left behind in the scene.
 //   node tools/legs.mjs [touch|desktop|both] [scenario,...]
 import { createRequire } from 'node:module';
@@ -10,7 +10,7 @@ let puppeteer; try { puppeteer = require('puppeteer-core'); } catch { puppeteer 
 const MODES = (process.argv[2] || 'both') === 'both' ? ['touch', 'desktop'] : [process.argv[2]];
 const ONLY = process.argv[3] ? process.argv[3].split(',') : null;
 const SAVE = { v: 1, lvl: 10, cash: 5000, xp: 0, districts: { oldtown: true, downtown: true, harbor: true, hills: true }, stats: { deliveries: 60 },
-  seen: { rideTip: 1, manualTip: 1 }, onboard: { step: 99 }, settings: { music: 0, sfx: 0, quality: 'low', haptics: false }, active: 'mule',
+  seen: { rideTip: 1, manualTip: 1, freeTip: 1 }, onboard: { step: 99 }, settings: { music: 0, sfx: 0, quality: 'low', haptics: false }, active: 'mule',
   vehicles: { rustbucket: { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, count: 1 }, mule: { parts: { engine: 3, suspension: 0, box: 0, tires: 0 }, count: 1 } } };
 
 // scenario setup runs in the page: returns the orders for the job (and may move the player)
@@ -23,7 +23,9 @@ const SCEN = {
   atRestaurant: `const o = mk(); game.St.S.pos = game.city.lots[o.restLot].door; game.St.S.posDir = null; return [o];`,
   eventAtDoor: `window.__evAtDoor = true; return [mk()];`,
   hopAtDoor: `window.__hopAtDoor = true; return [mk()];`,
-  otherLane: `window.__otherLane = true; return [mk()];`,
+  // riding freely: where in the door's ring the rider pulls up (m from its middle, + = toward the far lane)
+  farLane: `window.__stopAt = 3.6; return [mk()];`,
+  sidewalk: `window.__stopAt = -2.4; return [mk()];`,
   // a customer whose character downloads slowly / not at all (phones only preload a few people)
   slowChar: `const o = mk(); o.char = 'male-b'; return [o];`,
   charFails: `const o = mk(); o.char = 'male-f'; return [o];`,
@@ -31,7 +33,7 @@ const SCEN = {
 const NET = { slowChar: { match: 'character-male-b', delay: 5000 }, charFails: { match: 'character-male-f', fail: true } };
 const PLAN = {
   touch: ['slowChar', 'charFails', 'single', 'sameRest', 'threeRests', 'sameDoor', 'atRestaurant', 'eventAtDoor', 'hopAtDoor'],
-  desktop: ['single', 'sameRest', 'sameDoor', 'atRestaurant', 'otherLane'],
+  desktop: ['single', 'sameRest', 'sameDoor', 'atRestaurant', 'farLane', 'sidewalk'],
 };
 
 const { server, base } = await serve();
@@ -51,7 +53,7 @@ for (const mode of MODES) {
   await page.evaluateOnNewDocument((s) => localStorage.setItem('fds_save_v1', s), JSON.stringify(SAVE));
   await page.goto(`${base}/index.html?noti=1&clock=600`, { waitUntil: 'networkidle0', timeout: 240000 });
   await page.waitForFunction('window.ready', { timeout: 120000 });
-  console.log(`--- ${mode} (manual riding: ${await page.evaluate(() => game.manual())})`);
+  console.log(`--- ${mode} (riding freely: ${await page.evaluate(() => game.manual())})`);
   for (const name of PLAN[mode]) {
     if (ONLY && !ONLY.includes(name)) continue;
     const e0 = errs.length;
@@ -63,7 +65,7 @@ for (const mode of MODES) {
     const setup = await page.evaluate(async (src) => {
       const { makeOrder } = await import('./js/orders.js');
       const mk = (opt = {}) => makeOrder(game.city, Math.random, { from: game.St.S.pos, ...opt });
-      window.__evAtDoor = window.__hopAtDoor = window.__otherLane = false;
+      window.__evAtDoor = window.__hopAtDoor = false; window.__stopAt = null;
       const orders = new Function('mk', src)(mk);
       const S = game.St.S;
       const chars0 = []; game.scene.traverse((o) => { if (/^character-/.test(o.name) && o.parent === game.scene) chars0.push(o.name); });
@@ -103,16 +105,9 @@ for (const mode of MODES) {
           if (R.light && R.light.state !== 'g' && R.runLight !== R.light.tile && !R.manual) r.input('go');
           if (window.__evAtDoor && !T.evFired && toEnd < 14 && toEnd > 6) { T.evFired = true; game.testEvent('ketchup', 0.5); }
           if (window.__hopAtDoor && toEnd < 1.6 && !T.hopped) { T.hopped = true; r.input('hop'); }
-          if (R.manual) {
-            const L = R.light, red = L && L.state !== 'g' && L.d < 14 && L.d > 0.6;
-            const brake = R.cornerWarn || red;
-            r.input('gas', !brake); r.input('brake', !!brake);
-            const blockAhead = R.hazards.some((h) => !h.done && h.lane >= 0 && ['parked', 'barrier', 'cones'].includes(h.type) && h.s - R.s > -4 && h.s - R.s < 9);
-            if (window.__otherLane && toEnd < 30 && toEnd > 12 && !R.ot && !R.junc) r.input('left');
-            else if (!R.ot && game.manualBlock()) r.input('left');
-            else if (R.ot && R.ot.manual && R.ot.t >= 1 && !blockAhead && !(window.__otherLane && toEnd < 30)) r.input('right');
-          }
-          for (let i = 0; i < 20 && R.phase === 'ride'; i++) game.sim(0.05);
+          // riding freely: a careful rider on the keys (ride.bot), pulling up where the scenario says
+          const stopAt = () => { if (window.__stopAt == null) return null; const L = game.city.lots[R.job.legs[R.leg].lot], f = [[0, -1], [1, 0], [0, 1], [-1, 0]][L.front]; return { x: R.ring.x + f[0] * window.__stopAt, z: R.ring.z + f[1] * window.__stopAt }; };
+          for (let i = 0; i < 20 && R.phase === 'ride'; i++) { if (R.manual) r.bot({ stop: stopAt() }); game.sim(0.05); }
         } else if (R.active) {
           // a person who moves must be walking: how far each one slides with no walk cycle playing
           for (let i = 0; i < 4; i++) {
@@ -138,9 +133,10 @@ for (const mode of MODES) {
     if (!(st && st.receipt)) console.log('  stuck:', await page.evaluate(() => { const R = game.ride.R, L = R.light;
       const hz = R.hazards.filter((h) => !h.done && h.s - R.s > -3 && h.s - R.s < 25).map((h) => `${h.type}@${(h.s - R.s).toFixed(1)}${h.lane < 0 ? 'L' : ''}`).join(' ');
       return JSON.stringify({ phase: R.phase, leg: R.leg, s: +R.s.toFixed(1), len: +R.route.length.toFixed(1), v: +R.v.toFixed(2), crash: +R.crash.toFixed(1), wait: +R.wait.toFixed(1), hop: !!R.hop,
-        ev: !!R.eventCam, ot: R.ot && { t: +R.ot.t.toFixed(2), dir: R.ot.dir, manual: !!R.ot.manual, hz: !!R.ot.hz }, junc: !!R.junc, light: L && L.state + L.d.toFixed(1), blocked: R.blockedBy, mb: game.manualBlock(), hz,
-        gas: R.ctl.gas, brake: R.ctl.brake, modals: [...document.querySelectorAll('.modal, .evdock')].map((m) => m.className).join('|') }); }));
-    await page.evaluate(() => game.ride.input('gas', false));
+        ev: !!R.eventCam, ot: R.ot && { t: +R.ot.t.toFixed(2), dir: R.ot.dir, hz: !!R.ot.hz }, light: L && L.state + L.d.toFixed(1), blocked: R.blockedBy, hz,
+        free: R.manual && { x: +game.ride.F.x.toFixed(1), z: +game.ride.F.z.toFixed(1), fv: +game.ride.F.fv.toFixed(2), ring: Math.hypot(R.ring.x - game.ride.F.x, R.ring.z - game.ride.F.z).toFixed(1) },
+        gas: R.ctl.gas, brake: R.ctl.brake, left: R.ctl.left, right: R.ctl.right, modals: [...document.querySelectorAll('.modal, .evdock')].map((m) => m.className).join('|') }); }));
+    await page.evaluate(() => { for (const k of ['gas', 'brake', 'left', 'right']) game.ride.input(k, false); });
     if (net) { page.off('request', onReq); await page.setRequestInterception(false); }
     const res = await page.evaluate(() => {
       const T = window.__T, S = game.St.S;

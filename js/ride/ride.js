@@ -1,10 +1,11 @@
-// Delivery ride: the bike drives itself along the route (or, in manual mode on desktop, the player rides it: gas,
-// brake, lane changes and the turn at each junction); the player uses powers and answers events.
+// Delivery ride: the bike drives itself along the route (or, riding freely on desktop, the player steers it anywhere
+// in the city and the route is only the GPS); the player uses powers and answers events.
 import * as THREE from 'three';
 import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT, DPROFILE } from '../data.js';
-import { DIRS, OPP, RIGHT, LEFT, K } from '../city/gen.js';
+import { DIRS, OPP, K } from '../city/gen.js';
 import { findPath, buildRoute, sampleRoute, LANE, laneCurve, dirBetween, routeArcs } from '../city/graph.js';
 import { planHazards, makeHazardMesh, freeHazard, HZ, warmPeds } from './hazards.js';
+import { Y as GROUND, boxHit } from './world.js';
 import { pickEvent } from './events.js';
 import { makeBike } from './vehicle.js';
 import { buildRibbon } from './ribbon.js';
@@ -24,14 +25,14 @@ const look_ = new THREE.Vector3();
 const KAP_OFFS = [-3, -1.5, 0, 1.5, 3];
 
 export function createRide(ctx) {
-  const { scene, camera, city, traffic } = ctx;
+  const { scene, camera, city, traffic, world } = ctx;
   const rng = mulberry32((Date.now() & 0xffff) ^ 0x5eed);
   const R = {
     active: false, phase: 'idle', timeScale: 1, job: null, leg: 0, route: null, s: 0, v: 0, energy: 100, energyMax: 100,
     boost: false, hop: null, ot: null, runLight: -1, wait: 0, crash: 0, hazards: [], event: null, eventDone: false,
     orders: [], legMeters: 0, meters: 0, stats: null, shake: 0, camFov: 60, bike: null, agent: null, offer: null, hornCd: 0,
     lean: 0, steer: 0, lat: 0, sampled: [0, 0, 0, 0, 0], recentEvents: [], arcs: [], blend: null, yawOff: 0, camYaw: null, fines: 0, rideTime: 0,
-    manual: false, ctl: { gas: false, brake: false }, junc: null, cornerWarn: false, skidCd: 0,
+    manual: false, ctl: { gas: false, brake: false, left: false, right: false }, cornerWarn: false, ring: null, kap: 0,
     // feel: smoothed longitudinal acceleration (m/s²), throttle load 0–1, corner grip used (manual), brake ramp, camera springs
     accS: 0, load: 0, slip: 0, brk: 0, hardBrake: false, camG: 0, camKy: 0, camKv: 0,
   };
@@ -82,7 +83,7 @@ export function createRide(ctx) {
     const fx = St.skillFx();
     R.vs = vs; R.fx = fx;
     R.job = job; R.leg = 0; R.active = true; R.timeScale = 1; R.fines = 0; R.rideTime = 0;
-    R.manual = !!ctx.manual?.(); R.junc = null; R.skidCd = 0; R.accS = 0; R.load = 0; R.slip = 0; R.brk = 0; R.camG = 0; R.camKy = 0; R.camKv = 0;
+    R.manual = !!ctx.manual?.() && !!world; R.accS = 0; R.load = 0; R.slip = 0; R.brk = 0; R.camG = 0; R.camKy = 0; R.camKv = 0; R.cornerWarn = false;
     R.energyMax = 100 * fx.energy; R.energy = R.energyMax;
     // the people we'll meet at the doors: fetch them now (phones only preload a few), not when the bike pulls up
     for (const id of new Set(['female-c', ...job.orders.map((o) => o.char), ...(job.orders.some((o) => o.rest === 'sultan') ? ['male-d'] : [])])) loadChar(id).catch(() => {});
@@ -92,7 +93,9 @@ export function createRide(ctx) {
     R.meters = 0;
     scene.add(R.bike.root);
     if (!traffic.agents.includes(agent)) traffic.addAgent(agent);
+    if (!ringMk.parent) scene.add(ringMk);
     R.curTile = fromTile; R.curDir = fromDir;
+    if (R.manual) initFree();
     beginLeg();
   }
 
@@ -104,8 +107,9 @@ export function createRide(ctx) {
     if (!path) path = findPath(city, R.curTile, to);
     // already at this door (two orders for one building, or a job that starts at the restaurant): the scene plays
     // right here. A one-tile route still gets built so everything that reads R.route keeps working.
-    R.here = path.length < 2;
-    if (R.here) {
+    if (R.manual) R.ring = legRing(leg);
+    R.here = path.length < 2 || (R.manual && Math.hypot(F.x - R.ring.x, F.z - R.ring.z) < RING_R);
+    if (path.length < 2) {
       const t = city.tiles[R.curTile]; const d = [0, 1, 2, 3].find((k) => t.mask & (1 << k));
       path = [R.curTile, R.curTile + DIRS[d][0] + DIRS[d][1] * city.W];
     }
@@ -114,8 +118,10 @@ export function createRide(ctx) {
     setRibbon();
     R.s = 0; R.v = R.leg === 0 ? 0 : R.v; R.ot = null; R.hop = null; R.runLight = -1; R.wait = 0; R.crash = 0; R.offer = null; R.lat = 0;
     R.sampled[3] = 0; R.prevLat = 0; R.yawOff = 0;
-    // after resetting s: ease the bike from where it stands onto the start of the new route
-    if (R.leg > 0) startBlend();
+    // after resetting s: ease the bike from where it stands onto the start of the new route (riding freely, the bike
+    // stays where the rider left it and the GPS finds it there)
+    if (R.manual) { project(40); F.ringIn = false; F.told = false; F.gpsT = 0.6; F.offT = F.wrongT = 0; }
+    else if (R.leg > 0) startBlend();
     // hazards
     for (const h of R.hazards) freeHazard(h);
     const tutorial = St.S.stats.deliveries < 2;
@@ -169,7 +175,7 @@ export function createRide(ctx) {
     h.x = o[0] + rx * off; h.z = o[1] + rz * off; h.hd = hd;
     h.obj.position.set(h.x, h.obj.position.y, h.z);
     h.obj.rotation.y = hd;
-    if (h.type === 'ped') { h.cross = -1; h.obj.position.set(o[0] - rx * 4.2, 0.12, o[1] - rz * 4.2); h.px = -4.2; h.obj.rotation.y = hd + Math.PI / 2; h.walking = false; }
+    if (h.type === 'ped') { h.cross = -1; h.bx = o[0]; h.bz = o[1]; h.obj.position.set(o[0] - rx * 4.2, 0.12, o[1] - rz * 4.2); h.px = -4.2; h.obj.rotation.y = hd + Math.PI / 2; h.walking = false; }
   }
 
   // ---------- helpers ----------
@@ -233,8 +239,8 @@ export function createRide(ctx) {
 
   // ---------- input ----------
   function input(what, down = true) {
-    // pedals are held keys: remember them even between legs, so a key released during a scene is not stuck
-    if (what === 'gas' || what === 'brake') { R.ctl[what] = down; return; }
+    // pedals and steering are held keys: remember them even between legs, so a key released during a scene is not stuck
+    if (what === 'gas' || what === 'brake' || what === 'left' || what === 'right') { R.ctl[what] = down; return; }
     if (!R.active || R.phase !== 'ride') return;
     if (what === 'boost') {
       const was = R.boost; R.boost = down && R.energy > 4;
@@ -251,65 +257,8 @@ export function createRide(ctx) {
     if (what === 'overtake') return doOvertake();
     if (what === 'go') { const L = nextLight(); if (L) { R.runLight = L.tile; R.runLightState = L.state; ctx.ui.toast(L.state === 'r' ? 'Running the red!' : 'Go go go!', 'warn'); } return; }
     if (what === 'shortcut') return takeShortcut();
-    if (what === 'left' || what === 'right') return steerKey(what === 'left' ? -1 : 1);
   }
-  // ---------- manual riding: A / D pick the turn at the junction ahead, or change lane between junctions ----------
-  function steerKey(dir) {
-    if (!R.manual || R.crash > 0) return;
-    if (R.junc) { chooseExit(dir); return; }
-    if (stepAt().alley) return;
-    if (dir < 0) {
-      if (R.ot) { R.ot.dir = 1; return; }
-      const L = leaderAhead();
-      R.ot = { t: 0, dir: 1, manual: true, car: L.who && L.gap < 30 && L.who.kind === 'car' ? L.who : null, until: 0, time: 0, clean: true };
-      R.bike?.lookBack?.();
-      ctx.audio?.play('boost', { vol: 0.3, rate: 1.3 });
-    } else if (R.ot) R.ot.dir = -1;
-  }
-  // the next junction where the rider can leave the GPS route: open from a couple of seconds out until the turn starts
-  function updateJunction() {
-    // something parked in our lane comes first: A/D steer round it, the turn choice waits until the lane is clear
-    if (manualBlock()) { R.junc = null; return; }
-    const steps = R.route.steps, k0 = R.sampled[3];
-    const reach = Math.max(18, R.v * 2.4);
-    let J = null;
-    for (let k = k0 + 1; k < Math.min(steps.length - 1, k0 + 5); k++) {
-      const t = city.tiles[steps[k].tile];
-      if (!t.junction) continue;
-      let lock = steps[k].s0 - 1;
-      for (const a of R.arcs) if (a.s0 < lock && a.s1 > steps[k].s0 - 0.1) lock = a.s0 - 0.5;
-      const dist = lock - R.s;
-      if (dist < 0) continue; // already committed to this one
-      if (dist > reach) break;
-      const din = steps[k].din;
-      const rels = [-1, 0, 1].filter((r) => t.mask & (1 << (r < 0 ? LEFT(din) : r > 0 ? RIGHT(din) : din)));
-      if (rels.length < 2) break;
-      const dout = steps[k].dout, cur = dout === din ? 0 : dout === LEFT(din) ? -1 : 1;
-      J = { k, tile: steps[k].tile, din, rels, cur, dist, gps: R.junc && R.junc.tile === steps[k].tile ? R.junc.gps : cur };
-      break;
-    }
-    R.junc = J;
-  }
-  function chooseExit(dir) {
-    const J = R.junc;
-    const i = J.rels.indexOf(J.cur), ni = Math.max(0, Math.min(J.rels.length - 1, i + dir));
-    if (ni === i) return;
-    const rel = J.rels[ni], d = rel < 0 ? LEFT(J.din) : rel > 0 ? RIGHT(J.din) : J.din;
-    // leave the junction that way, then the GPS finds the quickest way on to the same door
-    const steps = R.route.steps, k0 = R.sampled[3];
-    const n = J.tile + DIRS[d][0] + DIRS[d][1] * city.W;
-    const rest = findPath(city, n, steps[steps.length - 1].tile, { noBack: OPP(d) });
-    if (!rest) { ctx.ui.toast('No way through there', 'bad'); return; }
-    const path = [];
-    for (let k = k0; k <= J.k; k++) path.push(steps[k].tile);
-    path.push(...rest);
-    replaceRoute(path);
-    R.stats.reroutes++;
-    ctx.audio?.play('ui-tap', { vol: 0.6 });
-    updateJunction();
-    if (R.junc && R.junc.cur !== R.junc.gps) ctx.ui.toast('Rerouting…', '');
-  }
-  // swap the route ahead (junction choice, shortcut): keep the bike where it is, re-plan hazards, move an event still to come
+  // swap the route ahead (shortcut): keep the bike where it is, re-plan hazards, move an event still to come
   function replaceRoute(path) {
     const cur = R.route.steps[R.sampled[3]];
     const into = R.s - cur.s0;
@@ -320,14 +269,17 @@ export function createRide(ctx) {
     for (const h of R.hazards) freeHazard(h);
     R.hazards = planHazards(route, city, rng, { startS: R.s + 20 }).filter((h) => h.s > R.s + 15);
     for (const h of R.hazards) { h.obj = makeHazardMesh(h); scene.add(h.obj); placeHazard(h); }
-    if (R.event && !R.event.fired && R.event.ev) {
-      if (R.event.prop) { disposeActor(R.event.prop); const i = actors.indexOf(R.event.prop); if (i >= 0) actors.splice(i, 1); R.event.prop = null; }
-      R.event.s = Math.min(R.s + 45, route.length * 0.7);
-      if (R.event.s < R.s + 6 || route.length - R.event.s < 30) R.event = null; // too close to come up properly, or to the door
-      else if (R.event.ev.pre) prePlace(R.event);
-    }
+    moveEvent();
     setRibbon();
     ctx.ui.routeChanged(R);
+  }
+  // a new route under an event still to come: it moves down the new way (with its props), or drops if too near
+  function moveEvent() {
+    if (!R.event || R.event.fired || !R.event.ev) return;
+    if (R.event.prop) { disposeActor(R.event.prop); const i = actors.indexOf(R.event.prop); if (i >= 0) actors.splice(i, 1); R.event.prop = null; }
+    R.event.s = Math.min(R.s + 45, R.route.length * 0.7);
+    if (R.event.s < R.s + 6 || R.route.length - R.event.s < 30) R.event = null; // too close to come up properly, or to the door
+    else if (R.event.ev.pre) prePlace(R.event);
   }
   function doHop() {
     if (R.hop || R.crash > 0) return;
@@ -336,9 +288,13 @@ export function createRide(ctx) {
     R.stats.hops++;
     ctx.audio?.play('hop');
     { const p = R.bike.root.position; pfx.hopTakeoff(p.x, p.z); }
-    // judge against the nearest hoppable hazard
+    // judge against the nearest hoppable hazard (riding freely: the nearest one in front of the wheel)
     let best = null, bd = Infinity;
-    for (const h of R.hazards) { if (h.done || !HZ[h.type].hop || h.lane < 0 && !R.ot) continue; const d = h.s - R.s; if (d > -0.5 && d < bd) { bd = d; best = h; } }
+    for (const h of R.hazards) {
+      if (h.done || !HZ[h.type].hop) continue;
+      if (R.manual ? !h.inPath : h.lane < 0 && !R.ot) continue;
+      const d = R.manual ? h.ahead : h.s - R.s; if (d > -0.5 && d < bd) { bd = d; best = h; }
+    }
     const v = Math.max(R.v, 2);
     if (best && bd < v * T * 0.95 + 1) {
       best.hopped = true;
@@ -351,8 +307,8 @@ export function createRide(ctx) {
     R.hornCd = 1.2;
     R.stats.horns++;
     ctx.audio?.play(VEHICLE[St.S.active].horn || 'horn-scooter');
-    for (const h of R.hazards) if (h.type === 'ped' && !h.done && h.s - R.s < 30 && h.s > R.s - 2) { h.hurry = true; if (h.ped) h.ped.c.play('sprint', 0.1); }
-    const L = leaderAhead(); if (L.who && L.gap < 18 && L.who.kind === 'car') { L.who.vmax += 2.5; L.who.wait = 0; }
+    for (const h of R.hazards) if (h.type === 'ped' && !h.done && h.ahead < 30 && h.ahead > -2) { h.hurry = true; if (h.ped) h.ped.c.play('sprint', 0.1); }
+    const L = R.manual ? carAhead(18) : leaderAhead(); if (L.who && L.gap < 18 && L.who.kind === 'car') { L.who.vmax += 2.5; L.who.wait = 0; }
   }
   function canOvertake() {
     if (R.ot || R.crash > 0) return null;
@@ -427,7 +383,7 @@ export function createRide(ctx) {
     }
     if (R.timeScale < 1 || St.S.stats.deliveries > 12) return;
     let want = null;
-    if (!seen.c_hop && R.hazards.some((h) => !h.done && HZ[h.type].hop && h.lane >= 0 && h.s - R.s > 4 && h.s - R.s < Math.max(10, R.v * 1.4))) want = 'hop';
+    if (!seen.c_hop && R.hazards.some((h) => !h.done && HZ[h.type].hop && h.inPath && h.ahead > 4 && h.ahead < Math.max(10, R.v * 1.4))) want = 'hop';
     else if (!R.manual && !seen.c_overtake && canOvertake()?.risk === 0) want = 'overtake';
     else if (!R.manual && !seen.c_go && R.light && R.light.state === 'r' && R.light.d < 10 && R.v < 2) want = 'go';
     else if (!seen.c_shortcut && R.offer) want = 'shortcut';
@@ -445,6 +401,8 @@ export function createRide(ctx) {
     const path = [];
     for (let k = k0; k <= o.k; k++) path.push(steps[k].tile);
     path.push(...o.tiles, ...o.rest);
+    // riding yourself, the button only puts the alley on the GPS: the shortcut counts once you've ridden through it
+    if (R.manual) { R.offer = null; adoptRoute(buildRoute(city, path, { startDir: steps[k0].din, firstFull: true })); ctx.ui.toast(`Shortcut on the GPS · ${o.label}`, 'good'); return; }
     replaceRoute(path);
     R.offer = null; R.stats.shortcuts++; St.goalProgress('shortcut');
     flow('SHORTCUT!');
@@ -461,7 +419,7 @@ export function createRide(ctx) {
   function crash(why) {
     if (R.crash > 0) return;
     ctx.audio?.play('skid', { vol: 0.8 });
-    R.crash = 1.8; R.v = 0; R.stats.crashes++;
+    R.crash = 1.8; R.v = 0; R.stats.crashes++; F.fv = 0; F.beta = 0;
     track('crash', { why: why || 'Crash!', d: city.tiles[stepAt().tile].d, ot: R.ot ? 1 : 0, manual: R.manual ? 1 : 0, lvl: St.S.lvl, veh: St.S.active });
     if (R.ot) R.ot.clean = false;
     flowBreak();
@@ -530,14 +488,16 @@ export function createRide(ctx) {
       if (best == null) { E.ev = { ...ev, actor: null, pre: 0 }; return; }
       E.s = best;
     }
+    // a parked car is solid for a rider steering freely
+    const solid = (p) => ({ x: p.x, z: p.z, c: Math.cos(p.h), s: Math.sin(p.h), hx: 0.95, hz: 2.2 });
     if (ev.actor === 'door') {
-      const car = makeDoorCar(rng() < 0.5 ? 'sedan' : 'taxi');
-      place(car.obj, along(E.s + ev.pre, 2.9));
-      E.prop = addActor({ obj: car.obj, s: E.s + ev.pre, car, update: (dt) => car.animate(dt) });
+      const car = makeDoorCar(rng() < 0.5 ? 'sedan' : 'taxi'), p = along(E.s + ev.pre, 2.9);
+      place(car.obj, p);
+      E.prop = addActor({ obj: car.obj, s: E.s + ev.pre, car, solid: solid(p), update: (dt) => car.animate(dt) });
     } else if (ev.actor === 'police') {
-      const car = makePoliceCar();
-      place(car.obj, along(E.s + ev.pre, 2.9));
-      const a = E.prop = addActor({ obj: car.obj, objs: [car.obj], s: E.s + ev.pre, car, update(dt) { car.animate(dt); if (a.cop) { a.cop.mixer.update(dt); a.walk?.(dt); } } });
+      const car = makePoliceCar(), p = along(E.s + ev.pre, 2.9);
+      place(car.obj, p);
+      const a = E.prop = addActor({ obj: car.obj, objs: [car.obj], s: E.s + ev.pre, car, solid: solid(p), update(dt) { car.animate(dt); if (a.cop) { a.cop.mixer.update(dt); a.walk?.(dt); } } });
       makePerson('male-c').then((cop) => { if (!actors.includes(a)) return; a.cop = cop; a.objs.push(cop.obj); place(cop.obj, along(E.s + ev.pre - 3.5, 0.3), 0, ROAD_Y, Math.PI); });
     } else if (ev.actor === 'works') {
       const h = { type: 'barrier', s: E.s + ev.pre, lane: 1, tile: stepAt().tile };
@@ -658,8 +618,11 @@ export function createRide(ctx) {
     if (ribbon) ribbon.visible = false;
     ctx.audio?.engine(false);
     const lot = city.lots[leg.lot];
-    // (a scene at the spot we already stood on keeps the tile and heading we had)
-    if (!R.here) { R.curTile = R.route.steps[R.route.steps.length - 1].tile; R.curDir = R.route.steps[R.route.steps.length - 1].din; }
+    ringMk.visible = false;
+    // (a scene at the spot we already stood on keeps the tile and heading we had; riding freely, wherever the bike stopped)
+    const rt = R.manual ? world.routeTile(F.x, F.z, true) : -1;
+    if (rt >= 0) { R.curTile = rt; R.curDir = cardinal(F.h); }
+    else if (!R.here) { R.curTile = R.route.steps[R.route.steps.length - 1].tile; R.curDir = R.route.steps[R.route.steps.length - 1].din; }
     // where the NPC comes from: the lot's front tile edge
     const door = city.tiles[lot.doorFrom];
     const f = DIRS[lot.front];
@@ -749,13 +712,14 @@ export function createRide(ctx) {
     R.camMode = 'scene';
     const mx = (b.x + dx) / 2, mz = (b.z + dz) / 2;
     // stand on the road side, look at the bike + door
-    const hx = Math.sin(R.sampled[2]), hz = Math.cos(R.sampled[2]);
+    const hx = Math.sin(R.bike.root.rotation.y), hz = Math.cos(R.bike.root.rotation.y);
     const sx = dx - b.x, sz = dz - b.z; const sl = Math.hypot(sx, sz) || 1;
     R.sceneCam = { pos: new THREE.Vector3(mx - sx / sl * 7.5 - hx * 3.5, 3.4, mz - sz / sl * 7.5 - hz * 3.5), look: new THREE.Vector3(mx, 1.3, mz) };
   }
 
   function finish() {
     R.phase = 'done'; R.active = false;
+    leaveFree();
     pfx.clear(); pfx.clearSkids(); clearActors(); R.dodge = null; R.dodgeLat = 0; R.stall = false; R.wobble = 0;
     if (ribbon) { ribbon.removeFromParent(); ribbon = null; }
     for (const h of R.hazards) freeHazard(h); R.hazards = [];
@@ -771,6 +735,7 @@ export function createRide(ctx) {
     if (ribbon) { ribbon.removeFromParent(); ribbon = null; }
     for (const h of R.hazards) freeHazard(h); R.hazards = [];
     if (npc) { npc.c.obj.removeFromParent(); npc = null; }
+    leaveFree();
     R.active = false; R.phase = 'idle'; traffic.removeAgent(agent); R.bike?.root.removeFromParent(); ctx.audio?.engine(false);
   }
 
@@ -790,10 +755,11 @@ export function createRide(ctx) {
           x.heat = Math.max(0, x.heat - rate * dt);
         }
       }
-      drive(dt);
+      if (R.manual) freeDrive(dt); else drive(dt);
     }
     if (R.phase !== 'ride') { R.accS *= Math.exp(-dt * 6); R.load = 0; R.slip = 0; }
-    if (R.bike) R.bike.update(dt, R.v, R.lean, R.steer, R.accS);
+    if (R.bike) R.bike.update(dt, R.manual && F.fv < 0 ? F.fv : R.v, R.lean, R.steer, R.accS);
+    if (ringMk.visible) { const p = 0.5 + 0.5 * Math.sin(R.rideTime * 4.5); ringMk.userData.mat.opacity = 0.55 + 0.35 * p; ringMk.userData.wmat.opacity = 0.28 + 0.2 * p; }
     if (ctx.renderer) pfx.update(dt, camera, ctx.renderer);
     updateActors(dt);
     camUpdate(dtReal);
@@ -821,8 +787,7 @@ export function createRide(ctx) {
     const toEnd = route.length - R.s;
     target = Math.min(target, Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4)), Math.max(0, toEnd - 0.4) * 3.2);
     let blockedBy = null;
-    if (R.manual) updateJunction();
-    if (!R.ot && !R.manual) {
+    if (!R.ot) {
       const L = leaderAhead();
       if (L.gap < 40) { const vt = stopV(L.gap - 2.4); if (vt < target) { target = vt; blockedBy = L.gap < 14 ? 'car' : null; } }
       const B = blockingHazard();
@@ -843,9 +808,7 @@ export function createRide(ctx) {
     }
     const L2 = nextLight();
     R.light = L2;
-    // a rider who doesn't stop at a red simply runs it (cross traffic and the camera still apply)
-    if (R.manual && L2 && L2.state !== 'g' && L2.tile !== R.runLight && L2.d < 0.5 && R.v > 1.5) { R.runLight = L2.tile; R.runLightState = L2.state; if (L2.state === 'r') ctx.ui.toast('Running the red!', 'warn'); }
-    if (!R.manual && L2 && L2.tile !== R.runLight && L2.state !== 'g') {
+    if (L2 && L2.tile !== R.runLight && L2.state !== 'g') {
       if (!(L2.state === 'y' && L2.d < R.v * 0.8)) { target = Math.min(target, stopV(L2.d)); if (L2.d < 18) blockedBy = blockedBy || 'light'; }
     }
     const hold = R.wait > 0 || R.crash > 0;
@@ -856,32 +819,22 @@ export function createRide(ctx) {
     const vBefore = R.v;
     const acc = R.vs.accel * (R.boost ? 1.7 : 1);
     R.slip = 0;
-    if (R.manual) manualSpeed(dt, top, corner, toEnd, acc, hold);
-    else autoSpeed(dt, target, top, acc);
-    // what the body, camera and engine feel: acceleration smoothed over a few frames
-    const aNow = THREE.MathUtils.clamp((R.v - vBefore) / Math.max(dt, 1e-4), -14, 9);
-    R.accS += (aNow - R.accS) * Math.min(1, dt * 7);
-    if (!R.hardBrake && R.accS < -8 && R.v > 4) { R.hardBrake = true; ctx.audio?.play('brake', { vol: 0.55, rate: 0.95 + Math.random() * 0.1 }); buzz(22); }
-    else if (R.hardBrake && R.accS > -3) R.hardBrake = false;
+    autoSpeed(dt, target, top, acc);
+    feel(dt, vBefore);
     const ds = R.v * dt;
     R.s += ds; R.meters += ds;
     if (R.v < 0.5) R.stats.stopT += dt;
-    // energy
-    if (R.boost) { R.stats.boostT += dt; R.energy -= 26 / R.fx.boostDur * dt; if (R.energy <= 0) { R.energy = 0; R.boost = false; } }
-    else R.energy = Math.min(R.energyMax, R.energy + 5.5 * R.fx.regen * dt);
+    energyTick(dt);
     // ---- overtake lateral motion ----
     if (R.ot) {
       const ot = R.ot;
       ot.time += dt;
       ot.t = Math.max(0, Math.min(1, ot.t + ot.dir * dt / (ot.slow ? 1.0 : 0.42)));
-      // the rider keeps the other lane until they steer back (or a corner comes up)
-      // a corner coming up sends the rider back to their lane — unless they're getting round something parked in it,
-      // which keeps them out until they're past (as the autopilot does)
+      // pull in to the kerb for the door, unless something parked still blocks our lane before it (then the autopilot
+      // stays out until it's past)
       const passing = R.hazards.some((h) => !h.done && h.lane >= 0 && h.type !== 'ped' && HZ[h.type].block && h.s + (HZ[h.type].len || 2) / 2 + 2 > R.s && h.s - R.s < 14);
-      if (ot.manual && ot.dir > 0 && !passing) { for (const a of R.arcs) { if (a.s1 < R.s) continue; if (a.s0 - R.s < 9) ot.dir = -1; break; } if (stepAt().alley) ot.dir = -1; }
-      // pull in to the kerb for the door, unless something parked still blocks our lane before it
       if (ot.dir > 0 && !ot.hz && route.length - R.s < 12 && !passing) ot.dir = -1;
-      if (ot.dir > 0 && ot.t >= 1 && !ot.manual) {
+      if (ot.dir > 0 && ot.t >= 1) {
         let until = R.s + 2;
         if (ot.car && ot.car.tile != null) {
           const k = route.steps.findIndex((x, i) => i >= R.sampled[3] && x.tile === ot.car.tile);
@@ -891,8 +844,7 @@ export function createRide(ctx) {
         if (R.s > until || ot.time > 7) ot.dir = -1;
       }
       if (ot.dir < 0 && ot.t <= 0) {
-        if (ot.manual) { if (ot.clean && ot.car && behind(ot.car)) { flow('OVERTAKE!'); R.stats.overtakes++; St.goalProgress('overtake'); } }
-        else if (ot.clean && !ot.slow) flow('OVERTAKE!');
+        if (ot.clean && !ot.slow) flow('OVERTAKE!');
         R.ot = null;
       }
       // head-on check
@@ -905,27 +857,15 @@ export function createRide(ctx) {
       for (const a of list) if (a.kind === 'car' && a.v > 1 && (a.din & 1) !== (st.din & 1) && Math.hypot(a.pos[0] - R.bike.root.position.x, a.pos[1] - R.bike.root.position.z) < 3.2) { crash('T-boned at the junction!'); a.wait = 2; break; }
       if (!R.lightJudged) { R.lightJudged = true; if (R.runLightState === 'r' && rng() < 0.22) { const fine = Math.round(3 + 4 * (DISTRICT[city.tiles[st.tile].d]?.pay || 1)); R.fines += fine; ctx.audio?.play('camera-shutter'); ctx.ui.toast(`Red-light camera! −$${fine}`, 'bad'); } }
     } else if (R.runLight >= 0 && route.steps[R.sampled[3]].s0 > 0 && st.tile !== R.runLight && R.lightJudged) { if (R.runLightState === 'r' && R.crash <= 0) flow('RED RUNNER!'); R.runLight = -1; R.lightJudged = false; }
-    // ---- hop ----
-    let y = 0;
-    if (R.hop) {
-      R.hop.t += dt;
-      const f = R.hop.t / R.hop.T;
-      y = 4 * 1.05 * f * (1 - f);
-      if (f >= 1) {
-        y = 0; if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land);
-        ctx.audio?.play('land'); kick(R.hop.perfect ? 0.6 : 1); buzz(15);
-        const p = R.bike.root.position; pfx.hopLand(p.x, p.z, R.hop.perfect);
-        if (R.hop.perfect) flow('PERFECT HOP!');
-        R.hop = null;
-      }
-    }
+    const y = hopTick(dt);
     // ---- hazards ----
     for (const h of R.hazards) {
       if (h.done) continue;
       const d = h.s - R.s;
+      h.ahead = d; h.inPath = h.lane >= 0;
       if (h.spin) h.spin.rotation.y += dt * 3;
       if (h.blink) { const on = (performance.now() / 400 | 0) % 2 === 0; for (const l of h.blink) l.visible = on; }
-      if (h.type === 'ped') updatePed(h, d, dt);
+      if (h.type === 'ped') updatePed(h, d < 32 && d > 4, dt);
       const inMyLane = h.lane === 0 || (h.lane > 0 && (!R.ot || R.ot.t < 0.5)) || (h.lane < 0 && R.ot && R.ot.t > 0.5);
       if (Math.abs(d) < 1.2) {
         const H = HZ[h.type];
@@ -952,12 +892,7 @@ export function createRide(ctx) {
       }
       if (d < -25) { h.done = true; freeHazard(h); }
     }
-    if (ribbon) ribbon.userData.setWindow(R.s + 2.5, R.s + 55, 52);
-    coach(dt);
-    // ---- shortcut offer ----
-    if (!R.offerT || performance.now() - R.offerT > 400) { R.offerT = performance.now(); R.offer = shortcutOffer(); }
-    // ---- event ----
-    if (R.event && !R.event.fired && R.s > R.event.s && R.crash <= 0) runEvent(R.event.ev);
+    routeTick(dt);
     // ---- pose ----
     // the path is a smooth chain of lines and circular arcs: heading is its tangent, lean follows the physics
     // of a turning bike (tan lean = v² κ / g), started a little early so the rider leans into the corner.
@@ -988,16 +923,53 @@ export function createRide(ctx) {
     const leanAngle = Math.atan(R.v * R.v * kap / 9.81) * 0.85 - R.yawOff * 1.4;
     R.lean = -THREE.MathUtils.clamp(leanAngle, -0.5, 0.5);
     R.steer = THREE.MathUtils.clamp(-Math.atan(1.4 * kap) * 1.3 + R.yawOff * 1.2, -0.45, 0.45);
+    R.kap = R.sampled[4];
+    poseTick(dt, ds, (vBefore - R.v) / Math.max(dt, 1e-4));
+    // ---- arrival ----
+    if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0 && !R.eventCam && !R.hop) arrive();
+  }
+  // ---- shared by both ways of riding ----
+  // what the body, camera and engine feel: acceleration smoothed over a few frames
+  function feel(dt, vBefore) {
+    const aNow = THREE.MathUtils.clamp((R.v - vBefore) / Math.max(dt, 1e-4), -14, 9);
+    R.accS += (aNow - R.accS) * Math.min(1, dt * 7);
+    if (!R.hardBrake && R.accS < -8 && R.v > 4) { R.hardBrake = true; ctx.audio?.play('brake', { vol: 0.55, rate: 0.95 + Math.random() * 0.1 }); buzz(22); }
+    else if (R.hardBrake && R.accS > -3) R.hardBrake = false;
+  }
+  function energyTick(dt) {
+    if (R.boost) { R.stats.boostT += dt; R.energy -= 26 / R.fx.boostDur * dt; if (R.energy <= 0) { R.energy = 0; R.boost = false; } }
+    else R.energy = Math.min(R.energyMax, R.energy + 5.5 * R.fx.regen * dt);
+  }
+  // the hop's arc (m above the road) and its landing
+  function hopTick(dt) {
+    if (!R.hop) return 0;
+    R.hop.t += dt;
+    const f = R.hop.t / R.hop.T;
+    if (f < 1) return 4 * 1.05 * f * (1 - f);
+    if (!R.hop.perfect && R.orders.some((x) => x.picked && !x.done)) hurtFood(2.5 * R.vs.land);
+    ctx.audio?.play('land'); kick(R.hop.perfect ? 0.6 : 1); buzz(15);
+    const p = R.bike.root.position; pfx.hopLand(p.x, p.z, R.hop.perfect);
+    if (R.hop.perfect) flow('PERFECT HOP!');
+    R.hop = null;
+    return 0;
+  }
+  // the GPS line, the coach, a shortcut on offer, an event coming up
+  function routeTick(dt) {
+    if (ribbon) ribbon.userData.setWindow(R.s + 2.5, R.s + 55, 52);
+    coach(dt);
+    if (!R.offerT || performance.now() - R.offerT > 400) { R.offerT = performance.now(); R.offer = shortcutOffer(); }
+    if (R.event && !R.event.fired && R.s > R.event.s && R.crash <= 0) runEvent(R.event.ev);
+  }
+  function poseTick(dt, ds, decel) {
+    const b = R.bike.root;
     if (R.crash > 0) { b.rotation.z = Math.sin(R.crash * 20) * 0.1 * R.crash; }
     else if (R.wobble > 0) { R.wobble -= dt; b.rotation.z = Math.sin(R.rideTime * 26) * 0.07 * Math.min(1, R.wobble); }
     else b.rotation.z = 0;
-    emit(dt, ds, (vBefore - R.v) / Math.max(dt, 1e-4));
+    emit(dt, ds, decel);
     nearMisses(dt);
     if (R.flow.n > 0) { R.flow.t -= dt; if (R.flow.t <= 0) { R.flow.n = 0; R.flow.mult = 1; } }
     if (R.bike.pose) R.bike.pose.tuck = R.boost ? 1 : 0;
     if (R.slowmo > 0) { R.slowmo -= dt / Math.max(0.05, R.timeScale); if (R.slowmo <= 0 && !document.querySelector('.evdock')) R.timeScale = 1; }
-    // ---- arrival ----
-    if (toEnd < 0.6 && R.v < 0.6 && R.crash <= 0 && !R.eventCam && !R.hop) arrive();
   }
   // braking target that eases the last metre in instead of planting the bike on the line
   const stopV = (d) => (d <= 0 ? 0 : Math.min(Math.sqrt(2 * B_DEC * d), d * 3.2));
@@ -1020,49 +992,395 @@ export function createRide(ctx) {
       R.load += (0 - R.load) * Math.min(1, dt * 10);
     }
   }
-  // the rider's pedals: gas, brake or coast; corners taken too fast slide or crash; the bumper and parked cars are real
-  function manualSpeed(dt, top, corner, toEnd, acc, hold) {
-    const c = R.ctl;
-    let a;
-    if (hold) a = -14;
-    else if (c.brake) a = -9.5;
-    else if (c.gas || R.boost) a = R.v < top ? acc * (1 - 0.5 * (R.v / top) ** 2) : -3;
-    else a = -(0.8 + 0.01 * R.v * R.v); // rolling resistance and drag
-    R.load += ((hold || c.brake ? 0 : c.gas || R.boost ? 1 : 0.12) - R.load) * Math.min(1, dt * 10);
-    R.v = Math.max(0, R.v + a * dt);
-    // the last metres to the door ride themselves: brake so a delivery never overshoots, and roll up to the door if
-    // the rider stopped a little short (unless they're holding the brake)
-    const endCap = Math.sqrt(2 * B_DEC * 0.8 * Math.max(0, toEnd - 0.4));
-    if (R.v > endCap) R.v = Math.max(endCap, R.v - 11 * dt);
-    if (toEnd < 9 && !c.brake && !hold && R.crash <= 0) R.v = Math.min(endCap, Math.max(R.v, Math.min(2.5, R.v + 4 * dt)));
-    R.skidCd = Math.max(0, R.skidCd - dt);
-    R.cornerWarn = false;
-    for (const ar of R.arcs) {
-      if (ar.s1 < R.s) continue;
-      if (ar.s0 > R.s + 24) break;
-      const vt = Math.sqrt(A_LAT * corner * ar.r);
-      if (ar.s0 > R.s) { if (R.v > vt * 1.12) R.cornerWarn = true; continue; }
-      R.slip = R.v / vt;
-      if (R.v > vt * 1.55 && R.crash <= 0) { crash('Way too fast for that corner!'); break; }
-      if (R.v > vt * 1.2 && R.skidCd <= 0) {
-        R.skidCd = 1.2; R.v = vt * 1.05; R.wobble = 0.8; hurtFood(6); flowBreak(); R.stats.skids++;
-        ctx.audio?.play('skid', { vol: 0.6 }); ctx.ui.toast('Too fast! Brake before corners', 'warn');
-        const b = R.bike.root.position, h = R.bike.root.rotation.y;
-        for (let i = 0; i < 4; i++) pfx.skidMark(b.x - Math.sin(h) * i * 0.4, b.z - Math.cos(h) * i * 0.4, h + 0.3);
+  // ======================================================================================================
+  // Free riding (desktop): the rider steers anywhere the city lets a scooter go; the route is only the GPS
+  // ======================================================================================================
+  // F: where the bike is and how it moves. h = where it points, fv = speed along it (negative = reversing),
+  // beta = slide angle (the way it actually travels is h − beta), steer = handlebar angle, yawV = how fast the
+  // direction of travel turns (what the rider leans against)
+  const F = { x: 0, z: 0, h: 0, fv: 0, beta: 0, steer: 0, yawV: 0, demand: 0, y: ROAD_Y, surf: 'asphalt', tile: -1, revT: 0, load: 0,
+    offT: 0, wrongT: 0, gpsT: 0, ringIn: false, told: false, slide: false, slideCd: 0, curbCd: 0, bumpCd: 0, skid: 0, alley: null, hit: null };
+  const WB = 1.3, BIKE_R = 0.42, BIKE_HALF = 0.6; // wheelbase; the bike's two collision circles, ahead of and behind its middle
+  const blocker = { x: 0, z: 0, r: 0.7 }; // where traffic sees the bike
+  const contacts = [], pj = [0, 0, 0, 0, 0];
+  const toward = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
+  const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+  // the compass direction nearest a heading (0 = +Z south, π/2 = +X east)
+  const cardinal = (h) => [2, 1, 0, 3][(((Math.round(h / (Math.PI / 2))) % 4) + 4) % 4];
+  function initFree() {
+    const b = R.bike.root;
+    Object.assign(F, { x: b.position.x, z: b.position.z, h: b.rotation.y, fv: 0, beta: 0, steer: 0, yawV: 0, y: b.position.y, revT: 0, load: 0, offT: 0, wrongT: 0, gpsT: 0, slide: false, curbCd: 0, bumpCd: 0, alley: null, hit: null });
+    F.surf = world.surface(F.x, F.z); F.tile = world.tileAt(F.x, F.z)?.i ?? -1;
+    agent.tile = -1; // traffic finds the bike through its blockers, not the road graph
+    blocker.x = F.x; blocker.z = F.z;
+    if (!traffic.blockers.includes(blocker)) traffic.blockers.push(blocker);
+    for (const a of traffic.agents) a.passT = 0;
+  }
+  function leaveFree() {
+    const i = traffic.blockers.indexOf(blocker); if (i >= 0) traffic.blockers.splice(i, 1);
+    ringMk.visible = false;
+    R.ctl.left = R.ctl.right = false;
+  }
+  // the stop at the door: a ring on the street in front of the building, over both lanes and the sidewalk
+  const RING_R = 4.6;
+  function legRing(leg) {
+    const lot = city.lots[leg.lot], t = city.tiles[lot.door], f = DIRS[lot.front];
+    return { x: t.x * TILE - f[0] * 2.2, z: t.z * TILE - f[1] * 2.2 };
+  }
+  const ringMk = (() => {
+    const g = new THREE.Group();
+    const rg = new THREE.RingGeometry(RING_R - 0.4, RING_R, 56); rg.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffb238, transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false });
+    const ring = new THREE.Mesh(rg, mat); ring.position.y = 0.23; ring.renderOrder = 2;
+    // a soft wall of light rising from the ring, fading upward
+    const cv = document.createElement('canvas'); cv.width = 4; cv.height = 64;
+    const c2 = cv.getContext('2d'), gr = c2.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#000'); gr.addColorStop(1, '#fff'); c2.fillStyle = gr; c2.fillRect(0, 0, 4, 64);
+    const wmat = new THREE.MeshBasicMaterial({ color: 0xffb238, alphaMap: new THREE.CanvasTexture(cv), transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, blending: THREE.AdditiveBlending });
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(RING_R, RING_R, 2.4, 56, 1, true), wmat); wall.position.y = 1.4;
+    g.add(ring, wall); g.visible = false; g.userData = { mat, wmat };
+    return g;
+  })();
+
+  function freeDrive(dt) {
+    if (R.here) { R.v = 0; F.fv = 0; arrive(); R.here = false; return; } // arrive() reads R.here before its first await
+    // something else changed the speed (a crash, a pothole, the scene at the door): carry it into the bike's motion
+    if (Math.abs(Math.abs(F.fv) - R.v) > 1e-6) F.fv = (F.fv < 0 ? -1 : 1) * R.v;
+    const hold = R.wait > 0 || R.crash > 0;
+    if (R.wait > 0) R.wait -= dt;
+    if (R.crash > 0) R.crash -= dt;
+    const vBefore = R.v, px = F.x, pz = F.z;
+    // ---- physics, in sub-steps short enough that a lamp post can't be skipped ----
+    F.hit = null;
+    const n = Math.min(8, Math.max(1, Math.ceil(Math.abs(F.fv) * dt / 0.35)));
+    for (let i = 0; i < n; i++) freeStep(dt / n, hold);
+    if (F.hit) impact(F.hit);
+    R.v = Math.abs(F.fv);
+    R.load += (F.load - R.load) * Math.min(1, dt * 10);
+    feel(dt, vBefore);
+    const ds = Math.hypot(F.x - px, F.z - pz);
+    R.meters += ds;
+    if (R.v < 0.5) R.stats.stopT += dt;
+    energyTick(dt);
+    blocker.x = F.x; blocker.z = F.z;
+    // ---- the street under the wheels, the tile we're on, the GPS ----
+    groundTick(dt);
+    gpsTick(dt);
+    R.light = nextLight();
+    const y = hopTick(dt);
+    freeHazards(dt, y, px, pz);
+    passes();
+    routeTick(dt);
+    // ---- pose: heading is where the bike points; lean follows the turn it's actually making (tan lean = a / g) ----
+    const b = R.bike.root;
+    b.position.set(F.x, F.y + y, F.z);
+    b.rotation.y = F.h;
+    R.lean = THREE.MathUtils.clamp(Math.atan(F.fv * F.yawV / 9.81) * 0.85, -0.5, 0.5);
+    const inp = (R.ctl.left ? 1 : 0) - (R.ctl.right ? 1 : 0);
+    R.steer = THREE.MathUtils.clamp(F.steer + (R.v < 2 ? inp * 0.35 * (1 - R.v / 2) : 0), -0.45, 0.45);
+    R.kap = -F.yawV / Math.max(0.5, R.v);
+    slideTick(dt, ds);
+    poseTick(dt, ds, (vBefore - R.v) / Math.max(dt, 1e-4));
+    // ---- the door: stop inside the ring ----
+    const rd = Math.hypot(F.x - R.ring.x, F.z - R.ring.z), inR = rd < RING_R;
+    if (inR && !F.ringIn && !F.told && R.v > 3) { F.told = true; ctx.ui.toast(R.job.legs[R.leg].kind === 'pickup' ? 'Stop here to pick up' : 'Stop here to deliver', ''); }
+    F.ringIn = inR;
+    ringMk.visible = true; ringMk.position.set(R.ring.x, 0, R.ring.z);
+    if (inR && R.v < 0.8 && !R.ctl.gas && R.crash <= 0 && !R.eventCam && !R.hop) arrive();
+  }
+
+  function freeStep(dt, hold) {
+    const c = R.ctl, vs = R.vs, grass = F.surf === 'grass';
+    const top = vs.top * (R.boost ? 1.45 * vs.boost : 1) * (grass ? 0.6 : 1);
+    const acc = vs.accel * (R.boost ? 1.7 : 1);
+    let fv = F.fv;
+    // ---- pedals: gas, brake, and (still holding the brake once stopped) reverse ----
+    F.load = 0;
+    if (hold) fv = toward(fv, 0, 14 * dt);
+    else if (c.brake && fv > 0.3) { fv = toward(fv, 0, 9.5 * dt); F.revT = 0; }
+    else if (c.brake) { F.revT += dt; if (F.revT > 0.3) { fv = Math.max(-2.8, fv - 2.6 * dt); F.load = 0.45; } else fv = toward(fv, 0, 9.5 * dt); }
+    else if ((c.gas || R.boost) && fv < -0.2) fv = toward(fv, 0, 9.5 * dt);
+    else if (c.gas || R.boost) { fv = fv < top ? Math.min(top, fv + acc * (1 - 0.5 * (Math.max(0, fv) / top) ** 2) * dt) : Math.max(top, fv - 3 * dt); F.load = 1; }
+    else { fv = toward(fv, 0, (0.8 + 0.01 * fv * fv + (grass ? 2.2 : 0)) * dt); F.load = 0.12; }
+    if (!c.brake) F.revT = 0;
+    // inside the door's ring with the gas off, the bike pulls up by itself
+    if (F.ringIn && !c.gas && !R.boost && fv > 0) fv = toward(fv, 0, 6 * dt);
+    // ---- steering: full lock gets smaller with speed, so the tightest turn at any speed sits just past the grip ----
+    const inp = hold && R.crash > 0 ? 0 : (c.left ? 1 : 0) - (c.right ? 1 : 0);
+    const v = Math.abs(fv);
+    const grip = 11 * vs.corner * (R.boost ? 1.22 : 1) * (1 - 0.2 * (ctx.weather?.rain || 0)) * (grass ? 0.7 : 1);
+    const lock = Math.min(0.6, Math.atan(1.15 * grip * WB / Math.max(1, v * v)));
+    F.steer = toward(F.steer, inp * lock, (inp ? 3.2 : 5.5) * dt);
+    let yaw = fv * Math.tan(F.steer) / WB;
+    // at walking pace the rider just turns the bike round with their feet (backing up, the nose swings the other way)
+    if (v < 2) { const k = v / 2; yaw = yaw * k + inp * 1.3 * (1 - k) * (fv < -0.05 ? -1 : 1); }
+    F.demand = Math.abs(fv * yaw) / grip;
+    // ---- grip: the tyres turn the bike's travel only as hard as they hold; beyond that it slides ----
+    const b0 = F.beta;
+    if (fv > 2) {
+      const maxYv = grip / fv;
+      const yawV = THREE.MathUtils.clamp(yaw + F.beta * 5, -maxYv, maxYv);
+      let beta = F.beta + (yaw - yawV) * dt;
+      if (Math.abs(beta) > 0.6) { const lim = Math.sign(beta) * 0.6; yaw -= (beta - lim) / dt; beta = lim; }
+      F.beta = beta;
+      fv = Math.max(0, fv - Math.abs(beta) * 7 * dt); // a sliding tyre scrubs speed
+    } else F.beta = toward(F.beta, 0, 2.5 * dt);
+    F.yawV = yaw - (F.beta - b0) / dt;
+    F.h = wrap(F.h + yaw * dt);
+    const th = F.h - F.beta;
+    F.x += fv * Math.sin(th) * dt; F.z += fv * Math.cos(th) * dt;
+    F.fv = fv;
+    collideBike();
+  }
+
+  // ---- what the bike runs into: buildings, street furniture, cars, people; push out, lose the speed going into it ----
+  const CRASH_AT = { wall: 7, pole: 6.5, small: 6, person: 2.4, car: 4.5, parked: 4.5 };
+  function contact(h, ovx, ovz, info) {
+    F.x += h.nx * h.depth; F.z += h.nz * h.depth;
+    const th = F.h - F.beta;
+    let vx = F.fv * Math.sin(th), vz = F.fv * Math.cos(th);
+    const rel = (vx - ovx) * h.nx + (vz - ovz) * h.nz; // < 0: closing on it
+    if (rel >= 0) return;
+    vx -= rel * h.nx; vz -= rel * h.nz;
+    // what's left of the motion, along the way the bike points (the tyres don't roll sideways)
+    F.fv = vx * Math.sin(F.h) + vz * Math.cos(F.h);
+    F.beta *= 0.5;
+    if (!F.hit || -rel > F.hit.imp) F.hit = { imp: -rel, kind: info.kind, what: info.what, car: info.car || null, by: info.by || false };
+  }
+  const hz2 = { kind: 'parked' }, carInfo = { kind: 'car' };
+  const pedInfo = { kind: 'person', what: 'ped' }, walkerInfo = { kind: 'person', what: 'walker' }, round = { nx: 0, nz: 0, depth: 0 };
+  // a round obstacle (a person) against the circle at cx, cz
+  function person(cx, cz, x, z, r, info) {
+    const dx = cx - x, dz = cz - z, d = Math.hypot(dx, dz);
+    if (d >= BIKE_R + r || d < 1e-4) return;
+    round.nx = dx / d; round.nz = dz / d; round.depth = BIKE_R + r - d;
+    contact(round, 0, 0, info);
+  }
+  function collideBike() {
+    const fx = Math.sin(F.h), fz = Math.cos(F.h);
+    let cx = 0, cz = 0;
+    for (let it = 0; it < 2; it++) for (const o of [BIKE_HALF, -BIKE_HALF]) {
+      const at = () => { cx = F.x + fx * o; cz = F.z + fz * o; }; // every push moves the bike: measure again
+      at();
+      for (const h of world.hits(cx, cz, BIKE_R, contacts)) { contact(h, 0, 0, h); at(); }
+      // traffic: cars and the fleet's couriers
+      for (const a of traffic.agents) {
+        if (a === agent || (a.kind !== 'car' && a.kind !== 'rider')) continue;
+        const dx = a.pos[0] - cx, dz = a.pos[1] - cz;
+        if (dx * dx + dz * dz > 36) continue;
+        const ah = a.pos[2], h = boxHit(cx, cz, BIKE_R, a.pos[0], a.pos[1], a.kind === 'rider' ? 0.4 : 0.95, a.len / 2, Math.cos(ah), Math.sin(ah));
+        if (!h) continue;
+        const ovx = Math.sin(ah) * a.v, ovz = Math.cos(ah) * a.v;
+        carInfo.car = a; carInfo.by = ovx * h.nx + ovz * h.nz > 2; carInfo.what = a.kind;
+        contact(h, ovx, ovz, carInfo); at();
       }
-      break;
-    }
-    if (R.crash > 0 || (R.ot && R.ot.t > 0.5)) return;
-    const L = leaderAhead();
-    if (L.who && L.gap < 0.35 && R.v > L.who.v + 2) crash('Rear-ended a car!');
-    else if (L.who && L.gap < 0.8) R.v = Math.min(R.v, L.who.v);
-    const B = blockingHazard();
-    if (B.h && B.d < 0.15 && (B.h.type === 'parked' || B.h.type === 'ped')) {
-      if (R.v > 2) crash(B.h.type === 'ped' ? 'Watch out for pedestrians!' : 'Hit a parked car!');
-      else R.v = 0; // nose to it: steer out (A) to get round
+      // double-parked cars, an event's parked car, someone crossing, people walking the sidewalks
+      for (const z of R.hazards) {
+        if (z.type === 'parked') { const h = boxHit(cx, cz, BIKE_R, z.x, z.z, 0.95, 2.2, Math.cos(z.hd), Math.sin(z.hd)); if (h) { contact(h, 0, 0, hz2); at(); } }
+        else if (z.type === 'ped' && z.ped && !z.done) { const p = z.obj.position; person(cx, cz, p.x, p.z, 0.38, pedInfo); at(); }
+      }
+      for (const a of actors) if (a.solid) { const S = a.solid, h = boxHit(cx, cz, BIKE_R, S.x, S.z, S.hx, S.hz, S.c, S.s); if (h) { contact(h, 0, 0, hz2); at(); } }
+      for (const p of ctx.peds?.peds || []) {
+        const q = p.c.obj.position;
+        if (Math.abs(cx - q.x) > 1 || Math.abs(cz - q.z) > 1) continue;
+        person(cx, cz, q.x, q.z, 0.32, walkerInfo); at();
+      }
     }
   }
-  const behind = (a) => { const b = R.bike.root.position, h = R.bike.root.rotation.y; return (a.pos[0] - b.x) * Math.sin(h) + (a.pos[1] - b.z) * Math.cos(h) < -1.5; };
+  function impact(h) {
+    if (R.crash > 0) return;
+    if (h.imp > CRASH_AT[h.kind]) {
+      const why = h.kind === 'person' ? 'Watch out for pedestrians!' : h.kind === 'car' ? (h.by ? 'Hit by a car!' : 'Crashed into a car!')
+        : h.kind === 'parked' ? 'Hit a parked car!' : h.kind === 'pole' ? (/tree|palm/.test(h.what) ? 'Hit a tree!' : 'Hit a pole!') : h.kind === 'small' ? 'Wiped out on the sidewalk!' : 'Hit a wall!';
+      crash(why);
+      if (h.car) h.car.wait = 2;
+    } else if (h.imp > 2.2 && F.bumpCd <= 0) {
+      F.bumpCd = 0.4;
+      hurtFood(Math.min(8, h.imp * 0.9));
+      ctx.audio?.play('bump', { vol: Math.min(1, h.imp / 6) });
+      pfx.bump(F.x + Math.sin(F.h) * 0.9, F.z + Math.cos(F.h) * 0.9);
+      if (h.imp > 4) flowBreak();
+    }
+  }
+
+  // ---- kerbs, grass, red lights, alleys ----
+  function groundTick(dt) {
+    const s = world.surface(F.x, F.z);
+    F.curbCd -= dt; F.bumpCd -= dt;
+    if (s !== F.surf) {
+      // up or down a kerb: a jolt through the springs, and a knock to the food if taken fast
+      if (Math.abs(GROUND[s] - GROUND[F.surf]) > 0.05 && R.v > 2.5 && F.curbCd <= 0 && !R.hop) {
+        F.curbCd = 0.3; kick(Math.min(1, 0.25 + R.v / 16));
+        if (R.v > 7) hurtFood(1 + R.v * 0.15); else ctx.audio?.play('bump', { vol: 0.3 });
+      }
+      F.surf = s;
+    }
+    F.y += (GROUND[s] - F.y) * Math.min(1, dt * 18);
+    // grass shakes the bike about
+    if (s === 'grass' && R.v > 3 && Math.random() < dt * R.v * 0.4) R.bike.bump?.(0.15 + Math.random() * 0.2);
+    const t = world.tileAt(F.x, F.z), ti = t ? t.i : -1;
+    if (ti !== F.tile) { onTile(F.tile, ti); F.tile = ti; }
+  }
+  function onTile(prev, next) {
+    const t = next >= 0 ? city.tiles[next] : null;
+    // out of a junction we ran on red, still in one piece
+    if (R.runLight >= 0 && prev === R.runLight) { if (R.runLightState === 'r' && R.crash <= 0) flow('RED RUNNER!'); R.runLight = -1; }
+    // into a junction whose light is red for the way we came in
+    if (t && t.k === K.ROAD && traffic.lightAt.has(next) && R.v > 1.5) {
+      let din = prev >= 0 ? dirBetween(city, prev, next) : -1;
+      if (din < 0) din = cardinal(F.h);
+      if (traffic.light(next, din) === 'r') {
+        R.runLight = next; R.runLightState = 'r';
+        ctx.ui.toast('Running the red!', 'warn');
+        if (rng() < 0.22) { const fine = Math.round(3 + 4 * (DISTRICT[t.d]?.pay || 1)); R.fines += fine; ctx.audio?.play('camera-shutter'); ctx.ui.toast(`Red-light camera! −$${fine}`, 'bad'); }
+      }
+    }
+    // through an alley from one street to the next: that's a shortcut
+    const pt = prev >= 0 ? city.tiles[prev] : null;
+    if (t && t.k === K.ALLEY && pt && pt.k === K.ROAD) F.alley = { sc: t.sc, from: prev };
+    else if (t && t.k === K.ROAD && F.alley) {
+      const sc = city.shortcuts[F.alley.sc];
+      if (pt && pt.k === K.ALLEY && sc.ends.includes(next) && next !== F.alley.from && R.crash <= 0) { R.stats.shortcuts++; St.goalProgress('shortcut'); flow('SHORTCUT!'); }
+      F.alley = null;
+    }
+  }
+
+  // ---- GPS: the route is re-planned from wherever the rider takes the bike ----
+  // the closest point of the route near where the bike was last found
+  function project(span = 30) {
+    const route = R.route, L = route.length;
+    let best = R.s, bd = Infinity;
+    const s0 = Math.max(0, R.s - 12), s1 = Math.min(L, R.s + span);
+    const test = (s) => { sampleRoute(route, s, pj); const d = (pj[0] - F.x) ** 2 + (pj[1] - F.z) ** 2; if (d < bd) { bd = d; best = s; } };
+    for (let s = s0; s < s1; s += 1) test(s);
+    test(s1);
+    const c = best;
+    for (let s = Math.max(0, c - 1); s <= Math.min(L, c + 1); s += 0.1) test(s);
+    R.s = best;
+    sampleRoute(route, R.s, R.sampled);
+    return Math.sqrt(bd);
+  }
+  function gpsTick(dt) {
+    const off = project();
+    // well off the line, or riding against it for a while: the rider wants another way, so the GPS finds one
+    F.offT = off > 6.5 ? F.offT + dt : 0;
+    F.wrongT = Math.cos(F.h - R.sampled[2]) < -0.3 && F.fv > 1.5 ? F.wrongT + dt : 0;
+    F.gpsT -= dt;
+    if ((F.offT > 0.35 || F.wrongT > 1) && F.gpsT <= 0) regps();
+  }
+  function regps() {
+    F.gpsT = 1.2; F.offT = F.wrongT = 0;
+    const to = legTarget(R.job.legs[R.leg]);
+    const from = world.routeTile(F.x, F.z);
+    if (from < 0 || from === to) return;
+    const d = cardinal(F.h);
+    const path = findPath(city, from, to, { noBack: OPP(d) }) || findPath(city, from, to);
+    if (!path || path.length < 2) return;
+    adoptRoute(buildRoute(city, path, { startDir: d }));
+    R.stats.reroutes++;
+  }
+  // a new GPS route: hazards already in the street stay where they are, a few more get planned down the new way
+  function adoptRoute(route) {
+    R.route = route; R.arcs = routeArcs(route); R.s = 0; R.sampled[3] = 0;
+    project(40);
+    if (R.hazards.filter((h) => !h.done).length < 8) {
+      for (const h of planHazards(route, city, rng, { startS: R.s + 30 })) {
+        if (h.s < R.s + 35) continue;
+        h.obj = makeHazardMesh(h); placeHazard(h);
+        if (R.hazards.some((o) => Math.hypot(o.x - h.x, o.z - h.z) < 18)) { freeHazard(h); continue; }
+        scene.add(h.obj); R.hazards.push(h);
+      }
+    }
+    moveEvent();
+    setRibbon();
+    ctx.ui.routeChanged(R);
+  }
+
+  // ---- hazards are things in the street: ride into them, round them, or hop them ----
+  // [half-width across the road, half-length along it, ellipse?] around each hazard's middle
+  const HZ_SHAPE = { pothole: [1.05, 0.72, true], puddle: [1.75, 1.1, true], cones: [1.3, 0.55], barrier: [1.6, 0.5], crates: [0.95, 0.6], cash: [1.2, 1.2, true], energy: [1.2, 1.2, true] };
+  function freeHazards(dt, y, px, pz) {
+    const fx = Math.sin(F.h), fz = Math.cos(F.h), air = y > 0.3;
+    for (let i = R.hazards.length - 1; i >= 0; i--) {
+      const h = R.hazards[i];
+      const dx = h.x - F.x, dz = h.z - F.z, dist = Math.hypot(dx, dz);
+      if (dist > 110) { freeHazard(h); R.hazards.splice(i, 1); continue; }
+      if (h.done) continue;
+      h.ahead = dx * fx + dz * fz;
+      h.inPath = Math.abs(dx * fz - dz * fx) < (h.type === 'ped' ? 6 : 2);
+      if (h.spin) h.spin.rotation.y += dt * 3;
+      if (h.blink) { const on = (performance.now() / 400 | 0) % 2 === 0; for (const l of h.blink) l.visible = on; }
+      if (h.type === 'ped') { updatePed(h, dist < 30 && h.ahead > 3, dt); continue; }
+      const S = HZ_SHAPE[h.type]; if (!S) continue;
+      // the nearest the bike came to it this frame, in the hazard's own frame
+      const sx = F.x - px, sz = F.z - pz, sl = sx * sx + sz * sz;
+      const k = sl > 1e-6 ? Math.max(0, Math.min(1, ((h.x - px) * sx + (h.z - pz) * sz) / sl)) : 1;
+      const qx = px + sx * k - h.x, qz = pz + sz * k - h.z, c = Math.cos(h.hd), s = Math.sin(h.hd);
+      const lx = qx * c - qz * s, lz = qx * s + qz * c;
+      const hit = S[2] ? (lx / (S[0] + 0.3)) ** 2 + (lz / (S[1] + 0.3)) ** 2 < 1 : Math.abs(lx) < S[0] + 0.35 && Math.abs(lz) < S[1] + 0.35;
+      if (!hit) continue;
+      const H = HZ[h.type];
+      h.done = true;
+      if (H.pickup) {
+        h.obj.visible = false;
+        if (h.type === 'cash') { const n = Math.max(1, Math.round((1 + rng() * 2) * (St.S.lvl > 4 ? 2 : 1))); R.stats.cash += n; ctx.audio?.play('pickup-bonus'); ctx.ui.toast(`+$${n}`, 'cash'); pfx.cash(F.x, 1.2, F.z); buzz(12); if (R.flow.n > 0) { R.flow.n += 0.5; R.flow.t = FLOW_TIME; } }
+        else { R.energy = Math.min(R.energyMax, R.energy + 40); ctx.audio?.play('pickup-bonus', { rate: 1.3 }); ctx.ui.toast('+Energy', 'good'); pfx.energy(F.x, 1.2, F.z); buzz(12); }
+        continue;
+      }
+      if (air) continue; // cleared it
+      hurtFood(H.dmg || 6);
+      R.v *= H.slow || 0.7;
+      ctx.audio?.play(H.sfx || 'bump');
+      if (h.type !== 'puddle') flowBreak();
+      if (h.type === 'puddle') pfx.splash(h.x, h.z, true);
+      else pfx.bump(h.x, h.z);
+      if (h.type === 'cones' || h.type === 'barrier' || h.type === 'crates') { for (const o of h.obj.children) { o.rotation.z = (rng() - 0.5) * 2; o.position.x += (rng() - 0.5) * 2; } }
+    }
+  }
+  // overtaking: a car going our way that was ahead of us is now behind, and we got past in one piece
+  function passes() {
+    const fx = Math.sin(F.h), fz = Math.cos(F.h), now = R.rideTime;
+    for (const a of traffic.agents) {
+      if (a.kind !== 'car' && a.kind !== 'rider') continue;
+      const dx = a.pos[0] - F.x, dz = a.pos[1] - F.z;
+      if (dx * dx + dz * dz > 400 || Math.cos(a.pos[2] - F.h) < 0.8 || Math.abs(dx * fz - dz * fx) > 5.5) { a.passT = 0; continue; }
+      const lon = dx * fx + dz * fz;
+      if (lon > a.len / 2 + 1) a.passT = now;
+      else if (a.passT && lon < -(a.len / 2 + 1.5)) {
+        if (now - a.passT < 8 && R.crash <= 0 && R.v > a.v + 0.5) { flow('OVERTAKE!'); R.stats.overtakes++; St.goalProgress('overtake'); R.bike?.lookBack?.(); }
+        a.passT = 0;
+      }
+    }
+  }
+  // sliding: rubber on the road, a squeal, and the food sloshing about
+  function slideTick(dt, ds) {
+    const sb = Math.abs(F.beta);
+    R.slip = Math.max(F.demand, sb > 0.05 ? 1.03 + sb : 0);
+    R.cornerWarn = sb > 0.15;
+    F.slideCd -= dt;
+    if (!F.slide && sb > 0.2 && R.v > 4) {
+      F.slide = true; R.stats.skids++;
+      ctx.audio?.play('skid', { vol: 0.5 });
+      if (sb > 0.3 && F.slideCd <= 0) { F.slideCd = 5; flowBreak(); ctx.ui.toast('Sliding! Ease off before corners', 'warn'); }
+    } else if (F.slide && sb < 0.1) F.slide = false;
+    if (sb > 0.1 && R.v > 3) {
+      for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(0, x.integrity - sb * R.v * 0.12 * dt * x.o.fragile * R.vs.bump);
+      F.skid += ds;
+      if (F.skid > 0.3) { F.skid = 0; pfx.skidMark(F.x - Math.sin(F.h) * 0.66, F.z - Math.cos(F.h) * 0.66, F.h - F.beta * 0.5); }
+    }
+  }
+  // the nearest car in front of the bike, in its way (m, bumper to bumper)
+  function carAhead(range) {
+    const fx = Math.sin(F.h), fz = Math.cos(F.h);
+    let gap = Infinity, who = null;
+    for (const a of traffic.agents) {
+      if (a.kind !== 'car' && a.kind !== 'rider') continue;
+      const dx = a.pos[0] - F.x, dz = a.pos[1] - F.z, lon = dx * fx + dz * fz;
+      if (lon < 0 || lon > range + a.len || Math.abs(dx * fz - dz * fx) > 1.8) continue;
+      const g = lon - a.len / 2 - 1; if (g < gap) { gap = g; who = a; }
+    }
+    return { gap, who };
+  }
   // close calls: a car slides past within a lane's width while we're moving fast
   function nearMisses() {
     if (R.crash > 0 || R.v < 6) return;
@@ -1097,7 +1415,7 @@ export function createRide(ctx) {
     if (R.stall) { stallT -= dt; if (stallT <= 0) { stallT = 0.07; pfx.stall(wp.x, wp.y, wp.z); } }
     if (R.boost) { turboT -= dt; while (turboT <= 0) { turboT += 1 / 45; pfx.turbo(wp.x, wp.y, wp.z, fx, fz, R.v, electric); } }
     // rubber on the road: hard braking, or turbo through a corner
-    if ((decel > 8.5 && R.v > 2) || (R.boost && Math.abs(R.sampled[4]) > 0.06 && R.v > 9)) {
+    if ((decel > 8.5 && R.v > 2) || (R.boost && Math.abs(R.kap) > 0.06 && R.v > 9)) {
       skidAcc += ds;
       if (skidAcc > 0.32) { skidAcc = 0; pfx.skidMark(b.position.x - fx * 0.66, b.position.z - fz * 0.66, hd); }
     }
@@ -1107,16 +1425,16 @@ export function createRide(ctx) {
       if (sprayT <= 0) { sprayT = 0.035 / rain; pfx.spray(b.position.x - fx * 0.8, b.position.z - fz * 0.8, -fx * R.v * 0.3, -fz * R.v * 0.3); }
     }
   }
-  function updatePed(h, d, dt) {
+  // near: the bike is close enough (and coming) for them to step out
+  function updatePed(h, near, dt) {
     if (!h.ped) { h.done = true; return; }
     const o = h.obj;
-    if (!h.walking && d < 32 && d > 4) { h.walking = true; }
+    if (!h.walking && near) { h.walking = true; }
     if (h.walking) {
       const sp = (h.hurry ? 3.2 : h.slow ? 0.6 : 1.15) * dt;
       h.px += sp;
       const hd = h.hd, rx = -Math.cos(hd), rz = Math.sin(hd);
-      const base = sampleRoute(R.route, h.s, [0, 0, 0, 0]);
-      o.position.set(base[0] + rx * h.px, 0.12, base[1] + rz * h.px);
+      o.position.set(h.bx + rx * h.px, 0.12, h.bz + rz * h.px);
       o.rotation.y = Math.atan2(rx, rz);
       h.ped.c.mixer.update(dt * (h.hurry ? 1.6 : 1));
       if (h.px > 5.5) { h.done = true; freeHazard(h); return; }
@@ -1181,9 +1499,9 @@ export function createRide(ctx) {
       R.camKy = THREE.MathUtils.clamp(R.camKy, -0.3, 0.3);
       const buzzA = R.phase === 'ride' ? 0.016 * Math.min(1.3, R.v / Math.max(1, R.vs?.top || 10)) ** 1.5 : 0, tt = R.rideTime;
       pos = v3.set(b.x - cx * horiz + Math.sin(tt * 41) * buzzA * 0.5, height + b.y * 0.4 + R.camKy + (Math.sin(tt * 37) * 0.6 + Math.sin(tt * 59 + 1.3) * 0.4) * buzzA, b.z - cz * horiz);
-      // look at the road ahead (so the view turns into a corner before the bike does)
+      // look at the road ahead (so the view turns into a corner before the bike does); riding freely, where the bike points
       let lx2, ly2, lz2;
-      if (R.route && R.phase === 'ride') {
+      if (R.route && R.phase === 'ride' && !R.manual) {
         sampleRoute(R.route, Math.min(R.route.length, R.s + aheadD), camAhead);
         const lx = b.x + fx * aheadD, lz = b.z + fz * aheadD;
         lx2 = lx * 0.45 + camAhead[0] * 0.55; ly2 = cc.lookY - ek * 1.2; lz2 = lz * 0.45 + camAhead[1] * 0.55;
@@ -1235,15 +1553,36 @@ export function createRide(ctx) {
 
   // test hook: schedule an event a little ahead (props placed like a real one)
   function testEvent(ev, lead = 2) { R.event = { ev, s: R.s + lead }; if (ev.pre) prePlace(R.event); }
-  // manual riding: something in our lane we have to steer round (a parked car, road works, a crawling car), and how risky
-  function manualBlock() {
-    if (!R.manual || R.ot || stepAt().alley) return null;
-    const B = blockingHazard(), L = leaderAhead();
-    const hz = B.h && B.d < 6 && B.h.type !== 'ped';
-    const car = L.who && L.gap < 5 && L.who.kind === 'car' && L.who.v < 1.5;
-    if (!hz && !car) return null;
-    return { risk: oncoming().dist < 25 };
+  // test hook (tools/manual.mjs, tools/legs.mjs): riding freely, hold the keys a careful rider would — follow the GPS
+  // line, brake for corners, red lights and traffic, swing round anything in the lane, and pull up where the line ends
+  // (always inside the door's ring), or at `stop`
+  const bp = [0, 0, 0, 0, 0], BOT = { dodge: null };
+  const blocky = (h) => h.type === 'parked' || h.type === 'barrier' || h.type === 'cones' || h.type === 'crates';
+  function bot({ stop = null } = {}) {
+    if (!R.manual || !R.active || R.phase !== 'ride') return null;
+    const toEnd = R.route.length - R.s, rd = stop ? Math.hypot(stop.x - F.x, stop.z - F.z) : toEnd;
+    const look = Math.max(4.5, R.v * 0.9);
+    let tx = stop?.x, tz = stop?.z;
+    if (!stop || rd > 10) {
+      sampleRoute(R.route, Math.min(R.route.length, R.s + look), bp); tx = bp[0]; tz = bp[1];
+      if (BOT.dodge && (!R.hazards.includes(BOT.dodge) || BOT.dodge.done || BOT.dodge.ahead < -3.5)) BOT.dodge = null;
+      if (!BOT.dodge) BOT.dodge = R.hazards.find((h) => !h.done && blocky(h) && h.inPath && h.ahead > 0 && h.ahead < 14) || null;
+      if (BOT.dodge) { tx += Math.cos(bp[2]) * 2 * LANE; tz -= Math.sin(bp[2]) * 2 * LANE; } // the other lane, till we're past
+    }
+    const err = wrap(Math.atan2(tx - F.x, tz - F.z) - F.h) - F.yawV * 0.15;
+    let target = R.vs.top;
+    for (const a of R.arcs) { if (a.s1 < R.s) continue; if (a.s0 > R.s + 50) break; const vt = Math.sqrt(7 * a.r); target = Math.min(target, Math.sqrt(vt * vt + 2 * 4.5 * Math.max(0, a.s0 - R.s - 2))); }
+    target = Math.min(target, Math.sqrt(2 * 3.5 * Math.max(0, rd - 0.3)));
+    if (Math.abs(err) > 0.7) target = Math.min(target, 3);
+    const L = R.light;
+    if (L && L.state !== 'g' && L.d > 0.2 && L.d < 30 && !(L.state === 'y' && L.d < R.v * 0.7)) target = Math.min(target, stopV(L.d - 0.3));
+    const A = carAhead(25); if (A.who) target = Math.min(target, Math.max(0, A.who.v) + stopV(A.gap - 2));
+    for (const h of R.hazards) if (h.type === 'ped' && !h.done && h.inPath && h.ahead > 0 && h.ahead < 12) target = Math.min(target, stopV(h.ahead - 3));
+    input('gas', R.v < target - 0.25);
+    input('brake', R.v > target + 0.9 && R.v > 0.3);
+    input('left', err > 0.04); input('right', err < -0.04);
+    return { target, err, rd };
   }
-  return { R, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, manualBlock, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; }, get npc() { return npc; } };
+  return { R, F, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, bot, ensureBike, setNight, testEvent, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; }, get npc() { return npc; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);

@@ -16,6 +16,7 @@ import { installGrade, makeEnvironment, setEnvNight } from './look.js';
 import { createHubCamera, createMarkers } from './hub.js';
 import { setProgress } from './assets.js';
 import { createRide } from './ride/ride.js';
+import { createWorld } from './ride/world.js';
 import { buildRibbon, ribbonTime } from './ride/ribbon.js';
 import { EVENT } from './ride/events.js';
 import { makeBike } from './ride/vehicle.js';
@@ -85,18 +86,18 @@ const markers = createMarkers(document.getElementById('markers'), camera);
 // ---------------------------------------------------------------- game object
 const game = {
   city, audio, board: [], taken: [], selOrder: null, mode: 'hub', isTouch,
-  // on a keyboard the player rides the bike (gas, brake, lanes, turns) unless they switch auto-drive on in Settings
+  // on a keyboard the player rides the bike freely (steer, gas, brake, reverse) unless they switch auto-drive on in Settings
   manual: () => !isTouch && S.settings.autodrive !== true,
   sampleRoute,
   rideInput: (k, d) => ride.input(k, d),
-  manualBlock: () => ride.manualBlock(),
   canOvertake: () => ride.canOvertake(),
 };
 const ui = createUI(game);
 const ob = createOnboarding(game, ui);
 game.ob = ob;
-const ride = createRide({ scene, camera, renderer, city, traffic, sky, audio, ui, weather, manual: () => game.manual(), onFinish: (s) => finishJob(s) });
-game.ride = ride;
+const world = createWorld(city, view.arch, people.list);
+const ride = createRide({ scene, camera, renderer, city, traffic, world, peds, sky, audio, ui, weather, manual: () => game.manual(), onFinish: (s) => finishJob(s) });
+game.ride = ride; game.world = world;
 
 const playerTile = () => (S.pos != null && city.tiles[S.pos]?.k === 1 ? S.pos : garageLot.door);
 const playerDir = () => (S.pos != null && S.posDir != null && city.tiles[S.pos]?.k === 1 && city.tiles[S.pos].mask & (1 << S.posDir) ? S.posDir : -1);
@@ -302,12 +303,12 @@ game.startJob = async () => {
   game.mode = 'ride'; ui.setMode('ride');
   await ride.start(job, from, dir0);
   // the controls tip, once per way of riding (a desktop player who rode on auto-drive still needs the keys)
-  const tip = ride.R.manual ? 'manualTip' : 'rideTip';
+  const tip = ride.R.manual ? 'freeTip' : 'rideTip';
   if (!S.seen[tip]) {
     S.seen[tip] = 1; St.save();
     ride.R.timeScale = 0;
     await ui.tutorial(ride.R.manual
-      ? `You ride the scooter.<br><br>${ICON('ui-speed')} <b>W</b> / <b>↑</b> gas, <b>S</b> / <b>↓</b> brake. Slow down before corners.<br>${ICON('ui-route')} <b>A</b> / <b>D</b> pick your turn at junctions (follow the blue arrows) and change lanes to pass.<br>${ICON('ui-jump')} <b>Space</b> hops potholes, <b>Shift</b> is turbo, <b>E</b> takes the button that pops up.`
+      ? `You ride the scooter — go anywhere you like.<br><br>${ICON('ui-speed')} <b>W</b> / <b>↑</b> gas, <b>S</b> / <b>↓</b> brake (hold it when stopped to back up).<br>${ICON('ui-route')} <b>A</b> / <b>D</b> steer. The blue arrows are the GPS: take another street and it finds a new way. Stop in the glowing ring at the door.<br>${ICON('ui-jump')} <b>Space</b> hops potholes, <b>Shift</b> is turbo, <b>E</b> takes the button that pops up. Walls, poles and cars hurt — so do corners taken too fast.`
       : `Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
     ride.R.timeScale = 1;
   }
@@ -430,7 +431,8 @@ game.focusDistrict = (id) => {
   hubCam.lookAt(c[0] * TILE, c[1] * TILE + 60, 520);
   ui.setSheet('min');
 };
-game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } if (ride.R.active) { ride.R.manual = game.manual(); ride.R.ctl.gas = ride.R.ctl.brake = false; } };
+// (auto-drive switched mid-ride takes effect from the next job: the bike can't jump between riding freely and the rail)
+game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } };
 
 // ---------------------------------------------------------------- ride free look: drag to orbit, pinch / wheel to zoom
 const rideLook = { ptrs: new Map(), last: null, start: null, t0: 0, snap: null, pinch: 0, zoom0: 1 };
@@ -468,14 +470,14 @@ canvas.addEventListener('wheel', (e) => { if (game.mode !== 'ride') return; e.pr
 const KEYS = { Space: 'boost', KeyW: 'hop', ArrowUp: 'hop', KeyH: 'horn', KeyA: 'overtake', ArrowLeft: 'overtake', KeyG: 'go', KeyS: 'shortcut' };
 // riding yourself: pedals on W/S (or the arrows), steering on A/D, hop on Space, turbo on Shift
 const KEYS_RIDE = { KeyW: 'gas', ArrowUp: 'gas', KeyS: 'brake', ArrowDown: 'brake', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
-  Space: 'hop', ShiftLeft: 'boost', ShiftRight: 'boost', KeyH: 'horn', KeyG: 'go' };
-const HELD = new Set(['gas', 'brake', 'boost']);
+  Space: 'hop', ShiftLeft: 'boost', ShiftRight: 'boost', KeyH: 'horn' };
+const HELD = new Set(['gas', 'brake', 'boost', 'left', 'right']);
 const keyMap = () => (ride.R.manual ? KEYS_RIDE : KEYS);
 addEventListener('keydown', (e) => {
   if (game.mode !== 'ride') return;
   const k = keyMap()[e.code];
-  // pedals keep working under an event card (the ride goes on in slow motion); everything else waits for it
-  if (document.querySelector('.modal, .evdock') && !(k === 'gas' || k === 'brake')) return;
+  // pedals and steering keep working under an event card (the ride goes on in slow motion); everything else waits for it
+  if (document.querySelector('.modal, .evdock') && !(k === 'gas' || k === 'brake' || k === 'left' || k === 'right')) return;
   if (e.code === 'KeyE') { const b = document.querySelector('.r-ctx .ctx'); if (b) ride.input(b.dataset.ride, true); e.preventDefault(); return; }
   if (!k) return;
   e.preventDefault();

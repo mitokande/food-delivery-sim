@@ -6,7 +6,8 @@ get hired in better districts, and grow your own courier fleet.
 
 **Play:** https://mithatck.com/food-delivery-sim/
 
-- **Auto-riding deliveries** — the scooter drives itself; you use powers (turbo, hop, overtake, run the light, horn, shortcuts) and react to random events and quick-time events.
+- **Auto-riding deliveries** — on phones the scooter drives itself; you use powers (turbo, hop, overtake, run the light, horn, shortcuts) and react to random events and quick-time events.
+- **Free riding on desktop** — steer anywhere in the city with the keyboard (W/S gas, brake and reverse, A/D steer); walls, poles, cars and people are solid, the GPS re-plans when you take another street, and you stop in the ring at the door.
 - **Progression** — 6 vehicles with 4 upgradeable parts and paint, 5 courier skills, 4 districts to unlock, daily goals, day/night cycle with rush hours.
 - **Fleet** — rent a dispatch office, hire freelance couriers who ride around the city and earn money even while you're away.
 

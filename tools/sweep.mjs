@@ -9,7 +9,7 @@ try { puppeteer = require('puppeteer-core'); } catch { puppeteer = require('/roo
 const CHROME = process.env.CHROME || '/root/.cache/puppeteer/chrome/linux-148.0.7778.97/chrome-linux64/chrome';
 const sizes = (process.argv[2] || '360x640,375x667,390x844,412x915,430x932,360x560,844x390,768x1024,1280x720').split(',').map((s) => s.split('x').map(Number));
 const SAVE = JSON.stringify({ v: 1, cash: 12450, xp: 400, lvl: 7, skills: { riding: 2, navigation: 1, charm: 1, reflexes: 0, stamina: 0 }, districts: { oldtown: true, downtown: true, harbor: true },
-  stats: { deliveries: 60 }, seen: { rideTip: 1, manualTip: 1 }, active: 'vespetta', vehicles: { rustbucket: { parts: { engine: 2, suspension: 1, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 1, suspension: 0, box: 0, tires: 0 }, count: 2 } },
+  stats: { deliveries: 60 }, seen: { rideTip: 1, manualTip: 1, freeTip: 1 }, active: 'vespetta', vehicles: { rustbucket: { parts: { engine: 2, suspension: 1, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 1, suspension: 0, box: 0, tires: 0 }, count: 2 } },
   fleet: { office: true, level: 1, couriers: [{ id: 'x1', name: 'Mert', char: 'male-c', skill: 2, veh: 'rustbucket', own: true, ownVeh: 'rustbucket', district: 'oldtown' }, { id: 'x2', name: 'Zeynep', char: 'female-a', skill: 4, veh: 'vespetta', own: false, district: 'downtown' }], last: Date.now(), bank: 42, applicants: [{ id: 'a1', name: 'Lena', char: 'female-b', skill: 2, fee: 180, ownVeh: 'rustbucket' }] } });
 const { server, base } = await serve();
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });

@@ -33,21 +33,34 @@ yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←
 Motor rotayı A* ile bulur ve kendi sürer: virajda yavaşlar, öndeki arabanın arkasında yavaşlar, kırmızıda durur,
 yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanacağına karar verir.
 
-**Masaüstünde kendin sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı, telefonda hep otomatik):
+**Masaüstünde serbest sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı, telefonda hep otomatik).
+Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sokak, park çimi); rota yalnızca GPS.
 
 | Tuş | İş |
 |---|---|
 | W / ↑ | gaz (basılı tut); bırakınca motor yavaşça süzülür |
-| S / ↓ | fren |
-| A / D, ← / → | şerit değiştir (A karşı şeride çık, D geri dön); kavşakta sola/düz/sağ seç → GPS yeni yolu çizer |
+| S / ↓ | fren; durmuşken basılı tutunca geri vites (~10 km/s) |
+| A / D, ← / → | direksiyon. Hızlandıkça tam kilit küçülür; dururken motoru olduğu yerde çevirirsin (U dönüşü) |
 | Space · Shift · E · H | zıpla · turbo · olay butonu · korna |
 
-Virajlara fazla hızlı girmek kaydırır (yiyecek hasarı), çok hızlı girmek kaza; hız göstergesi kırmızı yanıp sönerse fren.
-Restorana/kapıya varış: son metreleri motor kendisi ayarlar (fazla hızlıysa frenler, birkaç metre kısa durduysan fren
-basılı değilken kapıya kadar yuvarlanır); alım/teslim sahnesi kapıda başlar.
-Öndeki arabaya çarpmak, park etmiş arabaya/yayaya bindirmek kaza. Şeride park etmiş araç varsa durursun ve "Go round A"
-belirir; karşı şeritten dolaşıp D ile dönersin. Kırmızıda durmazsan ışığı ihlal etmiş sayılırsın. Sollama ve "Go"
-butonları manuel modda gizlenir (iş tuşlarda).
+- **Fizik** (`ride.js` serbest sürüş bölümü): bisiklet modeli (dingil arası 1,3 m), tutuş = 11 m/s² × lastik × (turbo 1,22)
+  × (yağmur −%20) × (çim 0,7). En sıkı dönüş tutuşun biraz üstünde: sert virajda motor kayar (kayma açısı, lastik izi,
+  ses, hız kaybı, yiyecek sarsılır; büyük kaymada Flow bozulur). Çimde hız ×0,6 ve sarsıntı; kaldırıma çıkış/iniş
+  (0,1 m bordür) yaylara tekme, hızlıysa yiyeceğe darbe.
+- **Çarpışma** (`ride/world.js`): bina tabanları, ağaç/lamba/trafik lambası/tabela direkleri, bank, saksı, kafe masası,
+  çöp kutusu, konteyner, viyadük ayakları, saat kulesi, oturan/duran insanlar, şehir sınırı ve rıhtım; trafik arabaları,
+  filo kuryeleri, çift park etmiş araçlar, olay arabaları, yayalar. Çarpınca motor dışarı itilir, o yöndeki hızını kaybeder;
+  hızlıysa kaza (duvar 7, direk 6,5, eşya 6, araba 4,5, yaya 2,4 m/s üstü), değilse sarsıntı. Arabalar önlerindeki motoru
+  görüp durur (`traffic.blockers`). Çukur/su birikintisi/koni/bariyer/kasa dünyada bir yerde durur: üstünden geçersen
+  çarparsın, etrafından dolaşabilir ya da zıplayabilirsin; para/enerji üstünden geçince alınır.
+- **GPS:** rota motorun en yakın noktasına izdüşürülür. Çizgiden 6,5 m uzaklaşınca ya da 1 sn ters yöne gidince
+  bulunduğun sokaktan, baktığın yönde yeni rota çizilir (aynı kapıya). Yoldaki engeller yerinde kalır, yeni yola birkaç
+  tane daha eklenir; gelecek olay yeni yola taşınır. "GPS shortcut" butonu ara sokağı GPS'e koyar; kestirme ancak ara
+  sokaktan öbür caddeye çıkınca sayılır.
+- **Varış:** kapının önünde parlayan halka (iki şerit + kaldırım, 4,6 m). Halkada gaz bırakılınca motor kendiliğinden
+  durur; durunca alım/teslim sahnesi başlar (çalışan/müşteri motora yürür).
+- Kırmızıda kavşağa girmek ışık ihlali (kamera cezası şansı, sağ salim çıkınca Flow). Sollama: aynı yöne giden aracı
+  geçmek. Ara sokaktan geçmek kestirme. Sollama ve "Go" butonları serbest sürüşte yok.
 
 | Güç | Tetik | Etki | Risk |
 |---|---|---|---|
@@ -151,7 +164,8 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/city/backdrop.js` · `train.js` | ufuk dağları (sis renginde), doğu tepesindeki evler, körfez (mendirek + deniz feneri, iskele + dönme dolap), saat kulesi; viyadükte giden metro |
 | `js/look.js` | renk derecelendirme (özel tone mapping: doygunluk, sıcak ışık/serin gölge, kontrast) ve parlak malzemeler için ortam haritası |
 | `js/city/traffic.js` | instanced arabalar, trafik ışıkları, yayalar, filo kuryeleri (rider ajanları) |
-| `js/ride/ride.js` | otomatik pilot sürüş, güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
+| `js/ride/ride.js` | otomatik pilot sürüş, masaüstünde serbest sürüş (fizik, çarpışma, GPS, varış halkası), güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
+| `js/ride/world.js` | serbest sürüş için şehir: zemin (asfalt/kaldırım/çim ve yüksekliği), çarpılabilir her şey (10 m ızgarada), rota başlatılacak yol karosu |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi |
@@ -320,6 +334,13 @@ turbo + kırmızıda geçiş, sipariş geç kalmasın). Sonra filo: tek kuryeden
 - 2026-10-24: "Confirm Pickup"a erken basılınca çalışan motora varmadan dönüyor, poşet elinden yolda kayboluyordu;
   artık önce motora geliyor, poşet orada bagaja giriyor. Bekleme oyun zamanıyla ölçülüyor, yavaş telefonda da poşet
   motorun yanında veriliyor. `tools/legs.mjs` poşetin motordan 2,4 m'den uzakta verilmesini hata sayıyor.
+- 2026-10-25: masaüstünde tam serbest sürüş (kullanıcı: "sürüşte hâlâ ray üzerinden yapıyoruz"). Motor artık rotaya
+  bağlı değil: A/D direksiyon, S ile geri vites, dururken yerinde dönüş; binalara, sokak eşyalarına, arabalara ve yayalara
+  dünyada çarpılıyor (`ride/world.js`); rota yalnızca GPS, rotadan çıkınca yeniden çiziliyor; kapıda parlayan halkada durunca
+  sahne başlıyor. Eski şerit/kavşak seçimi ("Go round A", kavşak okları) kaldırıldı. Telefon/otomatik sürüş aynı.
+  Ayar yolculuk ortasında değişirse bir sonraki işte geçerli. İlk serbest sürüşte yeni tuş ipucu (`seen.freeTip`).
+  Test: `node tools/manual.mjs` (tuşlar, direksiyon, geri vites, duvarda durma, GPS'in yeniden rotası, baştan sona iş),
+  `node tools/legs.mjs desktop` (karşı şeritte ve kaldırımda durma dahil). Testlerdeki sürücü `game.ride.bot()`.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
