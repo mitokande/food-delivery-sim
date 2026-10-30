@@ -6,7 +6,7 @@ get hired in better districts, and grow your own courier fleet.
 
 **Play:** https://mithatck.com/food-delivery-sim/
 
-- **One-touch deliveries** — on phones the scooter steers itself and the gas is always on; you hold anywhere to brake for corners, red lights, people crossing, potholes and the door (brake late for perfect corners and stops, catch the green without stopping), swipe at a junction to take another street, and react to random events.
+- **Courier run** — on phones the road rides itself (pace, corners, the door) and the busy traffic is yours: hold the BRAKE pedal for the car in front, people crossing and red lights, swipe left / right to slip between the cars (the oncoming lane or the sidewalk), swipe up to hop potholes; grab the coins, keep the food in one piece, and react to random events.
 - **Free riding on desktop** — steer anywhere in the city with the keyboard (W/S gas, brake and reverse, A/D steer); walls, poles, cars and people are solid, the GPS re-plans when you take another street, and you stop in the ring at the door.
 - **Progression** — 6 vehicles with 4 upgradeable parts and paint, 5 courier skills, 4 districts to unlock, daily goals, day/night cycle with rush hours.
 - **Energy** — every order costs 1 ⚡ at Start; it refills one every 6 minutes (even while the game is closed), a level-up fills the tank, daily goals and coffee top it up.
@@ -17,11 +17,10 @@ get hired in better districts, and grow your own courier fleet.
 Any static file server works, e.g. `npx serve .` or `python3 -m http.server`, then open `index.html`.
 Useful URL flags: `?fps` (frame-rate meter), `?clock=1260` (sky time), `?noti` (skip the welcome card), `?energy=off` (orders cost no energy),
 `?an=dev` (mark this device as the developer's so it stays out of the analytics; `?an=off` / `?an=on`),
-`?ctl=run` / `?ctl=a` / `?ctl=b` / `?ctl=stop` (other ways to ride, for QA: `run` the courier run — the road rides itself,
-the busy traffic is yours: a BRAKE button, left / right a lane, up a hop, coins in the lanes, the food is the life bar;
-`a` the lane run — hold to brake, swipe to change lane;
-`b` the phone's brake on a keyboard too; `stop` the earlier autopilot with turbo, hop and a STOP button; it sticks to the
-device until `?ctl=off`).
+`?ctl=b` / `?ctl=a` / `?ctl=stop` / `?ctl=run` (other ways to ride, for QA: `b` the brake — gas always on, hold anywhere
+to brake for corners, lights and the door (the phone's ride before the courier run); `a` the lane run — hold to brake,
+swipe to change lane; `stop` the earlier autopilot with turbo, hop and a STOP button; `run` the courier run on a keyboard
+too; it sticks to the device until `?ctl=off`).
 
 ## Analytics
 

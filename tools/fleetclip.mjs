@@ -122,7 +122,8 @@ async function open(save, clock) {
   }, D0);
   await page.evaluateOnNewDocument(SHIM);
   await page.evaluateOnNewDocument((s) => { localStorage.setItem('fds_save_v1', s); localStorage.setItem('fds_an', 'off'); }, JSON.stringify(save));
-  await page.goto(`${base}/index.html?noti=1&energy=off&clock=${clock}`, { waitUntil: 'networkidle0', timeout: 300000 });
+  // (scripted on the brake ride, the phone's ride when this was made; ?ctl=b keeps it there now that phones ride the run)
+  await page.goto(`${base}/index.html?noti=1&energy=off&ctl=b&clock=${clock}`, { waitUntil: 'networkidle0', timeout: 300000 });
   await page.waitForFunction('window.ready', { timeout: 300000, polling: 300 });
   await page.evaluate(async (STYLE, LOGO, FPS) => {
     await document.fonts.ready;

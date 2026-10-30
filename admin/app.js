@@ -54,7 +54,8 @@ const stars = (n) => `<span class="stars" title="${n} yıldız">${'★'.repeat(n
 
 // ---------------------------------------------------------------- game vocabulary
 const vehName = (id) => VEHICLE[id]?.name || id || '–';
-// how a ride was controlled (job_start / crash 'ctl'): the brake is the phone's way of riding since 2026-10-28
+// how a ride was controlled (job_start / crash 'ctl'): the courier run is the phone's way of riding since 2026-10-30
+// (the brake 2026-10-28 to -30)
 const ctlName = (c) => (c === 'b' ? 'fren' : c === 'a' ? 'prototip A' : c === 'run' ? 'kurye koşusu' : esc(String(c)));
 const distName = (id) => DISTRICT[id]?.name || id || '–';
 const restName = (id) => RESTAURANT[id]?.name || id || '–';
@@ -647,8 +648,8 @@ const VIEWS = {
       { label: 'Tür', f: (x) => esc(BUY_TR[x.kind] || x.kind) }, { label: 'Ne', f: (x) => esc(itemName(x.kind, x.item)) },
       { label: 'Adet', n: 1, f: (x) => num(x.n) }, { label: 'Toplam', n: 1, f: (x) => money(x.spent) }, { label: 'Ort. seviyede', n: 1, f: (x) => num1(x.lvl) },
     ];
-    // (k: 0 auto-drive, 1 riding yourself, 'b' the brake — phones since 2026-10-28, a prototype before — 'a' the lane
-    // run, 'run' the courier run)
+    // (k: 0 auto-drive, 1 riding yourself, 'b' the brake — phones 2026-10-28 to -30, a prototype before — 'a' the lane
+    // run, 'run' the courier run — phones since 2026-10-30, a prototype before)
     const proto = (x) => x.k === 'a' || x.k === 'b' || x.k === 'run', auto = (x) => !proto(x) && !+x.k;
     const modeCols = [{ label: 'Mod', f: (x) => (x.k === 'a' ? 'Prototip A · şerit' : x.k === 'b' ? 'Fren (B)' : x.k === 'run' ? 'Kurye koşusu' : +x.k ? 'Elle (klavye)' : 'Otomatik (STOP)') }, { label: 'Sürüş', n: 1, f: (x) => num(x.n) }, { label: 'Ort. süre', n: 1, f: (x) => dur(x.secs * 1000) },
       { label: 'Ort. kazanç', n: 1, f: (x) => money(x.total) }, { label: 'Ort. yıldız', n: 1, f: (x) => num1(x.stars) }, { label: 'Geç', n: 1, f: (x) => pct(x.late) },
@@ -678,7 +679,7 @@ const VIEWS = {
           ${card('Yıldız dağılımı', '<div class="chart" data-chart="stars"></div>')}
           ${card('Araçlara göre sürüş', table(vehCols, d.vehicles))}
         </div>
-        ${card('Sürüş modları', table(modeCols, d.modes || []), { sub: 'Fren (B): 28 Ekim 2026\'dan beri telefonda varsayılan (öncesi ?ctl=b prototipi). Otomatik (STOP): 26–28 Ekim telefonda varsayılan, artık ?ctl=stop; daha öncesi eski otopilot. Elle: masaüstünde klavyeyle kendi süren. Prototip A: ?ctl=a. Kurye koşusu: ?ctl=run (yalnız kaydırma). Değerler sürüş başına ortalama.' })}
+        ${card('Sürüş modları', table(modeCols, d.modes || []), { sub: 'Kurye koşusu: 30 Ekim 2026\'dan beri telefonda varsayılan (öncesi ?ctl=run prototipi). Fren (B): 28–30 Ekim telefonda varsayılan, artık ?ctl=b. Otomatik (STOP): 26–28 Ekim telefonda varsayılan, artık ?ctl=stop; daha öncesi eski otopilot. Elle: masaüstünde klavyeyle kendi süren. Prototip A: ?ctl=a. Değerler sürüş başına ortalama.' })}
         <div style="height:16px"></div>
         ${card('Sürüş olayları', table(evCols, d.events), { sub: 'Başarı: QTE ya da riskli seçimin iyi bitme oranı. Süre doldu: oyuncu 7 sn içinde seçmedi.' })}
         <div class="grid g2" style="margin-top:16px">

@@ -1,10 +1,11 @@
-// The brake (a phone's way of riding: 'b', no ?ctl needed) and the lane run prototype (?ctl=a) on a phone: the HUD has
+// The brake (?ctl=b, the phone's ride 2026-10-28 to -30) and the lane run (?ctl=a) prototypes on a phone: the HUD has
 // no power buttons, a finger held on the screen brakes (on the lane run a swipe changes lane; on the brake a swipe only
 // takes a junction's other street, and a thumb drifting on the brake keeps braking), and whole jobs finish both with a
 // careful rider (ride.schemeBot) and with nobody touching the screen at all (no soft-locks: stuck behind a parked car,
 // past the door, after crashes).
-// The courier run (?ctl=run): the road rides itself, the traffic is the rider's — a BRAKE button of its own (a finger held
-// anywhere else does nothing), left / right is a lane, up a hop; the streets around the route are busy.
+// The courier run (a phone's way of riding since 2026-10-30: 'run', no ?ctl needed): the road rides itself, the
+// traffic is the rider's — a BRAKE button of its own (a finger held anywhere else does nothing), left / right is a
+// lane, up a hop; the streets around the route are busy.
 // On the brake and the run, the careful and hands-off riders also ride the same orders from the same spot (events off,
 // a jaywalker put out on each leg), so the two can be compared.
 //   node tools/ctl.mjs [a|b|run|both|all] [shot-prefix]    env: JOBS=n (careful jobs per scheme, default 2), PAIRS=n
@@ -37,11 +38,11 @@ for (const scheme of SCHEMES) {
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
   await page.evaluateOnNewDocument((s) => localStorage.setItem('fds_save_v1', s), JSON.stringify(SAVE));
-  await page.goto(`${base}/index.html?noti=1&energy=off&clock=600&ctl=${scheme === 'b' ? 'off' : scheme}`, { waitUntil: 'networkidle0', timeout: 240000 });
+  await page.goto(`${base}/index.html?noti=1&energy=off&clock=600&ctl=${scheme === 'run' ? 'off' : scheme}`, { waitUntil: 'networkidle0', timeout: 240000 });
   await page.waitForFunction('window.ready', { timeout: 120000 });
   const R = (fn, arg) => page.evaluate(fn, arg);
   console.log(`--- scheme ${scheme} (game.ctl ${await R(() => game.ctl)}, riding freely: ${await R(() => game.manual())})`);
-  ok((await R(() => game.ctl)) === scheme, scheme === 'b' ? 'a phone rides the brake by default' : `?ctl=${scheme} switches the prototype on`);
+  ok((await R(() => game.ctl)) === scheme, scheme === 'run' ? 'a phone rides the courier run by default' : `?ctl=${scheme} switches the prototype on`);
 
   // one job: start it (an order near the bike), then ride it out. bot: the careful rider, or hands off. resume: ride
   // out the job already under way
@@ -87,7 +88,7 @@ for (const scheme of SCHEMES) {
       ok(scheme === 'run' ? hud.brake : !hud.brake, scheme === 'run' ? 'a BRAKE button of its own' : 'no brake button (the whole screen is the brake)');
       const lanes = scheme === 'a';
       ok(lanes ? hud.lanes && !hud.gear : scheme === 'b' ? hud.gear && !hud.lanes : !hud.gear && !hud.lanes, `scheme HUD: ${lanes ? 'lanes' : scheme === 'b' ? 'gear' : 'neither lanes nor gear'} shown (lanes ${hud.lanes}, gear ${hud.gear}) · "${hud.proto}"`);
-      ok(scheme === 'a' ? /Prototype A/.test(hud.proto) : scheme === 'run' ? /courier run/.test(hud.proto) : !hud.proto, `prototype label: ${scheme === 'b' ? 'none (it is the game now)' : 'shown'}`);
+      ok(scheme === 'a' ? /Prototype A/.test(hud.proto) : scheme === 'b' ? /Prototype B/.test(hud.proto) : !hud.proto, `prototype label: ${scheme === 'run' ? 'none (it is the game now)' : 'shown'}`);
       // up to speed (in one piece), then a finger held on the screen brakes, and lifting it lets go
       const g = await R(async () => {
         const c = document.getElementById('gl'), r = game.ride.R, ev = (type, x, y, id = 11) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch' }));

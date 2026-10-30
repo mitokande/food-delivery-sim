@@ -213,8 +213,9 @@ switch ($q) {
       AVG(json_extract(e.props, '$.stats.events')) events, AVG(json_extract(e.props, '$.stats.horns')) horns")[0] ?? [];
     $rides['started'] = (int) ($ev('job_start', 'COUNT(*) n')[0]['n'] ?? 0);
     $vehicles = $ev('job_end', "json_extract(e.props, '$.veh') k, COUNT(*) n, AVG(json_extract(e.props, '$.secs')) secs, AVG(json_extract(e.props, '$.total')) total, AVG(json_extract(e.props, '$.stats.crashes')) crashes", 'k', 'n DESC');
-    // the brake ('b': phones since 2026-10-28, the ?ctl=b prototype before) vs the autopilot (STOP 2026-10-26 to -28, now
-    // ?ctl=stop) vs riding yourself (desktop keyboard) vs the lane run prototype (?ctl=a)
+    // the courier run ('run': phones since 2026-10-30, the ?ctl=run prototype before) vs the brake ('b': phones 2026-10-28
+    // to -30, now ?ctl=b) vs the autopilot (STOP 2026-10-26 to -28, now ?ctl=stop) vs riding yourself (desktop keyboard)
+    // vs the lane run prototype (?ctl=a)
     $mode = "COALESCE(json_extract(e.props, '$.ctl'), json_extract(e.props, '$.manual'), 0)";
     $modes = $ev('job_end', "$mode k, COUNT(*) n, AVG(json_extract(e.props, '$.secs')) secs, AVG(json_extract(e.props, '$.total')) total,
       AVG(json_extract(e.props, '$.stats.crashes')) crashes, AVG(json_extract(e.props, '$.stats.skids')) skids, AVG(json_extract(e.props, '$.stats.reroutes')) reroutes,

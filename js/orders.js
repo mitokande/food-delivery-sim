@@ -22,7 +22,7 @@ export function autoSpeed(district, vs = vehStats()) { return (AUTO_BASE[distric
 // timers follow the bike only a little (^0.15), stop tightening at Lv 10's on-time-without-turbo, and a fast order
 // (rush, VIP, express) squeezes the clock half as hard: a careful rider is on time (standard orders at ~80–95% of the
 // clock from Lv 10, rush ~90–105%), late braking, green waves and gears are what make one early.
-// The courier run (`?ctl=run`) has no turbo either, and since its busy traffic became the rider's (2026-10-30) a careful
+// The courier run (the phone's ride) has no turbo either, and since its busy traffic became the rider's (2026-10-30) a careful
 // rider there averages about what one does on the brake (SEED=7 CTL=run BOT=1 tools/speed.mjs, Rust Bucket / Vespetta /
 // Viper: Old Town 5.2 / 6.2 / 6.6, Downtown Vespetta 6.1 m/s — braking behind the slow cars, waiting for a gap in the
 // ones coming). So it gets the brake's timers too: lanes, gaps and the slingshot make one early.

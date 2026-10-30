@@ -33,17 +33,17 @@ import { mulberry32 } from './rng.js';
 window.__started = true;
 const q = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-// How the ride is controlled. A phone (and a keyboard with Auto-drive on) rides the brake: the scooter steers itself,
-// the gas is always on and the rider holds anywhere to brake ('b'). A keyboard otherwise rides freely. For QA,
-// ?ctl=run (the courier run: swipes only), ?ctl=a (the lane run), ?ctl=b (the brake on any device) or ?ctl=stop (the
-// STOP autopilot) stick to the device until ?ctl=off.
+// How the ride is controlled. A phone (and a keyboard with Auto-drive on) rides the courier run since 2026-10-30: the
+// road rides itself and the busy traffic is the rider's — the BRAKE pedal and lane swipes ('run'). A keyboard
+// otherwise rides freely. For QA, ?ctl=b (the brake: hold anywhere, the phone's ride 2026-10-28 to -30), ?ctl=a (the
+// lane run), ?ctl=stop (the STOP autopilot) or ?ctl=run (the run on any device) stick to the device until ?ctl=off.
 const CTL_IDS = ['a', 'b', 'run', 'stop'];
 const CTL = (() => {
   const v = q.get('ctl');
   try { if (v === 'off') localStorage.removeItem('fds_ctl'); else if (CTL_IDS.includes(v)) localStorage.setItem('fds_ctl', v); const s = localStorage.getItem('fds_ctl'); return CTL_IDS.includes(s) ? s : null; }
   catch { return CTL_IDS.includes(v) ? v : null; }
 })();
-const scheme = () => (CTL === 'stop' ? null : CTL || (isTouch || S.settings.autodrive === true ? 'b' : null));
+const scheme = () => (CTL === 'stop' ? null : CTL || (isTouch || S.settings.autodrive === true ? 'run' : null));
 setTimerRide(() => (scheme() === 'b' || scheme() === 'run' ? scheme() : null)); // (no turbo on either: orders.js)
 const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
