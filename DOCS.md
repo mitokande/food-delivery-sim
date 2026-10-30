@@ -27,13 +27,23 @@ yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←
 - **Gün** 08:00'de başlar, 24:00'te biter. Saat sadece sürerken ilerler (1 gerçek sn ≈ 20 oyun sn). Öğle (11:30–13:30)
   ve akşam (18:30–21:00) yoğunluğu: daha çok sipariş, ücret çarpanı. Işık sabah → öğle → gün batımı → gece (sokak
   lambaları, neon). Gün sonu: rapor (kazanç, gider, filo geliri, günlük hedefler).
+- **Enerji ⚡** (iş almanın bedeli; sayılar `data.js` `ENERGY`'de): her sipariş **1 ⚡**, START'a basınca düşer. Depo 10
+  (Dayanıklılık becerisi seviye başına +2, en çok 20). Gerçek zamanla dolar: **6 dakikada 1**, oyun kapalıyken de (zaman
+  damgasından hesaplanır; saat geri alınırsa sayaç sıfırdan başlar), ama zamanla depodan fazlası dolmaz. Seviye atlamak
+  depoyu doldurur; alınan her günlük hedef +2 ⚡; kahve +5 ⚡ (nakitle: günün ilk fincanı tipik bir teslimatın 2 katı,
+  sonra 4×, 8×, gerçek günde 3 fincan; hedef ve kahve depoyu aşabilir). Filo enerji harcamaz: oyuncu dinlenirken filo
+  kazanır. Ekonomi: bir teslimat ~2 dk sürer, zaman harcananın ~üçte birini geri verir; hiç durmayan oyuncu ~15–20
+  teslimattan sonra boş depoya çarpar, yeni oyuncu çok daha geç (ilk seviyeler birkaç teslimatta bir gelir, her biri
+  depoyu doldurur). Yeterli enerji yokken sipariş alınmaz, START bar griye döner; ikisi de enerji panelini açar.
 
 ## 3. Sürüş (teslimat)
 
-Motor rotayı A* ile bulur ve kendi sürer: virajda yavaşlar, öndeki arabanın arkasında yavaşlar, kırmızıda durur,
-yayaya yol verir. Oyuncu sürmez — **ne zaman** ve **hangi gücü** kullanacağına karar verir.
+Motor rotayı A* ile bulur ve direksiyonu kendisi kırar. **Telefonda tek fiil fren:** gaz hep açık, oyuncu ekranın
+herhangi bir yerine basılı tutarak yavaşlar. Viraj, kırmızı ışık, karşıdan karşıya geçen yaya, çukur ve kapı oyuncunun
+(aşağıda *Fren*). QA için başka sürüşler `?ctl` ile: `?ctl=a` şerit koşusu, `?ctl=stop` eski otopilot (güçler + STOP).
 
-**Masaüstünde serbest sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı, telefonda hep otomatik).
+**Masaüstünde serbest sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı). *Auto-drive* açıkken
+masaüstü de frenle sürer (↓ / S / Space).
 Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sokak, park çimi); rota yalnızca GPS.
 
 | Tuş | İş |
@@ -59,15 +69,19 @@ Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sok
   sokaktan öbür caddeye çıkınca sayılır.
 - **Varış:** kapının önünde parlayan halka (iki şerit + kaldırım, 4,6 m). Halkada gaz bırakılınca motor kendiliğinden
   durur; durunca alım/teslim sahnesi başlar (çalışan/müşteri motora yürür).
-- Kırmızıda kavşağa girmek ışık ihlali (kamera cezası şansı, sağ salim çıkınca Flow). Sollama: aynı yöne giden aracı
+- Kırmızıda kavşağa girmek ışık ihlali (kamera cezası şansı, sağ salim çıkınca Flow). **Kamera şansı bölgeye göre**
+  (her sürüşte aynı, `DPROFILE.cams`): Downtown %70, Harbor %45, Old Town %35, Green Hills %20; kamera yoksa ceza yok
+  ("No camera at this one — lucky!"). Sollama: aynı yöne giden aracı
   geçmek. Ara sokaktan geçmek kestirme. Sollama ve "Go" butonları serbest sürüşte yok.
+
+Güçler yalnız `?ctl=stop` otopilotunda (Turbo, Zıpla, Korna serbest sürüşte de); frende hiçbiri yok:
 
 | Güç | Tetik | Etki | Risk |
 |---|---|---|---|
 | **Turbo** | basılı tut (her zaman) | hız +%45; enerji barı harcar | virajda/çukurda daha çok sarsıntı |
 | **Zıpla** | HOP butonu | çukur, koni, su birikintisi, kaldırım üstünden geç | yanlış zaman → sert iniş |
 | **Sollama** | öndeki araç yavaşlatınca parlar | karşı şeride çıkıp geçer | karşıdan araç varsa çarpışma |
-| **Işıkta geç** | kırmızıda durunca parlar | beklemeden geçer | çapraz trafik, ceza olayı |
+| **STOP** | kırmızı ışık, geçen yaya, kapı (otopilot) | motor orada durur, yeşilde / yol açılınca kendi devam eder | basmazsan kırmızıyı geçer, yayayı ürkütür, kapıyı geçer |
 | **Korna** | yaya / yavaş araç | yol açar | kaba → küçük puan kaybı (bazı olaylarda) |
 | **Kestirme** | bazı kavşaklarda belirir | ara sokak / park içinden kısa yol | sarsıntılı, yiyecek hasarı |
 
@@ -81,13 +95,236 @@ Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sok
 
 Teslimatların bir kısmında olay çıkar; zaman yavaşlar, kart veya QTE gelir. Tepki penceresi Refleks becerisiyle uzar.
 
-- *Seçim kartı*: sarı ışık (bas / dur), yol çalışması (dolambaç / kaldırımdan), müşteri mesajı ("ketçap alır mısın?"),
+- *Seçim kartı*: sarı ışık (bas / dur; otopilotta ve frende yok: ışıklar STOP'un / frenin), yol çalışması (dolambaç / kaldırımdan), müşteri mesajı ("ketçap alır mısın?"),
   yaşlı teyze karşıya geçiyor (bekle / korna), rakip kurye yarışa davet ediyor, yağmur başladı, polis çevirmesi,
   hayranın selfie isteği, sipariş hazır değil (bekle / mutfağa yardım et).
 - *Refleks QTE*: köpek kovalıyor (hızlı tıkla), açılan araba kapısı (yöne kaydır), yola top kaçtı (zıpla),
   güvercin sürüsü (korna).
 - *Ritim QTE*: külüstür motor stop etti (yeşil bölgede bas, marş), lastik patladı (pompala).
 - Külüstüre özel arızalar; araç iyileştikçe arıza olayları azalır.
+
+### Fren (telefon; masaüstünde *Auto-drive*)
+
+Denetim raporunun "ustalaşılacak tek bir hareket yok" bulgusu üzerine (2026-10-28, kullanıcı: "yap"): telefonda dört ayrı
+sürüş biçimi yerine tek fiil, **basılı tut = fren**. Aşağıdaki *Şerit ve fren prototipi*nin B'si ("Geç Fren") varsayılan
+oldu; STOP'un "ne zaman duracağın senin kararın" fikri onun içine katlandı (dokunuş yerine basılı tutmak: ne zaman ve ne
+kadar), şerit değiştirme kalktı. Kod: `ride.js` "Lanes & brake" bölümü (`R.scheme === 'b'`), test `tools/ctl.mjs b`.
+B'nin kuralları (viraj sınırı, vites, halka, geri sayım, kavşakta dönüş) prototip bölümünde; farklar:
+
+- **Kontrol:** gaz hep açık; ekranın herhangi bir yerine basılı tut = fren (~0,15 sn'de tam güç, 9,5 m/s²), bırakınca
+  motor yine hızlanır. Kaydırma yalnız sokak seçilecek bir an varken sayılır (kavşağın okları, kestirme); başka zaman
+  freni tutan başparmak yana kaysa da fren sürer. **Şerit yok:** şeridi kapatan engel de yok — çift park etmiş araç ve
+  yol çalışması bariyeri frende koni olur (yavaş geç). Yalnız *yol çalışması* kartının bariyerinde otopilot işçiyi bekler;
+  6 sn'den uzun takılırsa yedek kural olarak karşı şeritten dolanır, o sırada karşıdan gelen araba motoru görüp fren
+  yapar (`traffic.blockers`, serbest sürüşteki gibi). Klavye: ↓ / S / Space fren; ← / ↑ / → kavşakta sokak.
+- **Kırmızı oklar ve tabela** (hız göstergesinin yanında) en yakın fren noktasını gösterir (tam frenin %80'i):
+  viraj (hız sınırı, km/s), kırmızı ışık (yalnız vardığımızda hâlâ kırmızı / sarı olacaksa ve önümüzde ışıkta bekleyen
+  araba yoksa — yeşile yetişeceksen ok yok), **karşıya geçen yaya** (yürümeye başlamış ve vardığımızda yolumuzda olacak;
+  olay kartlarının yayalarını otopilot bekler), **yolumuzdaki çukur / su birikintisi / koni / kasa** (16 km/s; otopilot
+  koni ve kasa için kendisi yavaşlamaz), kapı.
+- **Ödüller (Flow → bahşiş):** PERFECT CORNER, PERFECT STOP (halkanın ortası), GREEN WAVE (kırmızıyken görülen ışığa
+  durmadan yeşilde yetişmek), **SMOOTH** (çukur / su birikintisi / koni / kasa üstünden ≤ 16 km/s ile, son 3 sn içinde fren
+  yapılmışsa: yemek sarsılmaz), SMART TURN, vites.
+  Motor dururken Flow süresi işlemez (kırmızıda beklemek kimsenin suçu değil; bedeli vitesin 1'e düşmesi).
+- **Cezalar:** viraj sınırının %106–145'i dışa kayma, üstü kaza; **kırmızıyı geçmek** STOP'taki gibi Flow'u bitirir, kavşakta
+  kamera varsa (bölgenin şansı, yukarıda) ceza (1 + 2 × bölge ücret çarpanı, ilk iki teslimatta uyarı; "RED RUNNER" Flow'u
+  yok), yan yolda gerçekten araba varsa
+  "T-boned"; ışık çizgiden geçmeden en fazla 0,5 sn önce kırmızıya döndüyse sarıda girilmiş sayılır (kaçınılmaz ikilem
+  yok; bu kural her sürüşte). **Yayayı ürkütmek** (yaya sıçrar, motor yavaşlar, yemeğe 9, Flow biter). Yaya tahmini
+  frende motorun bırakınca hızlanacağını hesaba katar (yoksa tabelaya uyan oyuncu da ürkütüyordu). Engele hızlı: eski hasar
+  (çukur 11, su 4, koni 8, kasa 10, hız kaybı, Flow biter). Kapıyı geçmek: kayarak durur, geri geri halkaya.
+- **Olaylar:** sarı ışık kartı çıkmaz (ışıklar frenin). Öbür kartlar ve QTE'ler değişmedi.
+- **Süreler** (`orders.js`): frende dikkatli sürücü her motorda aşağı yukarı aynı hızda (`SEED=7 BOT=1 tools/speed.mjs`,
+  6'şar sürüş, Külüstür / Vespetta / Viper: Old Town 5,5 / 5,7 / 6,7 · Downtown 5,9 / 5,5 / 6,5 · Harbor 5,6 / 5,7 / 5,2 m/s;
+  ilk ölçümde Zippy 5,7, Volt 6,0 — hızı viraj, ışık ve yaya belirliyor, tepe hız değil; STOP'ta da aynı: Old Town
+  Vespetta 5,6, Viper 5,9, ama orada turbo var). Bu yüzden frende süre motoru ^0,15 ile izler (eskiden ^0,45),
+  Sv 10'un "turbosuz zamanında"sından sonra daralmaz (`etaSlack` en az 1,06) ve hızlı siparişlerin sıkıştırması yarıya
+  iner (Rush ×0,78 → ×0,89, VIP ×0,95, Express ×0,85). Hesapla dikkatli sürücü Sv 10'dan sonra standart siparişte
+  sürenin ~%80–95'inde, Rush'ta ~%90–105'inde; erken gelmek geç frene, yeşil dalgaya ve vitese kalıyor. Sipariş
+  kartındaki "you ~" tahmini de frende motoru ^0,15 ile izler. Kısa rotalarda iki kırmızı ışık sürenin sabit 6 sn'lik
+  payını aşıyordu (ölçümde kısa bir standart siparişte dikkatli sürücü %140): 2026-10-30'dan beri frende ve koşuda
+  sabit pay 12 sn (bir tam kırmızı, duruş ve kalkış; `FIXED_STOP`). Şehirde rotalar ~40 m'de bir ışığa rastlar (Hills'te
+  hiç): ışık başına süre de denendi, ama ışıklar mesafeyle orantılı olduğundan uzun siparişleri de %30 uzatıyordu.
+- **İlk sürüş:** yeni kart (`seen.brakeTip`, STOP'u görmüş oyunculara da), karşılama slaytı "The gas is always on".
+  İlk karşılaşmada ağır çekimli ipuçları `seen.c_lb_*` (şeridin "sola kaydır" ipucu frende çıkmaz).
+- **Henüz eski oynanışa göre** (sonraki adım): turbo'ya bağlı Sürüş / Dayanıklılık becerileri ve araçların `boost`
+  değeri (frende işe yaramıyor; fren gücü / viraj tutuşuna dönmeli), parçalara "Fren", tıklama QTE'leri (köpek, stop
+  eden motor, patlak lastik), enerji kutuları paraya döner, kırmızıyı geçince kameranın çapraz trafiği göstermesi.
+
+### Kurye Koşusu (`?ctl=run`, prototip)
+
+Kullanıcı (2026-10-29): "bu dönüşlerin de hızını ayarlama olayını hiç sevmedim ya, biraz subway surfers, temple run gibi
+oyunlardan ilham alalım" → önerdiğim *Kurye Koşusu*: "yap". İlk hâli yalnız kaydırmaydı: otopilot kendi şeridinde
+mesafeyi koruyor, kırmızıda bekliyordu (↑ ile geçilirdi). Kullanıcı (2026-10-30): "sürüş yapısı şöyle olsun, yol auto
+drive olsun, şeritlerde sağ sol yapmak zorunda kalalım, araba sıklığı artsın gerçek hayattaki gibi, kuryeler arabaların
+arasından geçmiş olacak. frenleme butonu olsun hem ışıklarda hem de çarpışma önlemek için". Şimdiki hâli bu: **yol
+kendini sürer, trafik oyuncunun.** `?ctl=run` cihaza yazılır (sağ altta "Prototype · courier run"). Kod: `ride.js` "the
+courier run" bölümü ve `R.scheme === 'run'` dalları (şerit koşusunun şeritleri, kaldırımı, sapanı ve kavşakta dönüşü
+üstüne), test `tools/ctl.mjs run`.
+
+- **Kontrol:** sağ altta **BRAKE** pedalı (basılı tut = fren, 9,5 m/s²; bırakınca gaz yine açık). Pedal bir araba fren
+  pedalı (`PEDAL`, `ui.js`, SVG): kolu yukarıda cıvatalı mafsalda, çelik plaka, nervürlü kauçuk. Basılıyken menteşesinden
+  öne yatar (CSS `rotateX`), etrafı fren lambası gibi kırmızı parlar; klavyeyle frende de iner. Ekranın başka her yeri
+  kaydırma: **← / →** şerit (karşı şerit, kendi şeridin, kaldırım; kaldırım yalnız düz bloklarda), **↑** zıpla (çukur, su
+  birikintisi, koni, yol çalışması bariyeri, kasa; son kısımda zıplamak PERFECT HOP). Bir başparmak freni tutarken öbürü
+  kaydırabilir. Yolda basılı tutmak bir şey yapmaz. **Kaydırma hep şerit, kavşakta seçim yok:** her dönüşü GPS alır,
+  kavşak okları çıkmaz (`updateJunction` koşuda `R.junc`'u hep boş bırakır). İlk hâlinde kavşak penceresinde kaydırma
+  dönüştü; kalabalık trafikte kavşaktan önce yavaş arabayı geçmek için sola kaydıran oyuncu yan sokağa sapıyordu (test
+  botu bu yüzden kavşak yakınında hiç şerit değiştiremedi, kısa bir siparişte sürenin %179'u); sonra oklara dokunularak
+  seçiliyordu, 2026-10-30'da kullanıcının isteğiyle oklar da kalktı. HUD'da şeridi gösteren üç kutu yok (yalnız draft
+  barı kalır). Klavye: ← / → (A / D) şerit, ↓ / S / Space fren, ↑ / W zıpla.
+- **Otopilot** yalnız tempoyu, virajı (şeridin çizgisinden, viraj hızı oyuncunun derdi değil) ve kapıdaki duruşu tutar.
+  Öndeki araba, çift park etmiş araç, karşıdan geçen yaya ve kırmızı ışık için **durmaz**: fren ya da başka şerit.
+  Öndeki arabaya kapanma hızı 4,5 m/s üstüyse kaza ("Rear-ended a car!"), altıysa sarsıntı ve arabanın hızına inme; park
+  etmiş araca 4,5 m/s üstü kaza, değilse durur (6 sn sonra karşı şerit boşsa kendisi dolanır). Kırmızıyı geçmek Flow'u
+  bitirir, kamera bölgenin şansıyla ceza keser (frendeki gibi), yan yolda araba varsa "T-boned"; ışık çizgiden 0,5 sn önce kırmızıya döndüyse
+  sarıda girilmiş sayılır. Durmadan yeşile yetişmek GREEN WAVE. Yaya ürkütmek frendeki gibi.
+- **Trafik:** rotanın çevresi kalabalık (`denseTick`). 0,4 sn'de bir önümüzdeki 160 m sayılır: bölgenin payından az araba
+  varsa bisikletten en uzaktaki (170 m+, görünmeyen) araba alınıp rotanın 105–160 m ilerisine konur (sisin içi). Kendi
+  şeridimizde ağır aksak (3–6,5 m/s, motorlardan yavaş: arkasında kalan fren yapar ya da araya girer), karşı şeritte
+  5–8 m/s akan bir sıra; en az bir sonraki kavşağa kadar rotayı izlerler. Aralık Downtown'da kendi yönümüzde ~30 m,
+  karşıdan ~40 m, sakin bölgelerde daha seyrek (`traffic` 0,4–1,0 → yoğunluk ×0,67–1). Sürüş bitince arabalar eski
+  hızlarına döner. Karşı şeritte neredeyse durmuş (2,5 m/s altı) bir motoru karşıdan gelen araba görüp fren yapar; üstüne
+  sürülen motoru görmez (kafa kafaya kaza).
+- **Oyuncunun riskleri:** karşı şerit hızlı ama karşıdan gelenle kafa kafaya; kaldırımda araba yok ama masa, direk ve
+  insan (çarpınca kaza; bordürden iniş-çıkış yemeği sarsar). Zıplanmayan alçak engel **sendeletir**: hız %35'e düşer (su
+  birikintisinde %60), motor sallanır, Flow biter, yemek 1,5 kat hasar alır (çukur 16,5, su 6, koni 12, bariyer 18, kasa
+  15); frenle 16 km/s altında üstünden geçmek yalnız sarsıntı (son 3 sn'de fren yapılmışsa SMOOTH).
+- **Paralar:** düzlüklerde para sıraları (kendi şeridinde 5, karşı şeritte ve kaldırımda 7: riskli şeritte daha çok),
+  tane başı $0,15 × bölge ücret çarpanı, art arda toplanınca ses inceliyor, Flow serisini canlı tutar; fişte "Cash found
+  on the road". Banknotlar eskisi gibi (bir kısmı kaldırımda), enerji kutuları paraya döner.
+- **Flow** (kusursuz zıplama, sollama, sapan, kıl payı, akıllı dönüş, kestirme, yeşil dalga) tepe hızı %20'ye kadar açar.
+- **Yemek = can barı:** kutu barı 5 dilimli. Sıfıra inerse sipariş **bozulur**: ücret, bahşiş yok, 1★ ("FOOD RUINED",
+  fişte "food ruined").
+- **Süreler:** kalabalık trafikte dikkatli sürücü frendekiyle aynı hızda (`SEED=7 CTL=run BOT=1 tools/speed.mjs`, 5'er
+  sürüş, Külüstür / Vespetta / Viper Old Town 5,2 / 6,2 / 6,6, Downtown Vespetta 6,1 m/s; trafik oyuncunun olmadan önce
+  6,4–7,3). Bu yüzden koşu da frenin sürelerini alır: motor ^0,15, Sv 10'dan sonra daralmaz (`etaSlack` en az 1,06),
+  hızlı siparişlerin sıkıştırması yarıya iner, sabit pay 12 sn (frendeki gibi; kısa bir standart siparişte dikkatli
+  sürücü 6 sn'lik payla sürenin %178'iydi). Sipariş kartındaki "you ~" dikkatli sürücüye göre (taban ×1,1).
+  **Dokunmayan sürücü daha hızlı** (Downtown Vespetta 6,8 m/s): kırmızıları geçer, arabaya çarpıp onun hızıyla devam eder
+  (kaza 1,8 sn). Bedelini yemekle ve cezayla öder (aşağıda *Ölçüm*); zaman farkı istenirse kazanın süresi uzatılabilir.
+- **Karşı şeritte sıkışma** (her şeritli sürüşte): burun buruna duran iki araç kaza sayılmaz; kafa kafaya kazadan sonra
+  karşıdan gelenler motoru görüp durur; karşı şeritte bir arabanın önünde durup yanındaki şeride (park etmiş araç
+  yüzünden) dönemeyen motor geri geri çekilip şeridine girer. Otopilotun kendi dolanışı ancak önündeki ışığa kadar
+  bitebilecekse başlar (karşı şerit 40 m boş) ve karşıdan araba gelirse yavaşlayıp ona yol verir.
+- **Kalabalık trafikte bulunan hatalar** (2026-10-30, her şeritli sürüşte): (1) araba motoru yalnız düz bir ışınla
+  arıyordu; köşeyi dönerek gelen araba karşı şeritte duran motoru görmüyordu, kazadan sonra her kalkışında yeniden
+  çarpıyordu (bir siparişte 5 kafa kafaya). Artık kendi yolu boyunca bakar (bu karodaki eğrisi, sonra çıkış yönünde düz,
+  40 m; serbest sürüşte de). (2) Duran motor için duran arabanın durma noktası kafa kafaya kontrolünün 1,2 m'sinin
+  içindeydi: fren yapıp duran araba yine kaza sayılıyordu (`blocker.pad` 0,8 m). (3) Kavşakta dönüp giden ya da
+  dönüp gelen araba "karşıdan gelen" sayılıyordu: yanından dönen arabaya kafa kafaya kaza yazılıyordu. Artık yalnız
+  bizim yolumuzu ters yönde izleyen araba karşıdan gelendir. (4) "Yan şerit boş mu" yalnız bulunduğu karoya bakıyordu
+  (karo sınırındaki arabayı görmüyordu); artık öncekine ve sonrakine de. (5) Kapıya ya da ara sokağa 15 m kala ve
+  kaldırımın ucunda motorun kendi şeridine kendiliğinden dönüşü önündeki arabaya bakmıyordu; koşuda artık arabanın
+  arkasında frenle durabilecek yer yoksa beklemeye devam eder.
+- **İpuçları:** ilk sürüşte kart (`seen.lbTip_run2`; trafik oyuncunun olunca yeniden), karşılama slaytı "Weave through
+  traffic"; ilk karşılaşmada ağır çekimli `seen.c_run_hop / lane / red / onc / coins / light` (öndeki araba, kırmızı ve
+  karşıdan gelen için BRAKE butonu parlar; draft, kestirme ve dönüş ipuçları şerit koşusunun `c_lb_*`'ı).
+- **Yapılmayanlar (sonra):** iki şeridin arasından (şerit çizgisinin üstünden) geçmek, güçlendirmeler (termos, mıknatıs,
+  roket kutu), aynı siparişe yarışan rakip kurye, kırmızıyı geçince polis kovalaması, "yeni kutu, devam et" ödüllü
+  reklamı, olay kartları ve QTE'ler (değişmedi; olay kartı açıkken BRAKE butonu gizli), koşu oyunlarına özgü kamera.
+- **Ölçüm** (`PAIRS=3 tools/ctl.mjs run`, Vespetta, Sv 6, aynı 3 sipariş, olaylar kapalı, her bacakta bir yaya; dikkatli
+  sürücü `runBot`: zıplanacak şeye son anda zıplar, öndeki yavaş arabayı, park etmiş aracı ya da yayayı karşıdan gelen
+  sırada yeterli boşluk varsa karşı şeritten geçer, geçemediğine fren yapar, kırmızıda durur; karşı şeritte dönemezse
+  durur ve araba durunca ağır ağır ilerler). Son tur: önümüzdeki 160 m'de ortalama 4,2 araba bizim yönde, 2,5 karşıdan;
+  dikkatli 4,7★, yemek %86, $51,3, 61 sn (sürenin %71'i), 0 geç, 0 kaza, 0 kırmızı · dokunmayan 2,3★, %36, $6,3, 69 sn
+  (%83), 1 geç, 7 kaza, 8 kırmızı (8 kamera cezası), 6 ürkütülen yaya, 1 bozulan sipariş. Önceki turlarda aynı sürücü
+  siparişe göre 0–1 kaza yaptı; dokunmayan sürücü hep 7–26 kaza. Dokunmayan bazen daha hızlı (kırmızıları geçer, çarpıp
+  devam eder) ama kazanamaz: cezalar ve bozulan yemek. Fren, şerit koşusu, STOP ve serbest sürüş testleri de hatasız.
+
+### STOP (`?ctl=stop`; 26–28 Ekim telefonda varsayılan)
+
+Kullanıcı (2026-10-26): "kırmızıda kendimiz duruyoruz, geçmek için buton var — sürücü kendiliğinden durmasın, kırmızıysa
+STOP butonu çıksın; ayrıca ekrana hiç dokunmadan teslimat bitirilebiliyor, akışa net ama yumuşak engeller koy". Kural tek
+cümle: *motor kendi sürer ama durmak senin işin*. Kod: `ride.js` "STOP is the rider's" bölümü, test `tools/stop.mjs`.
+
+- **Ne zaman çıkar:** alt ortada büyük kırmızı sekizgen (yatay ekranda HOP'un solunda), şu üçünden en yakını için
+  (~2–3,5 sn önceden: konfor fren mesafesi + 2,2 sn'lik yol + 8 m): **kırmızı ışık** (vardığımızda hâlâ kırmızı / sarıysa
+  ve önümüzde ışıkta bekleyen araba yoksa; etikette yeşile kalan saniye), **yaya** (yürümeye başlamış ve vardığımızda
+  yolumuzda olacak bir yaya — olay kartlarının yayaları hariç, onları otopilot bekler), **kapı** (son 70 m, kapıda halka).
+  Işık geri sayımı (§3 prototip) otopilotta da sinyal direğinin üstünde.
+- **Basınca:** motor durma noktasına kadar sürer, normal fren eğrisiyle (7,5 m/s²) durur; ışık yeşile dönünce / yaya
+  geçince kendi devam eder, kapıda halkada durunca sahne başlar. Beklerken buton söner ("wait · 4 s").
+- **Zamanlama:** fren noktasından (7,5 m/s²) önceki son ~1 sn (hız + 2 m) butonun **yeşil yandığı** an: o an basmak
+  **PERFECT STOP** (Flow → bahşiş; kapıda özellikle değerli, Flow teslimde bahşişe çarpılır; STOP ile durulan yerde
+  beklerken Flow süresi işlemez, yoksa 8 sn'lik kırmızı her seriyi bitirirdi). GPS okları fren noktasından
+  durma noktasına kadar kırmızı. Daha geç (sarsılır): **sert fren**, yemeğe küçük darbe; artık duramayacak kadar geçse
+  (11 m/s² ile bile) buton ışık/yaya için kaybolur.
+- **Basmazsan:** *kırmızı ışık* → geçersin: kavşakta kamera varsa (30 Ekim'e kadar her seferinde; artık bölgenin şansı,
+  §3 başı) patlar (beyaz flaş + deklanşör), küçük
+  ceza (1 + 2 × bölge ücret çarpanı: Old Town $3, Downtown $5, Harbor $6, Hills $8; ilk iki teslimatta yalnızca uyarı),
+  Flow kamera olmasa da biter. Yemek ve yıldız etkilenmez. Yan yolda gerçekten araba varsa çarpışma ("T-boned"), ama çapraz trafik
+  şehrin kendi trafiği: 27 Ekim'e kadar STOP çıkınca yan yola görüş dışından bir araba gönderiliyor, geçen oyuncu için
+  frene asılıp korna çalıyor ve motoru yarı hıza düşürüyordu — kullanıcı "yalandan" buldu, kaldırıldı. *Yaya* → yaya sıçrayıp
+  kaçar, motor savrulur ve yavaşlar, yemeğe 9 darbe, Flow biter (Honk da işe yarar: yaya koşar, STOP kaybolur). *Kapı* →
+  motor geçer, kayarak durur (yemeğe 4), geri geri halkaya döner (~5 sn). "Run it!" butonu kalktı; otopilotta "RED RUNNER"
+  ve "GREEN WAVE" Flow'u yok.
+- **Ölçüm** (`tools/stop.mjs`, Vespetta, Sv 6, aynı 4 sipariş, her bacakta bir yaya, olaylar kapalı): dikkatli sürücü
+  (`game.ride.autoBot()`, yeşil anında basar, turbo yok) 3,8★, yemek %84, ortalama $35,5, 115 sn; hiç dokunmayan 3,0★,
+  yemek %47, $9,8 (iş başı $14–46 kamera cezası, bazen eksiye düşüyor), 77 sn — bu ölçüm sahte çapraz trafik ve %35
+  kamera şansıyla. 27 Ekim'den sonra (her kırmızıya kamera, sahte çapraz trafik yok; aynı ilk 3 sipariş): dikkatli 4,7★,
+  yemek %86, $40, 99 sn; hiç dokunmayan 4,0★, yemek %72, $21, 75 sn (iş başı 4–6 kırmızı, $14–22 ceza, kısa bir işte
+  −$5). Hiç dokunmayan iki kapıyı da geçip geri dönüyor; kilitlenme yok. Kırmızıda gerçek bir araba çarparsa ("T-boned")
+  bu o kırmızıda bir kez olur, sonra yan yoldaki arabalar motor kavşaktan çıkana kadar durur (önceden motor kalkarken
+  aynı araba tekrar tekrar çarpabiliyordu: bir işte 4 kez). Dikkatli sürüş ≈ eski
+  otopilotun süresi (o da kırmızıda ve yayada bekliyordu), yani `etaFor` kalibrasyonu geçerli (Acil siparişlerde turbosuz
+  geç kalıyor, tasarım gereği); dokunmayan daha hızlı ama ceza ve yemek kaybı ağır basıyor. İlk ölçümde (çapraz trafik
+  5 darbe, Flow beklerken sönüyordu) iki sürücü aynı yıldızı alıyordu: dikkatli olan geç kalıyor, dokunmayan yemeği
+  bozuyordu — bu yüzden Flow beklerken donar ve çapraz trafik hız da aldırır.
+- **Tuşlar** (Auto-drive açıkken): S / ↓ STOP, A / ← sollama, D / → kestirme (eski G "Run it" ve S kestirme kalktı).
+- **İpuçları:** ilk sürüşte yeni kart (`seen.rideTip2`: "stopping is your job"); her durak türünün ilk karşılaşmasında
+  ağır çekimli ipucu (`seen.c_stop_light / c_stop_ped / c_stop_door`), deneyimli oyunculara da (STOP herkese yeni).
+
+### Şerit ve fren prototipi (`?ctl=a`; B 28 Ekim'den beri varsayılan, yukarıda *Fren*)
+
+QA geri bildirimi (2026-10-25): "turbo buton falan olmadan tüm mekaniği sağ sola geçme ve fren üzerinden kurgula".
+`?ctl=a` / `?ctl=b` / `?ctl=stop` cihaza yazılır (`localStorage` `fds_ctl`), `?ctl=off` siler. Her cihazda çalışır
+(masaüstünde serbest sürüşün yerine geçer; `?ctl=b` masaüstünde freni zorlar); sağ altta yalnız A'da "Prototype A · lane run"
+yazar. Kod: `ride.js` "Lanes & brake" bölümü. B'nin aşağıdaki kurallarını *Fren* bölümündeki farklarla oku (yayalar,
+çukurlar, kırmızı ışık kamerası, şerit yok).
+
+- **Kontrol:** gaz hep açık. Ekranın herhangi bir yerine **basılı tut = fren** (parmak değdiği an tutar, ~0,15 sn'de tam güç,
+  9,5 m/s²). Parmak 24 px yana kayarsa fren bırakılır ve **bir şerit** geçilir; yukarı kaydırmak düz giden kestirmeyi alır.
+  Klavye: ←/→ (A/D) şerit, ↓/S/Space fren, ↑/W düz kestirme. Turbo, HOP, korna ve bağlam butonları (Overtake, Run it, Honk)
+  yok, serbest bakış kapalı. Kestirme çıkınca alt ortada hangi yöne kaydırılacağı yazar; o yöne kaydırmak ara sokağa sokar
+  (şerit değişmez). Yan tarafta bir şey varken (park etmiş araba, yanımızdaki araba, kaldırımda masa/insan) o şeride geçilmez:
+  sürtme + küçük yemek hasarı. Motorun arkasında fren lambası, frende hız göstergesi kırmızı.
+- **A — Şerit Koşusu:** otopilot direksiyonu ve virajları yapar; öndeki araba, kırmızı ışık, karşıya geçen yaya ve şeritteki her
+  şey oyuncunun. Üç şerit: **karşı şerit** (kendi şeridimizin 3,2 m solu; karşıdan gelen araçla kafa kafaya = kaza),
+  **kendi şeridimiz**, **kaldırım** (3,9 m sağı = yol ortasından 5,5 m: ağaç/lamba sırası ile kafe masaları arasındaki yaya
+  çizgisi). Kaldırımda araba yok ama yürüyen ve oturan insanlar, kafe masaları var; hız ×0,8, bordürden çıkış/iniş yemeği
+  sarsar (çıkarken ağaç aralarından geçilir, çarpışma sayılmaz). Kaldırım yalnız düz bloklarda: kavşaktan, virajdan ve kapıya
+  20 m kala biter, motor kendiliğinden yola iner (yol doluysa kaldırımın ucunda bekler).
+  Öndeki arabaya kapanma hızı 4,5 m/s üstüyse kaza (masaüstü serbest sürüşle aynı eşik), altıysa sarsıntı ve arabanın
+  hızına inme; çift park: 4,5 m/s üstü kaza, değilse durur (6 sn sonra karşı şerit boşsa kendisi dolanır). Kırmızıda geçmek
+  oyuncunun kararı (kamera cezası şansı, çapraz trafik — klasik "Run it!" kuralları). **Draft:** kendi şeridimizde 10 m'den
+  yakın bir arabanın arkasında ~1,2 sn → dolu (kopunca 1,5 sn'de boşalır);
+  şerit değiştirince **sapan**: anında +1,2–3,4 m/s, 0,9–2,5 sn tepe hız ×(1 + 0,3 × aracın turbo değeri), turbo alevi.
+  Flow tepe hızı %12'ye kadar açar. Enerji kutuları paraya döner; paraların bir kısmı kaldırımda ve karşı şeritte.
+- **B — Geç Fren:** otopilot trafikte mesafeyi korur (öndeki araba, çift park, yol çalışması, yaya), ama **viraj, kırmızı ışık
+  ve kapı** oyuncunun. Her virajın hız sınırı √(8,5 × tutuş × yarıçap), yarıçap girilen şeride göre (dış şeritten geniş yay =
+  daha hızlı viraj). Girişte sınırın %86–106'sı ve son 2,5 sn'de fren yapılmışsa PERFECT CORNER; %106–145 arası dışa kayma
+  (sağ dönüşte karşı şeride, solda bordüre doğru; yemek hasarı, Flow biter); %145 üstü kaza. Viraj içinde gaz tutuşun üstüne
+  çıkaramaz. GPS okları fren noktasından hedefe kadar kırmızı (tam frenin %80'iyle hesap); hız göstergesinin yanında sıradaki
+  şeyin tabelası (viraj sınırı km/s, STOP, kapı), fren geç kalınca tabela ve gösterge yanıp söner. Kapıda 2,6 m'lik halka:
+  içinde dur (merkeze 0,9 m'den yakın = PERFECT STOP, Flow → bahşiş); geçersen motor kayarak durur ve geri geri halkaya döner.
+  **Vites:** tam durmadan geçilen her kavşak +1 vites (en çok 5, her biri tepe hıza +%4), tam duruş (olay beklemeleri hariç)
+  1'e indirir. Kırmızıyken görülen ışığa durmadan yeşilde yetişmek GREEN WAVE.
+- **Kavşakta dönüş (iki şemada):** rotada başka sokağa çıkışı olan bir kavşağa ~2 sn kala (16 m ya da 2,2 sn'lik yol) motorun
+  üstünde oklar belirir: GPS'in yolu mavi, öbür çıkışlar ne kazandırdığıyla etiketli ("−20 m", "skip 1 light", "+30 m",
+  "same"; kazandıranlar yeşil ve yanıp söner, belirince kısa bir tık sesi). Kaydırmazsan GPS'in yolu; sağa/sola kaydırmak
+  (ya da yukarı = düz) ya da oka dokunmak o sokağa sokar (Kurye Koşusu'nda oklar hiç çıkmaz: dönüşleri GPS alır), GPS
+  aynı kapıya yeniden rota çizer (`replaceRoute`, engeller yeniden, olay taşınır).
+  Pencere dönüş yayının başladığı yerde kapanır ve yalnız kendi şeridinden açılır: karşı şeritte ya da kaldırımdayken
+  (ve şeritte takılı kaldıysan, `blockHz`) kaydırma şerit değişimi olarak kalır — kendi şeridine dönüş olarak değil. Kazandıran
+  dönüş SMART TURN (Flow). Her çıkış için A* bir kez hesaplanır (`updateJunction`, kavşak başına). Masaüstünde oklar tıklanır.
+- **Işık ritmi (iki şemada):** rotadaki bir sonraki ışığın (70 m içinde) kendi yönümüzdeki sinyal direğinin üstünde geri sayım
+  (kırmızıda yeşile, yeşilde sarıya kalan saniye; ışık döngüsü 17 sn: 7 yeşil, 1,5 sarı). B'nin STOP tabelasında da
+  "red · 4 s". Kırmızıyken görülen ışığa durmadan yeşilde yetişmek artık her iki şemada GREEN WAVE.
+- **İpuçları:** ilk sürüşte şemaya özel kart (`seen.lbTip_a/b`); ilk karşılaşmada ağır çekimli tek seferlik ipuçları
+  (`seen.c_lb_*`: fren, kırmızı oklar, şeritte engel → sola kaydır, draft dolu → çık, halka, kestirme, kazandıran dönüş, geri sayım). Olay kartları ve
+  QTE'ler değişmedi (tıklama QTE'leri iki fiile uymuyor; yön seçilince dönüştürülecek). Turbo'ya bağlı Riding/Stamina
+  becerileri, araçların `boost` değeri ve `etaFor` süre kalibrasyonu da henüz eski oynanışa göre.
 
 ## 4. İlerleme
 
@@ -103,7 +340,7 @@ Teslimatların bir kısmında olay çıkar; zaman yavaşlar, kart veya QTE gelir
 | Viper 600 (spor) | $12.000 | 75 | 2 | güçlü turbo |
 
 **Kurye becerileri** (seviye atladıkça puan + nakit): Sürüş (turbo süresi/şarjı), Navigasyon (kestirmeler, ETA payı),
-Cazibe (bahşiş), Refleks (QTE penceresi), Dayanıklılık (enerji barı).
+Cazibe (bahşiş), Refleks (QTE penceresi), Dayanıklılık (enerji deposu seviye başına +2 ⚡; masaüstünde turbo deposu +%20).
 
 **Bölgeler** (işe girme: seviye + puan + araç şartı + başvuru ücreti):
 
@@ -120,7 +357,8 @@ kuryelerimiz şehirde dolaşır. "Your drivers kept working!" ekranı.
 
 ## 5. Arayüz
 
-Dikey, tek elle. Üst bar: seviye/XP, nakit, puan, saat. Alt sekmeler: **City · Garage · Courier · Jobs · Fleet**.
+Dikey, tek elle. Üst bar: seviye/XP, enerji (⚡ dolu/depo; dolarken altında bir sonrakine kalan süre; dokununca enerji
+paneli: depo, geri sayım, enerjinin yolları, kahve), nakit, puan, saat. START barının sağ üstünde işin enerji bedeli. Alt sekmeler: **City · Garage · Courier · Jobs · Fleet**.
 Görsel dil konseptten: lacivert yarı saydam paneller, yeşil "oyun" butonları, krem menü zemini, kalın yuvarlak yazı
 (Lilita One + Fredoka), kırmızı kask/kutu marka rengi. "D2 · Rozet" katmanı: başlıklar kırmızı kurdele, seviye altın
 kalkan, önemli yazılar açılış logosu gibi koyu konturlu, süre altın kronometre. Masaüstünde de çalışır (Space turbo, W/↑ zıpla, E eylem,
@@ -153,7 +391,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 |---|---|
 | `js/main.js` | açılış, ana döngü, hub ⇄ sürüş geçişi (kamera tween), sipariş panosu, harita işaretçileri, garaj vitrini, iş sonu fiş/XP/gün |
 | `js/data.js` | tüm içerik tabloları: bölgeler, araçlar, parçalar, beceriler, yemekler, restoranlar, sipariş tipleri, filo, hedefler |
-| `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, gün saati |
+| `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, enerji (`tickEnergy`, `useEnergy`, `buyCoffee`), gün saati |
 | `js/career.js` | başarımlar (istatistikten okunur, ödülü hemen verir) |
 | `js/orders.js` | sipariş üretimi (bölge profiline göre mesafe ve tip karışımı, pano bölge filtresi), ücret, süre (`etaFor`: ölçülmüş otomatik pilot hızı × seviye payı), yıldız/bahşiş hesabı |
 | `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
@@ -164,7 +402,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/city/backdrop.js` · `train.js` | ufuk dağları (sis renginde), doğu tepesindeki evler, körfez (mendirek + deniz feneri, iskele + dönme dolap), saat kulesi; viyadükte giden metro |
 | `js/look.js` | renk derecelendirme (özel tone mapping: doygunluk, sıcak ışık/serin gölge, kontrast) ve parlak malzemeler için ortam haritası |
 | `js/city/traffic.js` | instanced arabalar, trafik ışıkları, yayalar, filo kuryeleri (rider ajanları) |
-| `js/ride/ride.js` | otomatik pilot sürüş, masaüstünde serbest sürüş (fizik, çarpışma, GPS, varış halkası), güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
+| `js/ride/ride.js` | telefonun freni, Kurye Koşusu (`?ctl=run`) ve şerit koşusu prototipi (§3 *Fren*, *Kurye Koşusu*, `?ctl=a`), otomatik pilot ve STOP'u (`?ctl=stop`), masaüstünde serbest sürüş (fizik, çarpışma, GPS, varış halkası), güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
 | `js/ride/world.js` | serbest sürüş için şehir: zemin (asfalt/kaldırım/çim ve yüksekliği), çarpılabilir her şey (10 m ızgarada), rota başlatılacak yol karosu |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
@@ -174,13 +412,24 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `admin/` | analitik paneli: `index.php` giriş + kabuk, `api.php` salt-okunur sorgular, `app.js` görünümler + SVG grafikler (isimleri oyunun `data.js`'inden alır) |
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
-`node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/tabs.mjs W H` (sekme görüntüleri),
-`node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (otomatik pilotun gerçek ortalama hızı; `BOOST=1` turbo ile — süre kalibrasyonu için). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok.
+`node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/stop.mjs` (`?ctl=stop` otopilotunun STOP'u telefonda: ilk sürüş kartı, buton ve etiketleri, "Run it!" yok, kırmızıda basınca çizgide durup yeşilde devam, hiç dokunmadan kırmızı geçme + her birine kamera cezası, yaya ürkütme, kapıyı geçip geri dönme, dikkatli sürücü `game.ride.autoBot()` ile aynı siparişlerde kıyas; `JOBS=n`), `node tools/ctl.mjs [a|b|run|both|all]` (telefonun freni — `?ctl` olmadan varsayılan —, şerit koşusu ve Kurye Koşusu — basılı tutmak frenlemez, ↑ zıplar —: butonsuz HUD, basılı tut → fren, A'da kaydır → şerit, B'de kayan başparmak freni bırakmaz, B'de aynı siparişlerde dikkatli ve hiç dokunmayan sürücü kıyası (`PAIRS=n`), A'da draft → sapan ve kaldırım, kavşakta kaydırarak dönüş + GPS'in yeniden rotası, ışık geri sayımının döngüyle tutması, dikkatli sürücü botu `game.ride.schemeBot()` ile ve hiç dokunmadan tam teslimat), `node tools/tabs.mjs W H` (sekme görüntüleri),
+`node tools/energy.mjs` (enerji: START bedeli, yetmeyince sipariş/START yerine panel, zamanla ve kapalıyken dolma, kahve fiyatları ve günlük sınır, seviye/hedef/Dayanıklılık), `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (bir sürüşün gerçek ortalama hızı — süre kalibrasyonu için; telefonda fren, `CTL=stop|a` başka sürüş, `BOT=1` dikkatli sürücü, yoksa hiç dokunmadan; `BOOST=1` turbo ile). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok, `?energy=off` enerji harcanmaz (çok iş süren testler).
 Reklam klibi: `node tools/fleetclip.mjs [oyun-kökü] [çıktı.mp4]` — 9:16, iki bölüm. Önce kurye sensin: 1. gün kaydında külüstürle
 sürüş, gerçek "Engine stalled!" olayı + KICK, kapıda 5 yıldızlı teslim (aradaki yol `game.sim` ile kesilir; acelesi olan oyuncu gibi
 turbo + kırmızıda geçiş, sipariş geç kalmasın). Sonra filo: tek kuryeden dört bölgede 10 kuryeye, gün batımı, oyunun kendi
 "Your drivers kept working!" ekranı, bitiş kartı. Sanal zamanda kare kare; ekrandaki her şey oyunun kendisi, sayılar formüllerinden
 (`fleetPerMin`, `ui.offline`); ses sürüş + hub müziği ve oyunun efektleri. `SCALE=3` 1080x1920, `STILLS=30,300` yalnız o kareler, `AUDIO=0` sessiz.
+Trend edit (Tame Impala "Loser", doomer → hopecore; organik paylaşım için): `node tools/loserclip.mjs [çıktı-klasörü]` sahneleri
+çeker, her biri kendi klasörüne, anahtar anları (kamera flaşı, dokunuş, yıldızlar) `<sahne>.json`'da. Doomer: 1. gün, 23:47, yağmur,
+külüstür (gece sürüşü, motor stop, kırmızıda kamera cezası, kapı). Hopecore: haftalar sonra Vespetta ile (teyzeyi bekle, PERFECT STOP,
+ketçap, hayran selfie'si, 5 yıldız), gün batımında filo, bitiş kartı. Oyun baştan sanal zamanda koşar (her çekim aynı çekim);
+kırmızı ışık sahneleri sıradaki ışığın döngüsünü bize kırmızıya denk getirir (`redAhead`). `node tools/losercut.mjs [şarkı] [klasör]`
+şarkının vuruşlarını çıkarır (`tools/beats.py`, librosa) ve sahneleri vuruşa keser (her sahnenin anahtar anı bir vuruşa düşer;
+dönüş `CUT=chorus` ile nakarata, "I'm a loser, babe"ye (varsayılan), `CUT=bridge` ile köprüden sonra groove'un değiştiği yere,
+`TURN=<sn>` ile elle; ikisinde de bitiş kartı şarkının boşa düştüğü ölçüde), doomer / hopecore renk ayarı, küçük harf altyazılar.
+Çıktı: sessiz `loser-edit-<cut>.mp4` (şarkı uygulamada eklenir, başlangıç saniyesini araç yazar) ve kontrol için şarkılı
+`loser-preview-<cut>.mp4`. Varsayılan
+klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): şarkı ve şarkılı önizleme asla bu klasöre (yayında) girmez.
 
 ## 9. Durum
 
@@ -341,6 +590,88 @@ turbo + kırmızıda geçiş, sipariş geç kalmasın). Sonra filo: tek kuryeden
   Ayar yolculuk ortasında değişirse bir sonraki işte geçerli. İlk serbest sürüşte yeni tuş ipucu (`seen.freeTip`).
   Test: `node tools/manual.mjs` (tuşlar, direksiyon, geri vites, duvarda durma, GPS'in yeniden rotası, baştan sona iş),
   `node tools/legs.mjs desktop` (karşı şeritte ve kaldırımda durma dahil). Testlerdeki sürücü `game.ride.bot()`.
+- 2026-10-25: şerit + fren prototipi (QA: "turbo buton falan olmadan tüm mekaniği sağ sola geçme ve fren üzerinden
+  kurgula"). Üç dinamik konuşuldu: A Şerit Koşusu (trafikte kıvrılmak), B Geç Fren (viraj/ışık/kapı zamanlaması),
+  C Sallanan Yük (siparişler motorun arkasında sallanan bir yığın; yapılmadı). A ve B `?ctl=a|b` ile her cihazda
+  denenebilir (§3). Ortak katman: gaz hep açık, basılı tut = fren, kaydır = şerit; turbo/HOP/korna/bağlam butonları, serbest
+  bakış ve otomatik sollama kapalı; motora fren lambası (eski modlarda da otopilot frenlerken yanar). Admin "Sürüş modları"
+  tablosu otomatik / elle / prototip A / prototip B'yi yan yana gösterir.
+  Bot ölçümü (`tools/ctl.mjs`, Vespetta, Sv 6, Old Town/Downtown): dikkatli sürücü A'da teslimat başı ~45–70 sn, 15–25 sn
+  fren, 4–16 şerit değişimi, 4–5★; B'de ~55–120 sn, iş başı 1–4 kusursuz viraj ve 2 kusursuz duruş, 3–5. vites, çoğu 4★.
+  Hiç dokunmadan: A'da kırmızıları geçip öndeki arabalara çarparak bitiriyor (iş başı 0–4 kaza, 3–5 kırmızı, yemek çoğu
+  zaman perişan, 1–4★); B'de 4–6 kaza, 3–6 dışa kayma, her kapıyı geçip geri dönüyor, 2★. Kilitlenme yok (park etmiş aracın
+  arkasında 6 sn sonra kendisi dolanır, kapıyı geçince geri döner; sola dönüşte bordüre kayan motor viraj içinde takılı
+  kalıyordu, düzeltildi). Açık sorular (QA'ya): kırmızıda beklemek için parmağı basılı tutmak yorucu mu; A'da fren yapmadan
+  sürmenin cezası yeterli mi; süreler (`etaFor`) eski otopilota göre ölçülü, iki şemada geç/erken oranı admin panelinden izlenmeli.
+  - Aynı gün, 2. tur (kullanıcı: "dönüş kaydırma ve ışık ritmini yap"): kavşakta kaydırarak dönüş (varsayılan GPS, çıkışlar
+    fiyatlı) ve sinyal direğinde geri sayım, ikisi de her iki şemada (§3). Eski `chooseExit` (d1e5a94) fikri, şimdiki
+    `replaceRoute` ile. Gerekçe: kırmızıya "bekle / geç" dışında üçüncü seçenek (sağa sap, dolaş); B'nin vitesleri ve yeşil
+    dalga buna yaslanır; kestirmeler ayrı buton olmaktan çıkma yolunda (şimdilik alley ipucu duruyor). Konuşulup
+    yapılmayanlar: polis kovalamacası (kırmızıda geçmenin bedeli), aynı siparişe rakip kurye, dur kilidi, telefon eğerek
+    direksiyon.
+- 2026-10-26: otopilotta **STOP** (kullanıcı: "kırmızıda kendiliğinden durmasın, STOP butonu çıksın; dokunmadan
+  bitirilebiliyor, net ama yumuşak engeller koy"). Motor kırmızıda, geçen yayada ve kapıda artık kendisi durmuyor; üçü de
+  tek butonla (§3 *STOP*). "Run it!" ve otopilotta sarı ışık kartı kalktı, kapıyı geçen motor geri geri döner. Şerit +
+  fren prototipleri ve masaüstü serbest sürüş değişmedi.
+- 2026-10-27: kırmızıyı geçmenin bedeli sahnelenmiş çapraz trafikti (yan yola araba gönderilir, frene asılır, motor yarı
+  hıza düşer); kullanıcı "yalandan" buldu. Yerine her kırmızıda patlayan kamera (küçük ceza, ilk iki teslimatta uyarı);
+  çapraz trafik yine şehrin kendi trafiği. Aynı kavşakta tekrarlayan "T-boned" çarpışması da düzeldi (§3 *STOP*).
+- 2026-10-28: **telefonda tek fiil fren** (denetim raporu "ustalaşılacak tek bir hareket yok" dedi; önerim basılı tut =
+  fren, kullanıcı: "yap"). B prototipi telefonun ve masaüstü *Auto-drive*'ın varsayılanı; STOP otopilotu `?ctl=stop`
+  arkasına, şerit koşusu `?ctl=a`'da kaldı (§3 *Fren*). Frende yayalar ve yoldaki çukur / su birikintisi de oyuncunun
+  (SMOOTH; çift park ve yol çalışması frende koni), her kırmızıya kamera, kayan başparmak freni bırakmaz. Turbo
+  olmadığı için frende süreler Sv 10'dan sonra daralmıyor ve Rush / VIP / Express'in sıkıştırması yarıya iniyor
+  (`orders.js` `setTimerRide`). Bütün sürüşlerde: ışık çizgiden en fazla 0,5 sn önce kırmızıya döndüyse sarıda
+  girilmiş sayılır. Admin "Sürüş modları": "Fren (B)" / "Otomatik (STOP)".
+  Ölçüm (`PAIRS=4 tools/ctl.mjs b`, Vespetta, Sv 6, aynı 4 sipariş, olaylar kapalı, her bacakta bir yaya): dikkatli
+  sürücü (`schemeBot`) 3,3★, yemek %84, ortalama $55, 82 sn; 0 kaza, 0 kırmızı, 0 ürkütülen yaya, 0 kapı kaçırma; iş başı
+  2–5 kusursuz viraj, 2 kusursuz duruş, 1–3 yeşil dalga, 1–6 SMOOTH. Hiç dokunmayan: 2,5★, yemek %33, $37,5, 75 sn;
+  21 kaza (hepsi "Took the corner too fast!"), 24 dışa kayma, 11 kırmızı (11 kamera cezası), 8 kapı kaçırma. Dokunmayan
+  daha hızlı değil (kazalar yediriyor). Açık: dikkatli sürücü 4 siparişin 2'sinde geç (kısa rotalar, %140 ve %155;
+  zorla konan yayalar ve kırmızı ışık şansı sabit 6 sn'lik payı aşıyor) — testin "zamanında" maddesi bu yüzden FAIL.
+  Şerit koşusu (`tools/ctl.mjs a`), STOP (`tools/stop.mjs`) ve serbest sürüş (`tools/manual.mjs`) testleri hatasız.
+- 2026-10-29: **Kurye Koşusu** (`?ctl=run`, kullanıcı: "bu dönüşlerin de hızını ayarlama olayını hiç sevmedim ya, biraz
+  subway surfers, temple run gibi oyunlardan ilham alalım" → "Kurye Koşusu yap"; §3 *Kurye Koşusu*). Fren yok, her şey
+  kaydırma: ← / → şerit, ↑ zıpla (kırmızıda: geç), kavşakta sokak; otopilot tempo, viraj, kendi şeridinde mesafe ve
+  kırmızı; şeritlerde para sıraları; yemek can barı, sıfırda sipariş bozulur. Telefonun varsayılanı hâlâ fren; koşu
+  beğenilirse varsayılan olur. Aynı işte her şeritli sürüş için düzeltme: karşı şeritte bir araçla burun buruna kalan
+  motor sonsuz kafa kafaya çarpışma döngüsüne girip kilitleniyordu (dokunmadan sürüşte 380 sn); artık durana kaza yok,
+  kazadan sonra karşıdan gelenler durur, sıkışan motor geri çekilip şeridine girer, otopilot dolanışa ancak ışıktan önce
+  bitecekse çıkar. Test: `tools/ctl.mjs run`, `CTL=run tools/speed.mjs`; fren ve şerit koşusu testleri yeniden hatasız.
+- 2026-10-29: Kurye Koşusu, kullanıcı: "kırmızıda geçemiyorum". Işık kavşağın ağzında, kırmızıda beklerken dönüş penceresi
+  açık olduğundan ↑ "düz git" sayılıyordu: GPS dönüyorsa rota değişiyor, düz yolu olmayan T kavşağında motor yalnız
+  sallanıyordu; ışıkta bekleyen bir arabanın arkasında da kaydırma şerit değil dönüş seçiyordu. Artık kırmızıda ↑ (ve
+  GPS'in yönü) geçer, kuyruktaysan kaydırma şerittir. Kırmızıda 37 kez ↑ (kuyrukta önce karşı şerit): 37'si de geçti
+  (önce: 13'ün 10'u). `tools/ctl.mjs run` artık bunu da sınıyor ("red light job").
+- 2026-10-30: **Kurye Koşusu: yol kendini sürer, trafik oyuncunun** (kullanıcı: "yol auto drive olsun, şeritlerde sağ
+  sol yapmak zorunda kalalım, araba sıklığı artsın gerçek hayattaki gibi… frenleme butonu olsun hem ışıklarda hem de
+  çarpışma önlemek için"; §3 *Kurye Koşusu*). Otopilot yalnız tempo, viraj ve kapı; öndeki araba, park etmiş araç, yaya ve
+  kırmızı ışık oyuncunun: sağ altta BRAKE butonu ya da şerit. Rotanın çevresi kalabalık (`denseTick`: önümüzdeki 160 m'de
+  ~4 araba bizim yönde, ~3 karşıdan). Kırmızıda ↑ ile geçme kalktı (frenle dur ya da geç). Kaydırma hep şerit; kavşakta
+  başka sokak için oka dokunulur. Yeni kartlar ve ipuçları (`lbTip_run2`, `c_run_onc`). Trafikte bulunan beş hata
+  (köşeden gelen arabanın duran motoru görmemesi, duran arabaya kaza yazılması, dönen arabanın "karşıdan gelen" sayılması,
+  karo sınırındaki arabayı görmeyen şerit kontrolü, kendiliğinden şeride dönüşün öndeki arabaya bakmaması) her şeritli
+  sürüşte düzeldi. Süreler: koşu da frenin sürelerini alır; frende ve koşuda sabit pay 6 → 12 sn. Test: `tools/ctl.mjs
+  run` (BRAKE butonu, kırmızıda fren, kavşakta kaydırma şerit / ok dönüş, trafik yoğunluğu, dokunmayan sürücü kaza ve
+  ceza), `CTL=run BOT=1 tools/speed.mjs`.
+- 2026-10-30: Kurye Koşusu'nda kavşak okları ve alttaki üç kutulu şerit göstergesi kalktı (kullanıcı: "ortadaki yol
+  seçeneğini kaldır ve aşağıdaki 3 kutulu lane olayını da kaldır göstergesel"). Dönüşleri hep GPS alır; draft barı kalır.
+  Işık ipucu artık "başka sokağa sap" demiyor. Test: `tools/ctl.mjs run` kavşaktan oksuz geçildiğini ve HUD'da şerit
+  kutusu olmadığını sınar.
+- 2026-10-30: Kırmızıyı geçmek artık her seferinde ceza değil (kullanıcı: "not all red lights should give a fine, make it
+  random with weighted distrubition to districts"). Her kırmızı geçişte bölgenin şansıyla kamera çıkar (`DPROFILE.cams`:
+  Downtown %70, Harbor %45, Old Town %35, Green Hills %20). Bu şans her sürüşte aynı: serbest sürüşteki sabit %22 de
+  kalktı. Kamera yoksa ceza yok ("No camera at this one — lucky!"). Fren, Kurye Koşusu ve STOP'ta Flow yine biter. Koşunun ilk
+  sürüş kartında unutulan "kavşakta oka dokun" satırı da çıktı. Testler (`tools/ctl.mjs`, `tools/stop.mjs`) kamera
+  şansını 0 ve 1'e sabitleyip iki ucu sınar.
+- 2026-10-30: Kurye Koşusu'nun yuvarlak kırmızı BRAKE butonu gerçekçi bir fren pedalı oldu (kullanıcı: "change stop
+  button to a realistic pedal"; §3 *Kurye Koşusu*).
+- 2026-10-30: **Enerji** (kullanıcı: "lets add energy mechanic, we will need this to take a job. think about its filling
+  mechanics and spending economics yourself to be fitted as a mobile game"; §2). Sipariş başına 1 ⚡, 6 dakikada 1 dolar,
+  depo 10 (+2 Dayanıklılık seviyesi başına), seviye atlayınca dolu depo, günlük hedef +2, kahve +5 (artan fiyat, günde 3).
+  Üst barda ⚡ çipi ve geri sayım, START barında bedel, enerji paneli ("Out of energy!"), seviye kartında "Energy full",
+  hedef butonunda +2 ⚡. Dayanıklılık becerisi telefonda da işe yarıyor. Analitik: `energy_out`, `buy` (`k: 'coffee'`),
+  `job_start.energy`. Çok iş süren test araçları `?energy=off` ile koşar. Test: `tools/energy.mjs`.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
@@ -356,8 +687,8 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
 - **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
   Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.
 - **Olaylar:** `session_start`, `boot` (yükleme süresi), `boot_fail`, `error`, `intro_done`, `onboard_step`, `onboard_done`, `tab`,
-  `job_start` (siparişler, araç, yağmur, `manual`), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
-  zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
+  `job_start` (siparişler, araç, yağmur, `manual`, `ctl`: `b` fren — 28 Ekim'den beri telefonda varsayılan, öncesi prototip —, `a` şerit koşusu, boş: otopilot / elle), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
+  zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği; prototipte fren süresi `brakeT`, şerit değişimi `lanes`, sapan `slings`, kusursuz viraj `corners`, dışa kayma `wide`, kusursuz duruş `stops`, kapıyı geçme `overshoots`, en yüksek vites `gearMax`, kaldırımda metre `walkM`, kırmızıda geçiş `reds`, kavşakta dönüş `turns`, yeşil dalga `waves`, frende ayrıca kamera cezası `tickets`, ürkütülen yaya `pedHits`, çukura yumuşak geçiş `smooth`; otopilotta STOP ile duruş `halts` (kapıyı geçip geri gelmek sayılmaz), kusursuz duruş `stops`, kırmızıda geçiş `reds`, kapıyı geçme `overshoots`, ürkütülen yaya `pedHits`, kamera cezası `tickets` (27 Ekim öncesi kayıtlarda yerine `crossCalls`: frene basan çapraz trafik)), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
   `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
   `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,
   `save_export` / `save_import` / `save_reset`. Her pakette kaydın özeti de gider (seviye, para, teslimat, bölgeler, bulunulan ekran).
@@ -372,7 +703,7 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
 - **Panel:** Genel bakış (KPI'lar + önceki döneme göre, günlük grafik, yeni oyuncu hunisi, retention tablosu, saat, çıkış ekranı,
   cihaz/OS/tarayıcı, FPS ve GPU), Canlı (son 10 dk oturumlar + olay akışı, 10 sn'de bir yenilenir), Oturumlar (filtre, sıralama,
   oturum detayında zaman çizelgesi: her sürüş bir blok, yarım kalan sürüş işaretli), Oyuncular (oyuncu detayı: seviye süreleri,
-  oturumlar, satın almalar), Oynanış (bölge/sipariş tipi tabloları, olay seçimleri, kaza nedenleri, satın almalar, seviye süreleri,
+  oturumlar, satın almalar), Oynanış (bölge/sipariş tipi tabloları, sürüş modları — otomatik / elle / prototip A ve B yan yana; otomatikte STOP, kırmızıda geçiş, kapıyı geçme, yaya ürkütme —, olay seçimleri, kaza nedenleri, satın almalar, seviye süreleri,
   tutorial adımları), Hatalar (mesaja göre gruplu, örnek oturum + stack).
 - **Kurulum (sunucu):** veritabanı web kökünün dışında olmalı ve PHP kullanıcısı yazabilmeli:
   `php api/cli.php init /var/www/vhosts/mithatck.com/fds-analytics` → `api/config.local.php` yazar ve rastgele panel şifresini basar.

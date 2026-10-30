@@ -171,5 +171,24 @@ export async function makeBike(id, { paint, box, char = 'male-a', helmet = '#e84
   const cheer = () => { if (pose.cheer <= 0.2) pose.cheer = 0.9; };
   const lookBack = () => { pose.look = 0.9; };
   function openLid(open) { if (lid) lid.rotation.x = open ? -1.2 : 0; }
-  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id, pose, cheer, lookBack, bump, wheelie };
+  // a brake light under the back of the delivery box, on the body so it pitches and leans with it (made on the first
+  // call, so only the player's bike has one — the fleet's don't need the draw call)
+  let tail = null, braking = false;
+  function setBrake(on) {
+    if (!tail) {
+      // measured with the bike stood upright at the origin, then put back where it was
+      const saved = [root.position.clone(), root.rotation.y, lean.rotation.z, model.rotation.x, model.position.clone()];
+      root.position.set(0, 0, 0); root.rotation.y = 0; lean.rotation.z = 0; model.rotation.x = 0; model.position.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(boxNode || model);
+      const at = model.worldToLocal(new THREE.Vector3((bb.min.x + bb.max.x) / 2, boxNode ? bb.min.y + 0.06 : Math.max(0.55, bb.min.y + 0.5), bb.min.z - 0.016));
+      root.position.copy(saved[0]); root.rotation.y = saved[1]; lean.rotation.z = saved[2]; model.rotation.x = saved[3]; model.position.copy(saved[4]);
+      root.updateMatrixWorld(true);
+      tail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.07, 0.03), new THREE.MeshBasicMaterial({ color: 0x4a0c0a, toneMapped: false }));
+      tail.position.copy(at);
+      model.add(tail);
+    }
+    if (on !== braking) { braking = on; tail.material.color.setHex(on ? 0xff2416 : 0x4a0c0a); }
+  }
+  return { root, lean, model, rider: ch, helmet: helm, wheels, steer, box: boxNode, lid, seat, exhaust, setColors, update, openLid, st, id, pose, cheer, lookBack, bump, wheelie, setBrake };
 }

@@ -54,6 +54,8 @@ const stars = (n) => `<span class="stars" title="${n} yıldız">${'★'.repeat(n
 
 // ---------------------------------------------------------------- game vocabulary
 const vehName = (id) => VEHICLE[id]?.name || id || '–';
+// how a ride was controlled (job_start / crash 'ctl'): the brake is the phone's way of riding since 2026-10-28
+const ctlName = (c) => (c === 'b' ? 'fren' : c === 'a' ? 'prototip A' : c === 'run' ? 'kurye koşusu' : esc(String(c)));
 const distName = (id) => DISTRICT[id]?.name || id || '–';
 const restName = (id) => RESTAURANT[id]?.name || id || '–';
 const typeName = (id) => ORDER_TYPES[id]?.name || id || '–';
@@ -75,7 +77,8 @@ function whereName(w) {
 }
 const STEP_TR = { 0: 'Başlangıç', 1: 'Sipariş seç', 2: 'Start', 3: 'Yemeği al', 4: 'Teslim et', 5: 'Fiş', 6: 'Garaja git', 7: 'Motor yükselt', 8: 'Şehre dön', 99: 'Bitti' };
 const BUY_TR = { vehicle: 'Araç', part: 'Parça', paint: 'Boya', skill: 'Beceri', district: 'Bölge başvurusu', premium: 'Premium boya', office: 'Ofis', office_up: 'Ofis yükseltme',
-  hire: 'Kurye işe alma', train: 'Kurye eğitimi', reroll: 'Aday yenileme', fleet_crash: 'Kurye kaza tamiri', fleet_star: 'Yıldız kurye kursu' };
+  hire: 'Kurye işe alma', train: 'Kurye eğitimi', reroll: 'Aday yenileme', fleet_crash: 'Kurye kaza tamiri', fleet_star: 'Yıldız kurye kursu',
+  coffee: 'Kahve (+enerji)' };
 const CLAIM_TR = { goal: 'Günlük hedef', contract: 'Haftalık sözleşme', week: 'Sözleşme bonusu', fleet: 'Filo kasası' };
 const FLEET_EV_TR = { crash: 'kaza', raise: 'zam isteği', catering: 'catering işi', star: 'yıldız kurye' };
 function buyWhat(p) {
@@ -115,23 +118,24 @@ function fmtEvent(e) {
     case 'onboard_step': return { c: 'prog', t: `Tutorial: ${esc(STEP_TR[p.step] ?? p.step)} <small>adım ${esc(p.step)}</small>` };
     case 'onboard_done': return { c: 'prog', t: p.skipped ? `Tutorial atlandı <small>${esc(STEP_TR[p.at] ?? p.at)} adımında</small>` : 'Tutorial tamamlandı' };
     case 'tab': return { c: 'sys', dim: 1, t: `Sekme: ${esc(TAB_TR[p.tab] || p.tab)}` };
-    case 'job_start': return { c: 'ride', t: `<b>Sürüş başladı</b> <small>${num(p.n)} sipariş · ${esc(vehName(p.veh))}${p.manual ? ' · elle sürüş (klavye)' : ''}${p.rain > 0.35 ? ' · yağmur' : ''}${p.rush > 1 ? ' · yoğun saat' : ''}</small>
+    case 'job_start': return { c: 'ride', t: `<b>Sürüş başladı</b> <small>${num(p.n)} sipariş${p.energy != null ? ` · kalan enerji ${num(p.energy)}` : ''} · ${esc(vehName(p.veh))}${p.manual ? ' · elle sürüş (klavye)' : ''}${p.ctl ? ` · ${ctlName(p.ctl)}` : ''}${p.rain > 0.35 ? ' · yağmur' : ''}${p.rush > 1 ? ' · yoğun saat' : ''}</small>
       <div class="orders">${(p.orders || []).map((o) => `<span>${esc(restName(o.rest))} · ${esc(distName(o.d))} · ${esc(typeName(o.type))} · ${num(o.m)} m · süre ${num(o.eta)} sn · ${money(o.pay)}</span>`).join('')}</div>` };
     case 'job_end': {
       const s = p.stats || {};
       return { c: 'ride', t: `<b>Teslimat bitti · ${money(p.total)}</b> <small>${num(p.secs)} sn · ${num(p.m)} m · +${num(p.xp)} XP${p.fines ? ` · ceza ${money(p.fines)}` : ''}${p.levels ? ' · seviye atladı' : ''}</small>
         <div class="orders">${(p.orders || []).map((o) => `<span>${stars(o.stars)} ${esc(restName(o.rest))} · ${esc(typeName(o.type))} · ${money(o.pay + o.bonus)} + ${money(o.tip)} bahşiş · ${o.early ? 'erken' : o.late ? 'geç' : 'zamanında'} (süre ×${num1(o.ratio)}) · kondisyon %${num(o.cond)}</span>`).join('')}</div>
-        <div class="chips"><span>sollama ${num(s.overtakes)}</span><span>zıplama ${num(s.hops)} (mükemmel ${num(s.perfect)})</span><span>kestirme ${num(s.shortcuts)}</span><span>kaza ${num(s.crashes)}</span><span>turbo ${num1(s.boostT)} sn</span><span>durma ${num1(s.stopT)} sn</span><span>kıl payı ${num(s.nearMisses)}</span><span>flow ×${num1(s.bestFlow)}</span>${p.manual ? `<span>virajda kayma ${num(s.skids)}</span><span>rota değiştirdi ${num(s.reroutes)}</span>` : ''}</div>` };
+        <div class="chips"><span>sollama ${num(s.overtakes)}</span><span>zıplama ${num(s.hops)} (mükemmel ${num(s.perfect)})</span><span>kestirme ${num(s.shortcuts)}</span><span>kaza ${num(s.crashes)}</span><span>turbo ${num1(s.boostT)} sn</span><span>durma ${num1(s.stopT)} sn</span><span>kıl payı ${num(s.nearMisses)}</span><span>flow ×${num1(s.bestFlow)}</span>${p.manual ? `<span>virajda kayma ${num(s.skids)}</span><span>rota değiştirdi ${num(s.reroutes)}</span>` : ''}${!p.manual && !p.ctl && s.halts != null ? `<span>STOP ${num(s.halts)} (kusursuz ${num(s.stops)})</span><span>kırmızıda geçti ${num(s.reds)}</span>${s.tickets != null ? `<span>kamera cezası ${num(s.tickets)}</span>` : ''}<span>kapıyı geçti ${num(s.overshoots)}</span><span>yaya ürküttü ${num(s.pedHits)}</span>` : ''}${p.ctl ? `<span>fren ${num1(s.brakeT)} sn</span><span>şerit ${num(s.lanes)}</span><span>dönüş ${num(s.turns)}</span><span>yeşil dalga ${num(s.waves)}</span><span>kırmızıda geçti ${num(s.reds)}</span>${p.ctl === 'a' || p.ctl === 'run' ? `<span>sapan ${num(s.slings)}</span><span>kaldırımda ${num(s.walkM)} m</span>${p.ctl === 'run' ? `<span>para ${num(s.coins)}</span><span>kamera cezası ${num(s.tickets)}</span><span>yaya ürküttü ${num(s.pedHits)}</span><span>bozulan sipariş ${num(s.ruined)}</span>` : ''}` : `<span>kusursuz viraj ${num(s.corners)}</span><span>dışa kaydı ${num(s.wide)}</span><span>kusursuz duruş ${num(s.stops)}</span><span>kapıyı geçti ${num(s.overshoots)}</span><span>vites ${num(s.gearMax)}</span>${s.tickets != null ? `<span>kamera cezası ${num(s.tickets)}</span><span>yaya ürküttü ${num(s.pedHits)}</span><span>yumuşak geçiş ${num(s.smooth)}</span>` : ''}`}` : ''}</div>` };
     }
     case 'ride_event': {
       const opt = p.opt != null ? EVENT[p.id]?.options?.[p.opt]?.label : null;
       const bits = [opt && `seçim: ${esc(opt)}`, p.good === 1 ? 'başarılı' : p.good === 0 ? 'başarısız' : '', p.auto ? 'süre doldu, otomatik seçildi' : ''].filter(Boolean);
       return { c: p.good === 0 ? 'bad' : 'ride', t: `Olay: ${esc(evName(p.id))} <small>${bits.join(' · ')}</small>` };
     }
-    case 'crash': return { c: 'bad', t: `Kaza: ${esc(p.why)} <small>${esc(distName(p.d))}${p.ot ? ' · sollarken' : ''}${p.manual ? ' · elle sürüş' : ''}</small>` };
+    case 'crash': return { c: 'bad', t: `Kaza: ${esc(p.why)} <small>${esc(distName(p.d))}${p.ot ? ' · sollarken' : ''}${p.manual ? ' · elle sürüş' : ''}${p.ctl ? ` · ${ctlName(p.ctl)}` : ''}</small>` };
     case 'level_up': return { c: 'prog', t: `<b>Seviye ${num(p.lvl)}</b> <small>${num1(p.pm)} dk oyunda · ${num(p.del)} teslimat</small>` };
     case 'buy': { const w = buyWhat(p); return { c: 'money', t: `Satın aldı: ${esc(BUY_TR[p.k] || p.k)}${w ? ` · ${esc(w)}` : ''} <small>${money(p.cost)} · kalan ${money(p.cash)}</small>` }; }
     case 'claim': return { c: 'money', t: `Ödül aldı: ${esc(CLAIM_TR[p.k] || p.k)} <small>${money(p.reward)}</small>` };
+    case 'energy_out': return { c: 'bad', t: `Enerji yetmedi <small>${num(p.need)} gerekli · ${num(p.have)} vardı · ${money(p.cash)} nakit · ${num(p.coffee)} kahve hakkı</small>` };
     case 'equip': return { c: 'money', t: `Araç değiştirdi: ${esc(vehName(p.id))}` };
     case 'fleet': {
       const what = p.k === 'decision' ? `${FLEET_EV_TR[p.kind] || p.kind} → ${p.choice === 'a' ? 'kabul' : 'ret'}` : p.k === 'fire' ? 'kurye ayrıldı' : p.k === 'assign' ? `atama: ${p.district ? distName(p.district) : vehName(p.veh)}` : p.k;
@@ -643,10 +647,17 @@ const VIEWS = {
       { label: 'Tür', f: (x) => esc(BUY_TR[x.kind] || x.kind) }, { label: 'Ne', f: (x) => esc(itemName(x.kind, x.item)) },
       { label: 'Adet', n: 1, f: (x) => num(x.n) }, { label: 'Toplam', n: 1, f: (x) => money(x.spent) }, { label: 'Ort. seviyede', n: 1, f: (x) => num1(x.lvl) },
     ];
-    const modeCols = [{ label: 'Mod', f: (x) => (+x.k ? 'Elle (klavye)' : 'Otomatik') }, { label: 'Sürüş', n: 1, f: (x) => num(x.n) }, { label: 'Ort. süre', n: 1, f: (x) => dur(x.secs * 1000) },
+    // (k: 0 auto-drive, 1 riding yourself, 'b' the brake — phones since 2026-10-28, a prototype before — 'a' the lane
+    // run, 'run' the courier run)
+    const proto = (x) => x.k === 'a' || x.k === 'b' || x.k === 'run', auto = (x) => !proto(x) && !+x.k;
+    const modeCols = [{ label: 'Mod', f: (x) => (x.k === 'a' ? 'Prototip A · şerit' : x.k === 'b' ? 'Fren (B)' : x.k === 'run' ? 'Kurye koşusu' : +x.k ? 'Elle (klavye)' : 'Otomatik (STOP)') }, { label: 'Sürüş', n: 1, f: (x) => num(x.n) }, { label: 'Ort. süre', n: 1, f: (x) => dur(x.secs * 1000) },
       { label: 'Ort. kazanç', n: 1, f: (x) => money(x.total) }, { label: 'Ort. yıldız', n: 1, f: (x) => num1(x.stars) }, { label: 'Geç', n: 1, f: (x) => pct(x.late) },
       { label: 'Kaza', n: 1, f: (x) => num1(x.crashes) }, { label: 'Virajda kayma', n: 1, f: (x) => (+x.k ? num1(x.skids) : '–') },
-      { label: 'Rota değişikliği', n: 1, f: (x) => (+x.k ? num1(x.reroutes) : '–') }, { label: 'Sollama', n: 1, f: (x) => num1(x.overtakes) }];
+      { label: 'Rota değişikliği', n: 1, f: (x) => (+x.k ? num1(x.reroutes) : '–') }, { label: 'Sollama', n: 1, f: (x) => num1(x.overtakes) },
+      { label: 'Fren (sn)', n: 1, f: (x) => (proto(x) ? num1(x.brake) : '–') }, { label: 'Şerit değişimi', n: 1, f: (x) => (proto(x) ? num1(x.lanes) : '–') },
+      { label: 'Kırmızıda geçiş', n: 1, f: (x) => (proto(x) || auto(x) ? num1(x.reds) : '–') },
+      { label: 'STOP', n: 1, f: (x) => (auto(x) ? num1(x.halts) : '–') }, { label: 'Kapıyı geçti', n: 1, f: (x) => (auto(x) || x.k === 'b' ? num1(x.overshoots) : '–') },
+      { label: 'Yaya ürküttü', n: 1, f: (x) => (auto(x) || x.k === 'b' || x.k === 'run' ? num1(x.pedHits) : '–') }];
     const vehCols = [{ label: 'Araç', f: (x) => esc(vehName(x.k)) }, { label: 'Sürüş', n: 1, f: (x) => num(x.n) }, { label: 'Ort. süre', n: 1, f: (x) => dur(x.secs * 1000) },
       { label: 'Ort. kazanç', n: 1, f: (x) => money(x.total) }, { label: 'Kaza / sürüş', n: 1, f: (x) => num1(x.crashes) }];
     const crashes = d.crashes.map((x) => ({ label: x.k, value: +x.n }));
@@ -667,7 +678,7 @@ const VIEWS = {
           ${card('Yıldız dağılımı', '<div class="chart" data-chart="stars"></div>')}
           ${card('Araçlara göre sürüş', table(vehCols, d.vehicles))}
         </div>
-        ${card('Otomatik sürüş ve elle sürüş', table(modeCols, d.modes || []), { sub: 'Masaüstünde klavyeyle kendi süren oyuncular ile otomatik pilot; değerler sürüş başına ortalama.' })}
+        ${card('Sürüş modları', table(modeCols, d.modes || []), { sub: 'Fren (B): 28 Ekim 2026\'dan beri telefonda varsayılan (öncesi ?ctl=b prototipi). Otomatik (STOP): 26–28 Ekim telefonda varsayılan, artık ?ctl=stop; daha öncesi eski otopilot. Elle: masaüstünde klavyeyle kendi süren. Prototip A: ?ctl=a. Kurye koşusu: ?ctl=run (yalnız kaydırma). Değerler sürüş başına ortalama.' })}
         <div style="height:16px"></div>
         ${card('Sürüş olayları', table(evCols, d.events), { sub: 'Başarı: QTE ya da riskli seçimin iyi bitme oranı. Süre doldu: oyuncu 7 sn içinde seçmedi.' })}
         <div class="grid g2" style="margin-top:16px">

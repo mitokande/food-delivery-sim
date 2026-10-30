@@ -1,6 +1,6 @@
 // Save game + derived stats + economy actions. No three.js, no DOM.
 import { VEHICLE, VEHICLES, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICT, DISTRICTS, FLEET, fleetRate,
-  xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, CONTRACT_DAYS } from './data.js';
+  xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, CONTRACT_DAYS, ENERGY } from './data.js';
 
 const KEY = 'fds_save_v1';
 const listeners = new Set();
@@ -19,6 +19,7 @@ const fresh = () => ({
   vehicles: { rustbucket: { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, paint: null, box: null, count: 1 } },
   active: 'rustbucket',
   skills: { riding: 0, navigation: 0, charm: 0, reflexes: 0, stamina: 0 },
+  energy: { n: ENERGY.max, t: Date.now(), cups: null }, // ⚡ now, when it last came back, coffees bought today { day, n }
   districts: { oldtown: true },
   pos: null, // tile index where the player is parked; null = garage
   fleet: { office: false, level: 0, couriers: [], last: Date.now(), bank: 0, applicants: [] },
@@ -47,7 +48,7 @@ export function load() {
       const d = JSON.parse(raw);
       const f = fresh();
       S = { ...f, ...d, fleet: { ...f.fleet, ...d.fleet }, stats: { ...f.stats, ...d.stats }, skills: { ...f.skills, ...d.skills },
-        settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, today: { ...f.today, ...d.today }, seen: { ...d.seen },
+        settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, energy: { ...f.energy, ...d.energy }, today: { ...f.today, ...d.today }, seen: { ...d.seen },
         emp: { ...d.emp }, ach: { ...d.ach }, unlocked: { ...f.unlocked, ...d.unlocked },
         onboard: d.onboard ? { ...d.onboard } : { step: 99 } }; // saves from before onboarding existed skip it
       return true;
@@ -129,6 +130,7 @@ export function addXP(n) {
   S.xp += n;
   let ups = 0;
   while (S.xp >= xpNeed()) { S.xp -= xpNeed(); S.lvl++; ups++; const rw = levelReward(); S.cash += rw; S.stats.earned += rw; emit('levelup', S.lvl); }
+  if (ups) { tickEnergy(); S.energy.n = Math.max(S.energy.n, energyMax()); emit('energy'); } // a level-up fills the tank
   emit('xp'); save();
   return ups;
 }
@@ -166,6 +168,43 @@ export function applyDistrict(id) {
   if (st.open || !st.canApply) return false;
   if (!spend(st.fee)) return false;
   S.districts[id] = true; did('buy', { k: 'district', id, cost: st.fee }); emit('districts', id); save(); return true;
+}
+
+// ---------- energy: one ⚡ an order, paid at Start; it comes back with real time (data.js ENERGY) ----------
+export const energyMax = () => ENERGY.max + ENERGY.stamina * skill('stamina');
+const REGEN = ENERGY.regenMin * 60000;
+// bring the tank up to date (from timestamps, so it fills while the game is closed too); returns ⚡ now
+export function tickEnergy(now = Date.now()) {
+  const e = S.energy, max = energyMax();
+  if (!(e.t <= now)) e.t = now; // (a clock set back)
+  if (e.n >= max) { e.t = now; return e.n; } // full: the next one starts counting when some is spent
+  const k = Math.floor((now - e.t) / REGEN);
+  if (k > 0) { e.n = Math.min(max, e.n + k); e.t = e.n >= max ? now : e.t + k * REGEN; emit('energy'); save(); }
+  return e.n;
+}
+// ms to the next ⚡ and to a full tank (0 when full)
+export function energyEta(now = Date.now()) {
+  const n = tickEnergy(now), max = energyMax();
+  if (n >= max) return { next: 0, full: 0 };
+  const next = REGEN - (now - S.energy.t);
+  return { next, full: next + (max - n - 1) * REGEN };
+}
+export function useEnergy(n) {
+  if (tickEnergy() < n) return false;
+  S.energy.n -= n; emit('energy'); save(); return true;
+}
+export function addEnergy(n) { tickEnergy(); S.energy.n = Math.min(99, S.energy.n + n); emit('energy', n); save(); }
+// coffee: +ENERGY.coffee.n for cash, dearer with each cup of the (real) day
+const today = () => new Date().toDateString();
+const cupsToday = () => (S.energy.cups?.day === today() ? S.energy.cups.n : 0);
+export const coffeeLeft = () => Math.max(0, ENERGY.coffee.price.length - cupsToday());
+export function coffeePrice() { const k = ENERGY.coffee.price[cupsToday()]; return k ? Math.round(typicalPay() * k / 5) * 5 : null; }
+export function buyCoffee() {
+  const cost = coffeePrice();
+  if (cost == null || !spend(cost)) return false;
+  S.energy.cups = { day: today(), n: cupsToday() + 1 };
+  did('buy', { k: 'coffee', cost, cup: S.energy.cups.n, energy: S.energy.n });
+  addEnergy(ENERGY.coffee.n); return true;
 }
 
 // ---------- day / clock ----------
@@ -322,7 +361,7 @@ export function importCode(code) {
 export function claimGoal(i) {
   const g = S.goals.list[i];
   if (!g || g.p < g.n || g.claimed) return false;
-  g.claimed = true; did('claim', { k: 'goal', id: g.id, reward: g.reward }); earn(g.reward, 'goal'); addXP(30); return true;
+  g.claimed = true; did('claim', { k: 'goal', id: g.id, reward: g.reward }); earn(g.reward, 'goal'); addEnergy(ENERGY.goal); addXP(30); return true;
 }
 
 // ---------- fleet ----------

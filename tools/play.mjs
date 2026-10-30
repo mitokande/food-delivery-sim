@@ -16,7 +16,7 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !/404|Failed to load resource/.test(m.text())) errors.push(m.text()); if (process.env.LOG) console.log('[console]', m.text()); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 if (process.env.SAVE) await page.evaluateOnNewDocument((s) => localStorage.setItem('fds_save_v1', s), process.env.SAVE);
-await page.goto(`${base}/index.html?noti=1&clock=${process.env.CLOCK || 1000}`, { waitUntil: 'networkidle0', timeout: 180000 });
+await page.goto(`${base}/index.html?noti=1&energy=off&clock=${process.env.CLOCK || 1000}`, { waitUntil: 'networkidle0', timeout: 180000 });
 await page.waitForFunction('window.ready', { timeout: 90000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shot = async (n) => { await page.screenshot({ path: `${prefix}-${n}.png` }); console.log('shot', n); };

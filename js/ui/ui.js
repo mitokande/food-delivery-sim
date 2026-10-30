@@ -2,7 +2,7 @@
 import * as St from '../state.js';
 import { S } from '../state.js';
 import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT, RANKS, PREMIUM, ACHIEVEMENTS, CONTRACTS, CONTRACT_DAYS,
-  FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END } from '../data.js';
+  FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END, ENERGY } from '../data.js';
 import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
 import { autoSpeed } from '../orders.js';
@@ -20,10 +20,28 @@ export const money = (n, dec = false) => {
 };
 const clockStr = (m) => { const h = Math.floor(m / 60) % 24, mm = Math.floor(m % 60); return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
 const mmss = (s) => { const n = Math.max(0, Math.ceil(s)); return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
+const hmm = (s) => { const n = Math.ceil(s); return n >= 3600 ? `${Math.floor(n / 3600)} h ${String(Math.floor(n % 3600 / 60)).padStart(2, '0')} min` : mmss(n); }; // a longer wait
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
 const stars = (n, max = 5) => Array.from({ length: max }, (_, i) => ICON(i < n ? 'ui-star' : 'ui-star-empty', 'st')).join('');
 const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
+// the courier run's brake: a car's brake pedal seen from the seat — the arm up into the footwell on a bolted clevis, a
+// steel plate leaning away (narrower at the top, its thickness showing below), a ribbed rubber pad. Held, it tips
+// forward on its pivot (game.css)
+const PEDAL_PLATE = 'M18 26h64a8 8 0 0 1 8 7.4l6 81.6a9 9 0 0 1-9 9.6H13a9 9 0 0 1-9-9.6l6-81.6A8 8 0 0 1 18 26z';
+const PEDAL = `<svg viewBox="0 0 100 132" aria-hidden="true"><defs>
+  <linearGradient id="pd-arm" x2="1"><stop offset="0" stop-color="#23272d"/><stop offset=".45" stop-color="#9aa3af"/><stop offset="1" stop-color="#1f2328"/></linearGradient>
+  <linearGradient id="pd-rim" x2="0" y2="1"><stop offset="0" stop-color="#f5f7fa"/><stop offset=".55" stop-color="#a3acb8"/><stop offset="1" stop-color="#dfe3e8"/></linearGradient>
+  <linearGradient id="pd-rub" x2="0" y2="1"><stop offset="0" stop-color="#363b43"/><stop offset="1" stop-color="#121418"/></linearGradient>
+  <linearGradient id="pd-rib" x2="0" y2="1"><stop offset="0" stop-color="#6b7380"/><stop offset=".35" stop-color="#454b55"/><stop offset="1" stop-color="#262a30"/></linearGradient></defs>
+  <path d="M45 0h10l1 24H44z" fill="url(#pd-arm)"/>
+  <rect x="37" y="16" width="26" height="13" rx="3.5" fill="url(#pd-arm)" stroke="#16191d" stroke-width="1.2"/><circle cx="50" cy="22.5" r="3.2" fill="#c9cfd6" stroke="#22262b" stroke-width="1.2"/>
+  <path d="${PEDAL_PLATE}" transform="translate(0 5)" fill="#4b525c" stroke="#16191d" stroke-width="2"/>
+  <path d="${PEDAL_PLATE}" fill="url(#pd-rim)" stroke="#262b33" stroke-width="2"/>
+  <path d="M20 28.6h60" stroke="#fff" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M22 33h56a5 5 0 0 1 5 4.6l5 69.8a6 6 0 0 1-6 6.6H18a6 6 0 0 1-6-6.6l5-69.8a5 5 0 0 1 5-4.6z" fill="url(#pd-rub)"/>
+  ${[41, 50, 59, 68, 77, 86].map((y) => { const x = 21 - (y - 37) * 0.07; return `<rect x="${x.toFixed(1)}" y="${y}" width="${(100 - 2 * x).toFixed(1)}" height="5.5" rx="2.75" fill="url(#pd-rib)"/>`; }).join('')}
+  <text x="50" y="106" text-anchor="middle">BRAKE</text></svg>`;
 const km = (m) => m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 10) * 10} m`;
 
 export function createUI(game) {
@@ -34,6 +52,7 @@ export function createUI(game) {
       <button class="who" data-act="tab" data-tab="courier"><span class="ava">${ICON('char-' + S.look.char)}</span>
         <span class="lvwrap"><span class="shield"><b class="lvl">1</b></span></span>
         <span class="lvlbox"><small class="nm"></small><span class="xpbar"><i></i><em class="xptext"></em></span></span></button>
+      <button class="res energy" data-act="energy" aria-label="Energy">${ICON('ui-bolt')}<b class="env">10</b><small class="ent"></small></button>
       <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
       <button class="gear" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
     </header>
@@ -61,11 +80,18 @@ export function createUI(game) {
       <canvas class="r-map" width="240" height="240"></canvas>
     </div>
     <div class="r-ctx"></div>
-    <div class="r-speed"><svg viewBox="0 0 72 40" aria-hidden="true"><path class="trk" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/><path class="val" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/></svg><b>0</b><small>km/h</small></div>
+    <div class="r-speed"><svg viewBox="0 0 72 40" aria-hidden="true"><path class="trk" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/><path class="val" d="M6 36a30 30 0 0 1 60 0" pathLength="100"/></svg><b>0</b><small>km/h</small><em class="gear" hidden></em></div>
+    <div class="r-limit" hidden><b></b><small></small></div>
+    <div class="r-lanes" hidden><div class="draft"><u></u><span>DRAFT</span></div><div class="row"><i data-l="-1"></i><i data-l="0"></i><i data-l="1"></i></div></div>
+    <div class="r-hint" hidden></div>
+    <div class="r-turn" hidden><button data-r="-1"><i>⬅</i><small></small></button><button data-r="0"><i>⬆</i><small></small></button><button data-r="1"><i>➡</i><small></small></button></div>
+    <div class="r-proto" hidden></div>
     <button class="r-btn horn" data-ride="horn" aria-label="Horn">${ICON('ui-horn')}</button>
     <button class="r-btn hop" data-ride="hop" aria-label="Hop">${ICON('ui-jump')}<span>HOP</span></button>
     <button class="r-btn boost" data-ride="boost" aria-label="Turbo"><i class="ring"></i>${ICON('ui-nitro')}<span>TURBO</span></button>
-    <div class="r-keys">Space turbo · W hop · E action · H horn · drag to look</div>
+    <button class="r-btn stop" data-ride="stop" aria-label="Stop" hidden><b>STOP</b><small></small></button>
+    <button class="r-btn brake" data-ride="brake" aria-label="Brake">${PEDAL}</button>
+    <div class="r-keys">Space turbo · W hop · S stop · E action · H horn · drag to look</div>
   </div>
   <div id="modals"></div>
   <div id="toasts"></div>`;
@@ -133,6 +159,18 @@ export function createUI(game) {
     cashRaf = requestAnimationFrame(step);
   }
 
+  // the ⚡ chip: energy / tank, and while it fills the time to the next one
+  let shownEnergy = null;
+  function setEnergy() {
+    const n = St.tickEnergy(), max = St.energyMax(), eta = St.energyEta(), chip = $('.topbar .energy', hub);
+    if (shownEnergy != null && n > shownEnergy && !hub.hidden) { chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump'); }
+    shownEnergy = n;
+    $('.env', chip).textContent = `${n}/${max}`;
+    $('.ent', chip).textContent = eta.next ? mmss(eta.next / 1000) : '';
+    chip.classList.toggle('low', n < game.energyFor(1) * 2);
+    chip.classList.toggle('over', n > max);
+  }
+
   // ---------- top bar ----------
   function refreshTop() {
     $('.lvl', hub).textContent = S.lvl;
@@ -142,7 +180,7 @@ export function createUI(game) {
     const need = St.xpNeed();
     $('.xpbar i', hub).style.width = `${Math.min(100, S.xp / need * 100)}%`;
     $('.xptext', hub).textContent = `${S.xp}/${need}`;
-    setCash();
+    setCash(); setEnergy();
     $('.ratev', hub).textContent = St.rating().toFixed(1);
     $('.ava', hub).innerHTML = ICON('char-' + S.look.char);
     $('.day', hub).textContent = `Day ${S.day}`;
@@ -188,14 +226,16 @@ export function createUI(game) {
     if (!show) { startKey = ''; return; }
     const cap = St.vehStats().cap, used = game.taken.reduce((a, o) => a + o.size, 0);
     const pay = game.taken.reduce((a, o) => a + o.base, 0);
-    const key = game.taken.map((o) => o.id).join(',') + '|' + cap;
+    const need = game.energyFor(game.taken.length), short = need > St.tickEnergy();
+    startbar.classList.toggle('short', short);
+    const key = game.taken.map((o) => o.id).join(',') + '|' + cap + '|' + need + short;
     if (key === startKey) return;
     const grew = startKey && key.split('|')[0].split(',').length > startKey.split('|')[0].split(',').length;
     startKey = key;
     startbar.dataset.act = 'start';
     startbar.innerHTML = `<i class="sb-n">${game.taken.length}</i><span class="sb-foods">${game.taken.map((o) => ICON(FOODS[o.food].icon)).join('')}</span>
       <span class="sb-info"><b>${game.taken.length === 1 ? esc(game.taken[0].restName) : `${game.taken.length} orders`}</b><small>${money(pay)} + tips · box ${used}/${cap}</small></span>
-      <button class="sb-go" data-act="start">${ICON('ui-nitro')}START!</button>`;
+      <button class="sb-go" data-act="start">${ICON('ui-nitro')}START!</button>${need ? `<em class="sb-cost">${ICON('ui-bolt')}${need}</em>` : ''}`;
     if (grew) { startbar.classList.remove('bump'); void startbar.offsetWidth; startbar.classList.add('bump'); }
   }
 
@@ -222,7 +262,7 @@ export function createUI(game) {
       ? ''
       : `<div class="hint">${list.length ? `Tap an order to take it. Your ${VEHICLE[S.active].name} carries <b>${cap}</b>.` : 'No orders right now — new ones pop up every few seconds.'}</div>`;
     const goals = St.ensureGoals().list.map((g, i) => `<div class="goal ${g.p >= g.n ? 'done' : ''}">${ICON(g.p >= g.n ? 'ui-gift' : 'ui-trophy')}<span>${goalText(g)}<i><u style="width:${g.p / g.n * 100}%"></u></i></span>
-      ${g.claimed ? '<em>✓</em>' : g.p >= g.n ? `<button class="btn gold sm" data-act="claim" data-i="${i}">${money(g.reward)}</button>` : `<small>${g.p}/${g.n}</small>`}</div>`).join('');
+      ${g.claimed ? '<em>✓</em>' : g.p >= g.n ? `<button class="btn gold sm" data-act="claim" data-i="${i}">${money(g.reward)}<small class="gen">+${ENERGY.goal}${ICON('ui-bolt')}</small></button>` : `<small>${g.p}/${g.n}</small>`}</div>`).join('');
     // work one district only, or all of them
     const open = DISTRICTS.filter((d) => S.districts[d.id]);
     const focus = S.focus && S.districts[S.focus] ? S.focus : '';
@@ -416,6 +456,7 @@ export function createUI(game) {
         break;
       case 'grab': if (performance.now() - drag.endT < 350) break; sheetState = sheetState === 'min' ? 'mid' : sheetState === 'mid' ? (tab === 'city' ? 'min' : 'big') : 'min'; sheet.dataset.state = sheetState; break;
       case 'settings': settings(); break;
+      case 'energy': energy(); break;
       case 'order': game.toggleOrder(+id); render(); break;
       case 'start': game.startJob(); break;
       case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); coinsTo(b, 6); render(); } break;
@@ -530,7 +571,7 @@ export function createUI(game) {
       <label class="set">Sound<input type="range" min="0" max="1" step="0.05" value="${S.settings.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${S.settings.quality === q ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
       <label class="set">Vibration<input type="checkbox" data-k="haptics" ${S.settings.haptics ? 'checked' : ''}></label>
-      ${game.isTouch ? '' : `<label class="set">Auto-drive <small>(off: you ride with the keyboard)</small><input type="checkbox" data-k="autodrive" ${S.settings.autodrive === true ? 'checked' : ''}></label>`}
+      ${game.isTouch ? '' : `<label class="set">Auto-drive <small>(on: it steers, you brake with ↓; off: you ride with the keyboard)</small><input type="checkbox" data-k="autodrive" ${S.settings.autodrive === true ? 'checked' : ''}></label>`}
       <p class="small">Progress is saved on this device. Use a save code to move it to another phone.</p>
       <div class="set-more"><button class="btn ghost sm" data-x="export">Copy save code</button><button class="btn ghost sm" data-x="import">Load save code</button></div>
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
@@ -612,7 +653,10 @@ export function createUI(game) {
     name: $('.r-name', hud), verb: $('.r-verb', hud), food: $('.r-food', hud), dist: $('.r-dist', hud), timer: $('.r-timer b', hud), timerBox: $('.r-timer', hud),
     cond: $('.r-cond', hud), heat: $('.heat u', hud), integ: $('.integ u', hud), speed: $('.r-speed b', hud), ctx: $('.r-ctx', hud),
     boost: $('.boost', hud), hop: $('.hop', hud), map: $('.r-map', hud), timerLbl: $('.r-timer small', hud), dial: $('.r-speed .val', hud),
-    speedBox: $('.r-speed', hud), keys: $('.r-keys', hud),
+    speedBox: $('.r-speed', hud), keys: $('.r-keys', hud), stop: $('.r-btn.stop', hud), stopL: $('.r-btn.stop small', hud), brake: $('.r-btn.brake', hud),
+    // lanes & brake (?ctl): the gear in the dial, the next corner's limit, the lanes + draft, the shortcut swipe hint
+    gear: $('.r-speed .gear', hud), limit: $('.r-limit', hud), limitV: $('.r-limit b', hud), limitL: $('.r-limit small', hud),
+    lanes: $('.r-lanes', hud), draft: $('.r-lanes .draft', hud), draftU: $('.r-lanes .draft u', hud), hint: $('.r-hint', hud), proto: $('.r-proto', hud), turn: $('.r-turn', hud),
   };
   let vTop = 9; // the active bike's top speed (m/s), for the speed dial
   const mapCtx = rh.map.getContext('2d');
@@ -626,20 +670,31 @@ export function createUI(game) {
     while (pops.children.length > 3) pops.firstChild.remove();
     if (!lost) { flowEl.classList.remove('hit'); void flowEl.offsetWidth; flowEl.classList.add('hit'); }
   }
+  // a plain call-out in the same spot (gears)
+  function pop(label, kind = '') {
+    const el = document.createElement('div');
+    el.className = 'pop ' + kind;
+    el.textContent = label;
+    pops.append(el);
+    setTimeout(() => el.remove(), 1100);
+    while (pops.children.length > 3) pops.firstChild.remove();
+  }
   let ctxKey = '';
   // ride buttons: pointer events (hold for turbo)
   hud.addEventListener('pointerdown', (e) => {
+    const t = e.target.closest('.r-turn button'); if (t) { e.preventDefault(); game.rideInput({ '-1': 'turn-left', 0: 'turn-straight', 1: 'turn-right' }[t.dataset.r], true); return; }
     const b = e.target.closest('[data-ride]'); if (!b) return;
     e.preventDefault();
     b.classList.add('down');
     game.rideInput(b.dataset.ride, true);
-    if (b.dataset.ride === 'boost') { capture(b, e); }
+    if (b.dataset.ride === 'boost' || b.dataset.ride === 'brake') { capture(b, e); }
   });
-  const rideUp = (e) => { const b = e.target.closest('[data-ride]'); if (!b) return; b.classList.remove('down'); if (b.dataset.ride === 'boost') game.rideInput('boost', false); };
+  const rideUp = (e) => { const b = e.target.closest('[data-ride]'); if (!b) return; b.classList.remove('down'); if (b.dataset.ride === 'boost' || b.dataset.ride === 'brake') game.rideInput(b.dataset.ride, false); };
   hud.addEventListener('pointerup', rideUp); hud.addEventListener('pointercancel', rideUp); hud.addEventListener('lostpointercapture', rideUp);
-  // swipe left anywhere on the road = overtake (no swipe-up hop: an upward drag moves the camera; HOP is the button)
+  // swipe left anywhere on the road = overtake (no swipe-up hop: an upward drag moves the camera; HOP is the button).
+  // With lanes & brake the swipes are main.js's.
   let sw = null;
-  document.getElementById('gl').addEventListener('pointerdown', (e) => { if (!hud.hidden) sw = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  document.getElementById('gl').addEventListener('pointerdown', (e) => { if (!hud.hidden && !game.ride?.R.scheme) sw = { x: e.clientX, y: e.clientY, t: performance.now() }; });
   document.getElementById('gl').addEventListener('pointerup', (e) => {
     if (!sw || hud.hidden) return;
     const dy = e.clientY - sw.y, dx = e.clientX - sw.x;
@@ -654,8 +709,20 @@ export function createUI(game) {
     rh.food.innerHTML = leg.kind === 'pickup' ? ICON(FOODS[o.food].icon) : ICON('char-' + o.char);
     rh.cond.hidden = !R.orders.some((x) => x.picked && !x.done);
     vTop = St.vehStats().top || 9;
-    rh.keys.textContent = R.manual ? 'W/↑ gas · S/↓ brake & reverse · A/D steer · Space hop · Shift turbo · E action · H horn · drag to look'
-      : 'Space turbo · W hop · E action · H horn · drag to look';
+    rh.keys.textContent = R.scheme === 'run' ? '← / → change lane · ↓ / S / Space brake (hold) · ↑ / W hop — it rides itself, the traffic is yours'
+      : R.scheme === 'b' ? '↓ / S / Space brake (hold) · ← / ↑ / → another street at a junction — the gas is always on'
+      : R.scheme ? '← / → change lane, or the turn at a junction (↑ straight on) · ↓ / S / Space brake — the gas is always on'
+      : R.manual ? 'W/↑ gas · S/↓ brake & reverse · A/D steer · Space hop · Shift turbo · E action · H horn · drag to look'
+        : 'Space turbo · W hop · S stop · A overtake · D shortcut · E action · H horn · drag to look';
+    hud.classList.toggle('lb', !!R.scheme);
+    hud.classList.toggle('run', R.scheme === 'run');
+    hud.classList.toggle('auto', !!R.auto);
+    rh.lanes.hidden = R.scheme !== 'a' && R.scheme !== 'run';
+    rh.lanes.querySelector('.row').hidden = R.scheme === 'run'; // the run shows only the draft
+    rh.gear.hidden = R.scheme !== 'b';
+    if (R.scheme !== 'b') rh.limit.hidden = true;
+    rh.proto.hidden = R.scheme !== 'a' && R.scheme !== 'run';
+    rh.proto.textContent = R.scheme === 'a' ? 'Prototype A · lane run' : R.scheme === 'run' ? 'Prototype · courier run' : '';
     routeChanged(R);
   }
   let mapPts = [];
@@ -733,12 +800,13 @@ export function createUI(game) {
     rh.boost.style.setProperty('--e', (e * 100).toFixed(1) + '%');
     rh.boost.classList.toggle('empty', R.energy < 5);
     rh.boost.classList.toggle('on', R.boost);
-    // context actions
+    if (R.scheme) schemeFrame(R);
+    stopFrame(R);
+    // context actions (lanes & brake has none: a shortcut is a swipe, see schemeFrame; a red light is STOP's)
     const acts = [];
-    if (R.phase === 'ride' && R.crash <= 0) {
+    if (R.phase === 'ride' && R.crash <= 0 && !R.scheme) {
       const ot = !R.manual && game.canOvertake();
       if (ot) acts.push(['overtake', `${ICON('ui-overtake')}<span>Overtake</span>`, ['safe', 'risky', 'danger'][ot.risk]]);
-      if (!R.manual && R.light && R.light.state !== 'g' && R.light.d < 16 && R.runLight !== R.light.tile) acts.push(['go', `${ICON('ui-traffic-light')}<span>Run it!</span>`, 'risky']);
       // riding yourself, the shortcut button puts the alley on the GPS
       if (R.offer) acts.push(['shortcut', `${ICON('ui-shortcut')}<span>${R.manual ? 'GPS shortcut' : 'Shortcut'} <small>${R.offer.label}</small></span>`, 'safe']);
       if (R.hazards.some((h) => h.type === 'ped' && !h.done && h.walking && h.ahead > 0 && h.ahead < 28)) acts.push(['horn', `${ICON('ui-horn')}<span>Honk!</span>`, 'safe']);
@@ -753,6 +821,69 @@ export function createUI(game) {
     rh.hop.classList.toggle('hint', !!hz);
     if (hz) { const d = hz.ahead; rh.hop.classList.toggle('perfect', d > R.v * 0.16 && d < R.v * 0.38); } else rh.hop.classList.remove('perfect');
     mapT += 1; if (mapT % 2 === 0) drawMap(R);
+  }
+  // the autopilot's STOP: up for a red light, someone crossing or the door. It glows in the perfect second (just before
+  // the GPS arrows turn red), shakes once it's late, and dims while the bike waits there.
+  let stopKey = '';
+  const STOP_FOR = { light: 'red light', ped: 'crossing', door: 'door' };
+  function stopFrame(R) {
+    const U = R.auto && R.phase === 'ride' && R.crash <= 0 ? R.stopUi : null;
+    rh.stop.hidden = !U;
+    const secs = U && U.kind === 'light' && U.secs < 60 ? Math.max(1, Math.ceil(U.secs)) : 0, rolling = R.v > 1;
+    const k = U ? `${U.kind}|${U.timing}|${secs}|${rolling}` : '';
+    if (k === stopKey) return;
+    stopKey = k;
+    if (!U) return;
+    for (const c of ['now', 'late', 'on']) rh.stop.classList.toggle(c, U.timing === c || (c === 'late' && U.timing === 'gone'));
+    rh.stopL.textContent = U.timing === 'on' ? (U.kind === 'door' ? 'pulling in' : rolling ? 'stopping' : secs ? `wait · ${secs} s` : 'waiting') : STOP_FOR[U.kind] + (secs ? ` · ${secs} s` : '');
+  }
+  // lanes & brake: the dial glows red on the brake; lane run shows the lane and the draft, late brake the gear and the
+  // limit of what's coming (a corner's or a pothole's speed, a red light, someone crossing, the door); a shortcut on
+  // offer says which way to swipe
+  let laneKey = '', limitKey = '', hintKey = '', turnKey = '';
+  function schemeFrame(R) {
+    rh.speedBox.classList.toggle('brk', R.ctl.brake && R.phase === 'ride');
+    rh.brake.classList.toggle('down', R.ctl.brake && R.phase === 'ride'); // (the pedal goes down for the keys too)
+    if (R.scheme !== 'b') {
+      const k = `${R.lane}|${R.draft >= 0.95}`;
+      if (k !== laneKey) { laneKey = k; for (const i of rh.lanes.querySelectorAll('i')) i.classList.toggle('on', +i.dataset.l === R.lane); rh.draft.classList.toggle('full', R.draft >= 0.95); }
+      rh.draft.hidden = !(R.draft > 0.02);
+      rh.draftU.style.width = (R.draft * 100).toFixed(0) + '%';
+    } else {
+      rh.gear.textContent = 'G' + R.gear;
+      rh.gear.classList.toggle('top', R.gear >= 5);
+      const z = R.phase === 'ride' && R.bz && R.bz.at - R.s < 60 ? R.bz : null;
+      rh.limit.hidden = !z;
+      if (z) {
+        const speed = z.kind === 'corner' || z.kind === 'bump', k = speed ? String(Math.round(z.vt * 3.6)) : z.kind;
+        const secs = z.kind === 'light' && R.lightLeft < 60 ? Math.max(1, Math.ceil(R.lightLeft)) : 0, kk = k + '|' + secs + '|' + (z.h?.type || '');
+        if (kk !== limitKey) {
+          limitKey = kk;
+          rh.limitV.textContent = speed ? k : z.kind === 'light' || z.kind === 'ped' ? 'STOP' : '◎';
+          rh.limitL.textContent = z.kind === 'corner' ? 'corner' : z.kind === 'bump' ? (HZ[z.h.type].label || 'bump').toLowerCase() : z.kind === 'light' ? (secs ? `red · ${secs} s` : 'red light') : z.kind === 'ped' ? 'crossing' : 'door';
+          rh.limit.dataset.kind = z.kind;
+        }
+        rh.limit.classList.toggle('late', !!R.cornerWarn);
+      }
+    }
+    // the junction ahead: three arrows, the GPS's lit, the others saying what they buy; a swipe picks one
+    const J = R.phase === 'ride' ? R.junc : null;
+    rh.turn.hidden = !J;
+    const tk = J ? `${J.tile}|${J.cur}|${J.gps}` : '';
+    if (tk !== turnKey) {
+      turnKey = tk;
+      if (J) for (const b of rh.turn.querySelectorAll('button')) {
+        const r = +b.dataset.r, e = J.exits[r];
+        b.hidden = !e;
+        if (!e) continue;
+        b.classList.toggle('on', r === J.cur); b.classList.toggle('gps', r === J.gps); b.classList.toggle('good', e.save >= 10 || e.lights >= 1);
+        b.querySelector('small').textContent = r === J.cur ? (r === J.gps ? 'GPS' : 'chosen') : e.label;
+      }
+    }
+    const side = R.offer ? (game.ride?.offerSide?.(R.offer) ?? 1) : 0;
+    rh.hint.hidden = !side || R.phase !== 'ride';
+    const hk = side ? side + R.offer.label : '';
+    if (hk !== hintKey) { hintKey = hk; if (side) rh.hint.innerHTML = `${ICON('ui-shortcut')}<span>Swipe ${side === 1 ? 'right ➡' : side === -1 ? '⬅ left' : 'up ⬆'} for the shortcut <small>${R.offer.label}</small></span>`; }
   }
   let coachEl = null;
   function coach(c) {
@@ -945,7 +1076,7 @@ export function createUI(game) {
   }
   function levelUp(lvl, unlocks) {
     return new Promise((resolve) => {
-      const m = modal(`<div class="burst"></div><div class="lvshield"><span class="shield"><b>${lvl}</b></span></div><div class="ribwrap"><span class="ribbon">Level up!</span></div><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
+      const m = modal(`<div class="burst"></div><div class="lvshield"><span class="shield"><b>${lvl}</b></span></div><div class="ribwrap"><span class="ribbon">Level up!</span></div><p class="lvcash">${ICON('ui-cash')} +${money(St.levelReward())} bonus</p><p class="lvcash en">${ICON('ui-bolt')} Energy full</p>${unlocks.length ? `<ul class="unl">${unlocks.map((u) => `<li>${u}</li>`).join('')}</ul>` : ''}
         <button class="btn green big" data-x="ok">Nice!</button>`, { cls: 'pop' });
       game.audio?.play('ui-levelup');
       m.card.querySelector('[data-x]').onclick = (e) => { tap(); coinsTo(e.currentTarget, 8); m.close(); resolve(); };
@@ -989,6 +1120,48 @@ export function createUI(game) {
       setTimeout(r, 1600);
     }));
   }
+  // the energy panel: the ⚡ chip opens it, and so does an order or Start there isn't enough energy for (`need`)
+  function energy({ need = 0 } = {}) {
+    if ($('.modal.energy', modals)) return;
+    const bolt = ICON('ui-bolt', 'eb');
+    const m = modal('', { cls: 'pop energy', dismiss: true });
+    const draw = () => {
+      const n = St.tickEnergy(), max = St.energyMax(), short = need > n, price = St.coffeePrice(), left = St.coffeeLeft();
+      m.card.innerHTML = `<div class="en-icon">${ICON('ui-bolt')}</div><h2>${short ? 'Out of energy!' : 'Energy'}</h2>
+        <p class="small">${short ? `That takes ${bolt}<b>${need}</b> — you have <b>${n}</b>.` : `Every order costs ${bolt}<b>${ENERGY.order}</b>, paid when you start.`}</p>
+        <div class="en-bar"><i style="width:${Math.min(100, n / max * 100)}%"></i><b>${n} / ${max}</b></div>
+        <p class="en-eta small"></p>
+        <div class="rlines en-ways">
+          <div class="rl"><span>${ICON('ui-clock')} Rest</span><b>+1 every ${ENERGY.regenMin} min</b></div>
+          <div class="rl"><span>${ICON('ui-xp')} Level up</span><b>full tank</b></div>
+          <div class="rl"><span>${ICON('ui-trophy')} Daily goal</span><b>+${ENERGY.goal} ${bolt}</b></div>
+          <div class="rl"><span>${ICON('ui-bolt')} Stamina skill</span><b>+${ENERGY.stamina} tank / level</b></div>
+          ${S.fleet.office ? `<div class="rl"><span>${ICON('ui-people')} Your fleet</span><b>earns while you rest</b></div>` : ''}
+        </div>
+        ${price != null
+          ? `<button class="btn gold big" data-x="coffee" ${S.cash < price ? 'disabled' : ''}>${ICON('food-coffee')} Coffee +${ENERGY.coffee.n}${bolt}<small>${money(price)}</small></button>
+             <p class="small en-cups">${left} cup${left > 1 ? 's' : ''} left today${left < ENERGY.coffee.price.length ? ' · each one costs more' : ''}</p>`
+          : `<p class="small en-cups">${ICON('food-coffee')} The café is closed for today — back tomorrow.</p>`}
+        <button class="btn ${short ? 'ghost' : 'green big'}" data-x="ok">${short ? 'Wait' : 'OK'}</button>`;
+      tick();
+    };
+    // the countdowns tick without redrawing the buttons
+    const tick = () => {
+      const eta = St.energyEta(), el = $('.en-eta', m.card);
+      if (el) el.innerHTML = eta.next ? `Next ${ICON('ui-bolt', 'eb')} in <b>${mmss(eta.next / 1000)}</b> · full in <b>${hmm(eta.full / 1000)}</b>` : 'Full tank — go ride!';
+    };
+    let last = St.tickEnergy();
+    const iv = setInterval(() => { if (!m.el.isConnected) return clearInterval(iv); const n = St.tickEnergy(); if (n !== last) { last = n; draw(); } else tick(); }, 1000);
+    m.card.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.x === 'coffee') {
+        if (St.buyCoffee()) { game.audio?.play('ui-purchase'); toast(`${ICON('food-coffee')} +${ENERGY.coffee.n} energy`, 'good'); last = St.tickEnergy(); draw(); refreshStartbar(); }
+        else toast('Not enough cash', 'bad');
+      }
+      if (b.dataset.x === 'ok') { tap(); m.close(); }
+    });
+    draw();
+  }
   function tutorial(text, { at = 'center', btn = 'Got it' } = {}) {
     return new Promise((resolve) => {
       const m = modal(`<p>${text}</p><button class="btn green" data-x="ok">${btn}</button>`, { cls: 'tip at-' + at });
@@ -1004,14 +1177,15 @@ export function createUI(game) {
     refreshStartbar();
   }
   St.on((what, data) => {
-    if (['cash', 'xp', 'rating', 'clock', 'fleetbank', 'look', 'vehicles', 'skills', 'districts', 'fleet', 'fleetevent'].includes(what)) refreshTop();
+    if (['cash', 'xp', 'rating', 'clock', 'fleetbank', 'look', 'vehicles', 'skills', 'districts', 'fleet', 'fleetevent', 'energy'].includes(what)) refreshTop();
+    if (what === 'energy') refreshStartbar();
     if (what === 'fleetevent' && !hub.hidden) { toast('Your dispatch office needs a decision — see Fleet', ''); if (tab === 'fleet') render(); }
     if (what === 'contract' && data) toast('Contract goal done — claim it on the City tab', 'good');
   });
 
   return {
-    setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement,
-    rideLeg, rideFrame, routeChanged, flash, coach, flowPop, get tab() { return tab; },
+    setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
+    rideLeg, rideFrame, routeChanged, flash, coach, flowPop, pop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };
 }

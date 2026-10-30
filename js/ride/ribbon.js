@@ -11,11 +11,13 @@ function makeMat(color, chevrons) {
     transparent: true, depthWrite: false, fog: false,
     polygonOffset: true, polygonOffsetFactor: -4,
     vertexShader: 'attribute float aS; attribute float aV; varying float vS; varying float vV; void main(){ vS=aS; vV=aV; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: `uniform vec3 uColor; uniform float uTime, uFrom, uTo, uFade, uChev; varying float vS; varying float vV;
+    fragmentShader: `uniform vec3 uColor; uniform float uTime, uFrom, uTo, uFade, uChev, uB0, uB1; varying float vS; varying float vV;
       void main(){
         if (vS < uFrom || vS > uTo) discard;
         float a;
-        vec3 col = uColor;
+        // a brake zone (late brake) turns its stretch of arrows red
+        vec3 base = vS > uB0 && vS < uB1 ? vec3(1.0, 0.27, 0.2) : uColor;
+        vec3 col = base;
         if (uChev > 0.5) {
           // chunky arcade chevrons: dark-blue rim, bright body, pale core
           float p = fract((vS - uTime * 6.0) / 2.7);
@@ -23,7 +25,7 @@ function makeMat(color, chevrons) {
           float ad = abs(p - 0.56 + x * 0.34);
           float edge = smoothstep(1.0, 0.82, x);
           a = smoothstep(0.205, 0.175, ad) * edge * 0.95;
-          col = mix(uColor * vec3(0.32, 0.55, 0.85), uColor, smoothstep(0.18, 0.15, ad));
+          col = mix(base * vec3(0.32, 0.55, 0.85), base, smoothstep(0.18, 0.15, ad));
           col = mix(col, vec3(0.86, 0.98, 1.0), smoothstep(0.075, 0.0, ad - 0.01 * x) * 0.6);
         } else {
           float edge = smoothstep(0.0, 0.18, vV) * smoothstep(1.0, 0.82, vV);
@@ -59,7 +61,9 @@ export function buildRibbon(route, { width = 1.6, y = 0.12, step = 1.2, color = 
   const m = new THREE.Mesh(g, mat);
   m.renderOrder = 2; m.frustumCulled = false;
   m.userData.setWindow = (a, b, fade = 0) => { mat.uniforms.uFrom.value = a; mat.uniforms.uTo.value = b; mat.uniforms.uFade.value = fade; };
+  m.userData.setBrake = (a, b) => { mat.uniforms.uB0.value = a; mat.uniforms.uB1.value = b; };
   // per-mesh copies of the window uniforms so several ribbons can coexist
   mat.uniforms.uFrom = { value: 0 }; mat.uniforms.uTo = { value: 1e9 }; mat.uniforms.uFade = { value: 0 };
+  mat.uniforms.uB0 = { value: -1 }; mat.uniforms.uB1 = { value: -1 };
   return m;
 }

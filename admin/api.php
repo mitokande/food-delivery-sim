@@ -213,11 +213,15 @@ switch ($q) {
       AVG(json_extract(e.props, '$.stats.events')) events, AVG(json_extract(e.props, '$.stats.horns')) horns")[0] ?? [];
     $rides['started'] = (int) ($ev('job_start', 'COUNT(*) n')[0]['n'] ?? 0);
     $vehicles = $ev('job_end', "json_extract(e.props, '$.veh') k, COUNT(*) n, AVG(json_extract(e.props, '$.secs')) secs, AVG(json_extract(e.props, '$.total')) total, AVG(json_extract(e.props, '$.stats.crashes')) crashes", 'k', 'n DESC');
-    // auto-drive vs riding yourself (desktop keyboard)
-    $modes = $ev('job_end', "COALESCE(json_extract(e.props, '$.manual'), 0) k, COUNT(*) n, AVG(json_extract(e.props, '$.secs')) secs, AVG(json_extract(e.props, '$.total')) total,
+    // the brake ('b': phones since 2026-10-28, the ?ctl=b prototype before) vs the autopilot (STOP 2026-10-26 to -28, now
+    // ?ctl=stop) vs riding yourself (desktop keyboard) vs the lane run prototype (?ctl=a)
+    $mode = "COALESCE(json_extract(e.props, '$.ctl'), json_extract(e.props, '$.manual'), 0)";
+    $modes = $ev('job_end', "$mode k, COUNT(*) n, AVG(json_extract(e.props, '$.secs')) secs, AVG(json_extract(e.props, '$.total')) total,
       AVG(json_extract(e.props, '$.stats.crashes')) crashes, AVG(json_extract(e.props, '$.stats.skids')) skids, AVG(json_extract(e.props, '$.stats.reroutes')) reroutes,
-      AVG(json_extract(e.props, '$.stats.overtakes')) overtakes", 'k', 'k');
-    $modeOrders = array_column($ev('job_end', "COALESCE(json_extract(e.props, '$.manual'), 0) k, AVG(json_extract(o.value, '$.stars')) stars, AVG(json_extract(o.value, '$.late')) late", 'k', '', $orders), null, 'k');
+      AVG(json_extract(e.props, '$.stats.overtakes')) overtakes, AVG(json_extract(e.props, '$.stats.brakeT')) brake, AVG(json_extract(e.props, '$.stats.lanes')) lanes,
+      AVG(json_extract(e.props, '$.stats.reds')) reds, AVG(json_extract(e.props, '$.stats.halts')) halts, AVG(json_extract(e.props, '$.stats.overshoots')) overshoots,
+      AVG(json_extract(e.props, '$.stats.pedHits')) pedHits", 'k', 'k');
+    $modeOrders = array_column($ev('job_end', "$mode k, AVG(json_extract(o.value, '$.stars')) stars, AVG(json_extract(o.value, '$.late')) late", 'k', '', $orders), null, 'k');
     foreach ($modes as &$m) $m += ['stars' => $modeOrders[$m['k']]['stars'] ?? null, 'late' => $modeOrders[$m['k']]['late'] ?? null];
     unset($m);
     $events = $ev('ride_event', "json_extract(e.props, '$.id') k, COUNT(*) n, AVG(json_extract(e.props, '$.good')) good, SUM(json_extract(e.props, '$.opt') = 0) o0,

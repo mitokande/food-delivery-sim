@@ -16,7 +16,7 @@ page.on('console', (m) => { if (m.type() === 'error' && !/404/.test(m.text())) e
 await page.evaluateOnNewDocument(() => localStorage.setItem('fds_save_v1', JSON.stringify({ v: 1, lvl: 6, cash: 3000, districts: { oldtown: true, downtown: true }, seen: { rideTip: 1, manualTip: 1 }, onboard: { step: 99 },
   settings: { music: 0, sfx: 0, quality: 'low', haptics: false },
   active: 'vespetta', vehicles: { rustbucket: { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 1, suspension: 0, box: 0, tires: 0 }, count: 1 } } })));
-await page.goto(`${base}/index.html?noti=1&clock=600`, { waitUntil: 'networkidle0', timeout: 240000 });
+await page.goto(`${base}/index.html?noti=1&energy=off&clock=600`, { waitUntil: 'networkidle0', timeout: 240000 });
 await page.waitForFunction('window.ready', { timeout: 120000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let fails = 0;

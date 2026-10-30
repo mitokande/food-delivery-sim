@@ -20,7 +20,7 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.text()); if (process.env.LOG) console.log('[console]', m.text()); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 const t0 = Date.now();
-await page.goto(`${base}/index.html?noti=1&clock=${process.env.CLOCK || 990}`, { waitUntil: 'networkidle0', timeout: 240000 });
+await page.goto(`${base}/index.html?noti=1&energy=off&clock=${process.env.CLOCK || 990}`, { waitUntil: 'networkidle0', timeout: 240000 });
 await page.waitForFunction('window.ready', { timeout: 120000 });
 console.log('ready in', ((Date.now() - t0) / 1000).toFixed(1) + 's');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -10,16 +10,37 @@ import { W, rainBonus } from './weather.js';
 // bike — measured ≈ (top speed / 8.9 m/s)^0.6 (turns, lights and traffic eat most of a fast bike's top speed).
 const AUTO_BASE = { oldtown: 4.8, downtown: 5.0, harbor: 4.6, hills: 6.9 };
 const bikeGain = (vs, k) => Math.pow(Math.max(1, vs.top / 8.9), k);
-export function autoSpeed(district, vs = vehStats()) { return (AUTO_BASE[district] ?? 5) * bikeGain(vs, 0.6); }
+// (on the brake and the courier run a rider gains little from the bike — see below; on the run a careful rider averages
+// ~10% over the district base)
+export function autoSpeed(district, vs = vehStats()) { return (AUTO_BASE[district] ?? 5) * (ride() === 'run' ? 1.1 : 1) * bikeGain(vs, ride() ? FLAT_GAIN : 0.6); }
 // Timers follow the bike a little slower than its real gain (exponent 0.45 vs 0.6), so upgrades still make you
 // faster than the clock — and they tighten with courier level: generous at first, on-time-without-turbo by Lv 10,
 // tight for veterans (turbo, hops and shortcuts are what make you early).
-export function etaSlack(lvl = S.lvl) { return lvl <= 2 ? 1.3 : lvl >= 14 ? 0.94 : 1.3 - (lvl - 2) * 0.03; }
-const timerSpeed = (district, vs = vehStats()) => (AUTO_BASE[district] ?? 5) * bikeGain(vs, 0.45);
+// The brake (a phone's way of riding since 2026-10-28) has no turbo, and a careful rider there averages much the same
+// on any bike (SEED=7 BOT=1 tools/speed.mjs, Rust Bucket / Vespetta / Viper: Old Town 5.5 / 5.7 / 6.7, Downtown
+// 5.9 / 5.5 / 6.5, Harbor 5.6 / 5.7 / 5.2 m/s — corners, lights and people set the pace, not top speed). So there the
+// timers follow the bike only a little (^0.15), stop tightening at Lv 10's on-time-without-turbo, and a fast order
+// (rush, VIP, express) squeezes the clock half as hard: a careful rider is on time (standard orders at ~80–95% of the
+// clock from Lv 10, rush ~90–105%), late braking, green waves and gears are what make one early.
+// The courier run (`?ctl=run`) has no turbo either, and since its busy traffic became the rider's (2026-10-30) a careful
+// rider there averages about what one does on the brake (SEED=7 CTL=run BOT=1 tools/speed.mjs, Rust Bucket / Vespetta /
+// Viper: Old Town 5.2 / 6.2 / 6.6, Downtown Vespetta 6.1 m/s — braking behind the slow cars, waiting for a gap in the
+// ones coming). So it gets the brake's timers too: lanes, gaps and the slingshot make one early.
+const FLAT_GAIN = 0.15;
+let ride = () => null; // 'b' (the brake), 'run' (the courier run) or null
+export function setTimerRide(fn) { ride = fn; }
+export function etaSlack(lvl = S.lvl) { const k = lvl <= 2 ? 1.3 : lvl >= 14 ? 0.94 : 1.3 - (lvl - 2) * 0.03; return ride() ? Math.max(1.06, k) : k; }
+const timerSpeed = (district, vs = vehStats()) => (AUTO_BASE[district] ?? 5) * bikeGain(vs, ride() ? FLAT_GAIN : 0.45);
+// On the brake and the run the red lights are the rider's to stop at. A city route meets one every ~40 m (Green Hills
+// none), so on a long one they average out into the speeds above, but on a short one a red or two weigh far more than
+// the fixed few seconds did (a careful rider 1.4–1.8× the clock on 40–50 s orders): there the fixed part is a whole red
+// plus the stop and the pull away.
+const FIXED = 6, FIXED_STOP = 12;
 // seconds allowed for `meters` of riding (+ a few seconds for the stops) on the active bike
 export function etaFor(meters, district, typeEta = 1) {
   const wet = rainBonus() > 1 ? 1.08 : 1;
-  return Math.round((meters / timerSpeed(district) * etaSlack() + 6) * typeEta * skillFx().eta * wet);
+  const type = ride() && typeEta < 1 ? 1 - (1 - typeEta) / 2 : typeEta;
+  return Math.round((meters / timerSpeed(district) * etaSlack() + (ride() ? FIXED_STOP : FIXED)) * type * skillFx().eta * wet);
 }
 let nextId = 1;
 const routeLen = new Map();

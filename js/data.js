@@ -20,13 +20,14 @@ export const DISTRICT = Object.fromEntries(DISTRICTS.map((d) => [d.id, d]));
 //   dist   restaurant → customer distance, in tiles (Manhattan) — Old Town hops, Green Hills long rides
 //   same   share of customers in the same district (the rest live across town: longer rides)
 //   tip    tip generosity            haz  road-hazard density       ev  chance of a street event
+//   cams   chance a red run meets a red-light camera (the rest go unfined)
 //   types  order-type weight multipliers (see ORDER_TYPES)          evW event weight multipliers (see ride/events.js)
 //   traits short labels for the Jobs tab
 export const DPROFILE = {
-  oldtown: { dist: [5, 20], same: 0.85, tip: 1.0, haz: 1.0, ev: 1.0, types: { fragile: 1.6, big: 0.5, vip: 0.4, express: 0.3 }, evW: { granny: 1.6, pigeons: 1.5, door: 1.3, soup: 1.3 }, traits: ['Short hops', 'Fragile coffee', 'Grannies crossing'] },
-  downtown: { dist: [8, 26], same: 0.8, tip: 0.85, haz: 0.9, ev: 1.25, types: { rush: 2.2, vip: 1.8, express: 1.8, big: 0.7, fragile: 0.8 }, evW: { rival: 1.7, police: 2, yellow: 1.5, door: 1.4 }, traits: ['Rush, VIP & Express', 'Heavy traffic', 'Tips ×0.85'] },
-  harbor: { dist: [12, 34], same: 0.7, tip: 1.0, haz: 1.35, ev: 1.0, types: { big: 3.2, fragile: 0.5, rush: 0.8, express: 0.8 }, evW: { roadworks: 2, rival: 1.3, police: 1.2 }, traits: ['Group orders', 'Longer roads', 'Road works'] },
-  hills: { dist: [16, 44], same: 0.5, tip: 1.6, haz: 0.75, ev: 0.9, types: { vip: 2.4, fragile: 1.6, big: 1.4, rush: 0.5, express: 0.6 }, evW: { dog: 3, ball: 1.6, granny: 1.3 }, traits: ['Long rides', 'Tips ×1.6', 'VIP villas', 'Dogs!'] },
+  oldtown: { dist: [5, 20], same: 0.85, tip: 1.0, haz: 1.0, ev: 1.0, cams: 0.35, types: { fragile: 1.6, big: 0.5, vip: 0.4, express: 0.3 }, evW: { granny: 1.6, pigeons: 1.5, door: 1.3, soup: 1.3 }, traits: ['Short hops', 'Fragile coffee', 'Grannies crossing'] },
+  downtown: { dist: [8, 26], same: 0.8, tip: 0.85, haz: 0.9, ev: 1.25, cams: 0.7, types: { rush: 2.2, vip: 1.8, express: 1.8, big: 0.7, fragile: 0.8 }, evW: { rival: 1.7, police: 2, yellow: 1.5, door: 1.4 }, traits: ['Rush, VIP & Express', 'Heavy traffic', 'Tips ×0.85'] },
+  harbor: { dist: [12, 34], same: 0.7, tip: 1.0, haz: 1.35, ev: 1.0, cams: 0.45, types: { big: 3.2, fragile: 0.5, rush: 0.8, express: 0.8 }, evW: { roadworks: 2, rival: 1.3, police: 1.2 }, traits: ['Group orders', 'Longer roads', 'Road works'] },
+  hills: { dist: [16, 44], same: 0.5, tip: 1.6, haz: 0.75, ev: 0.9, cams: 0.2, types: { vip: 2.4, fragile: 1.6, big: 1.4, rush: 0.5, express: 0.6 }, evW: { dog: 3, ball: 1.6, granny: 1.3 }, traits: ['Long rides', 'Tips ×1.6', 'VIP villas', 'Dogs!'] },
 };
 
 // speed km/h; accel 0..1; bump = damage multiplier on bumps; fuel $/km; breakdown chance per ride
@@ -63,7 +64,7 @@ export const SKILLS = [
   { id: 'navigation', name: 'Navigation', icon: 'ui-shortcut', desc: 'Lv1 reveals shortcuts through alleys and parks; more ETA slack', per: '+4% ETA' },
   { id: 'charm', name: 'Charm', icon: 'ui-heart', desc: 'Customers tip more and forgive more', per: '+12% tips' },
   { id: 'reflexes', name: 'Reflexes', icon: 'ui-clock', desc: 'More time to react in events, wider perfect windows', per: '+12% reaction time' },
-  { id: 'stamina', name: 'Stamina', icon: 'ui-bolt', desc: 'Bigger turbo tank', per: '+20% energy' },
+  { id: 'stamina', name: 'Stamina', icon: 'ui-bolt', desc: 'A bigger energy tank for orders (and a bigger turbo tank)', per: '+2 max energy, +20% turbo' },
 ];
 export const SKILL_MAX = 5;
 export const skillCost = (lvl) => [40, 150, 450, 1200, 3000][lvl] ?? 99999;
@@ -133,6 +134,14 @@ export const FLEET = {
 };
 // $/min for one courier: district pay × base × vehicle speed factor × skill factor × (1-commission)
 export const fleetRate = (district, veh, skill, cut = FLEET.commission) => DISTRICT[district].pay * 1.9 * (VEHICLE[veh].speed / 32) * (0.75 + skill * 0.12) * (1 - cut) * FLEET.rateScale;
+
+// Energy: taking orders costs it (one ⚡ an order, paid at Start). It comes back with real time, online and off (one
+// every regenMin minutes up to the tank), a level-up fills the tank, a claimed daily goal adds `goal` (rewards may go over
+// the tank; time never does), each Stamina level adds `stamina` to the tank, and a coffee buys `coffee.n` more for cash:
+// the first cup of a real day costs price[0] × a typical delivery's pay, each next one more, and then the café is closed.
+// Riding ~2 min a delivery, time gives back about a third of what a rider spends, so a player who never stops meets an
+// empty tank after ~15–20 deliveries (a new one much later: early levels come every few deliveries).
+export const ENERGY = { max: 10, regenMin: 6, order: 1, goal: 2, stamina: 2, coffee: { n: 5, price: [2, 4, 8] } };
 
 export const xpToNext = (lvl) => Math.round(90 * Math.pow(lvl, 1.35) / 10) * 10;
 

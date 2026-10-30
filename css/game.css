@@ -86,7 +86,6 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .res { position: relative; display: inline-flex; align-items: center; height: 34px; border-radius: 17px; background: linear-gradient(180deg, #34507e, #1d2a44); box-shadow: inset 0 0 0 2px rgba(255,255,255,.1), 0 3px 0 rgba(0,0,0,.35);
   padding: 0 12px 0 30px; font-family: var(--display); font-size: 18px; text-shadow: 0 2px 0 rgba(0,0,0,.35); white-space: nowrap; }
 .res .ic { position: absolute; left: -10px; top: 50%; width: 40px; height: 40px; margin-top: -20px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.35)); }
-.topbar .cash { margin-left: auto; }
 .gear { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(180deg, #34507e, #1d2a44); display: grid; place-items: center; flex: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.35); }
 .gear svg { width: 23px; height: 23px; }
 .clockbar { position: absolute; top: calc(72px + var(--safe-t)); left: 8px; right: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-weight: 600; font-size: 13px; pointer-events: none; }
@@ -103,6 +102,32 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .badge.b-rain { background: #2f6fd6; }
 .fleetbank { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; border-radius: 10px; padding: 2px 9px 2px 4px; font-family: var(--display); font-size: 15px; border-bottom: 3px solid #c47a12; animation: bob 1.6s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-3px); } }
+/* energy: the ⚡ chip in the top bar (the countdown to the next one hangs under it), its cost on the Start bar, the panel */
+.topbar .energy { margin-left: auto; padding: 0 10px 0 27px; font-size: 17px; }
+.topbar .energy .ic { left: -9px; width: 37px; height: 37px; margin-top: -18.5px; }
+.topbar .energy .ent { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 2px); padding: 0 6px; border-radius: 7px; background: rgba(13, 22, 40, .82);
+  font: 700 10.5px/15px var(--font); color: #bfe2ff; text-shadow: none; }
+.topbar .energy .ent:empty { display: none; }
+.topbar .energy.low b { color: #ffb24a; } .topbar .energy.over b { color: #8fe3ff; }
+.topbar .energy.bump { animation: cashpop .6s cubic-bezier(.3,1.6,.5,1); }
+.sb-cost { position: absolute; right: -6px; top: -12px; display: inline-flex; align-items: center; height: 26px; padding: 0 8px 0 3px; border-radius: 13px; background: linear-gradient(#5cb8ff, #2f6fd6);
+  border: 3px solid #fff; font-family: var(--display); font-style: normal; font-size: 15px; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.sb-cost .ic { width: 22px; height: 22px; margin: -4px 0 -4px -6px; }
+#startbar.short { background: linear-gradient(180deg, #b7c0b3, #98a294 50%, #858f81); border-bottom-color: #5d675a; } #startbar.short::after { display: none; }
+#startbar.short .sb-foods, #startbar.short .sb-go .ic { filter: grayscale(.8); } #startbar.short .sb-go { -webkit-text-stroke-color: #4b5449; }
+#startbar.short .sb-cost { background: linear-gradient(#ff6a4f, #c7311f); animation: bob 1.2s ease-in-out infinite; }
+.goal .btn small.gen { display: inline-flex; align-items: center; margin-left: 2px; color: #4a2a00; font-weight: 700; opacity: 1; } .goal .btn small.gen .ic { width: 18px; height: 18px; }
+.modal .lvcash.en { margin-top: -6px; color: #2f6fd6; }
+.ic.eb { width: 1.25em; height: 1.25em; margin: -3px 0 -2px; }
+.energy .card .en-icon .ic { width: 78px; height: 78px; margin: -4px 0 -2px; filter: drop-shadow(0 4px 0 rgba(0,0,0,.2)); }
+.en-bar { position: relative; height: 30px; margin: 8px 0 4px; border-radius: 15px; background: #2a3550; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.18); overflow: hidden; }
+.en-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#7fd2ff, #2f8fe6 60%, #2268c4); border-radius: 0 12px 12px 0; }
+.en-bar b { position: relative; display: block; font: 400 18px/24px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.en-eta { min-height: 1.3em; } .en-eta b { color: var(--ink); }
+.en-ways { margin: 4px 0 10px; text-align: left; } .en-ways .rl b { white-space: nowrap; }
+.en-cups { margin: 2px 0 6px !important; }
+.modal.energy [data-x="coffee"] small { margin-left: 4px; padding: 1px 9px; border-radius: 10px; background: rgba(90, 50, 0, .22); font: 400 18px/1.3 var(--display); color: #fff; -webkit-text-stroke: 0; text-shadow: 0 1px 0 rgba(0,0,0,.3); opacity: 1; }
+.modal.energy .btn.ghost { color: #6b5a44; background: rgba(60, 40, 20, .08); box-shadow: none; margin-top: 4px; }
 
 .tabs { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; padding: 6px 4px calc(6px + var(--safe-b)); background: linear-gradient(180deg, #2a3b60, #1b2740); border-top: 2px solid rgba(255,255,255,.08); z-index: 3; }
 .tabs button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; flex: 1; padding: 4px 0 2px; border-radius: 12px; font-weight: 600; font-size: 12px; color: #b9c6e6; }
@@ -269,8 +294,15 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .r-cond u { display: block; width: 100%; height: var(--v, 100%); border-radius: 8px; background: linear-gradient(90deg, #ffb36b, #ff6a3d); transition: height .3s; }
 .r-cond .integ u { background: linear-gradient(90deg, #9ff07c, #4cc22c); }
 .r-cond .m.low i { animation: pulse .7s infinite; }
+/* the courier run: the food is the life bar — five pips */
+#ridehud.run .r-cond .integ i { position: relative; }
+#ridehud.run .r-cond .integ i::after { content: ''; position: absolute; inset: 2px; border-radius: 8px; pointer-events: none;
+  background: repeating-linear-gradient(to top, transparent 0 calc(20% - 2px), rgba(16, 24, 42, .85) calc(20% - 2px) 20%); }
 .r-map { width: 100px; height: 100px; margin-left: auto; border-radius: 50%; border: 4px solid var(--gold); box-shadow: 0 0 0 2px #fff, 0 4px 0 2px rgba(0,0,0,.3); background: #26375a; }
 .r-ctx { position: absolute; left: 50%; bottom: calc(150px + var(--safe-b)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+/* (on the autopilot, in portrait: between the speed dial and HOP, above STOP) */
+#ridehud.auto .r-ctx { left: 104px; right: 118px; bottom: calc(136px + var(--safe-b)); transform: none; }
+#ridehud.auto .ctx { max-width: 100%; white-space: normal; text-align: center; }
 .ctx { display: flex; align-items: center; gap: 6px; padding: 8px 18px 8px 10px; border-radius: 18px; font-family: var(--display); font-size: 21px; color: #fff; -webkit-text-stroke: 4px var(--cs, #1f5e12); paint-order: stroke fill;
   background: linear-gradient(180deg, #8be06f, #5bd13b 50%, #3aa31f); border-bottom: 4px solid #237a12; box-shadow: 0 4px 10px rgba(0,0,0,.3); animation: popin .25s cubic-bezier(.3,1.6,.5,1); white-space: nowrap; }
 .ctx .ic { width: 28px; height: 28px; }
@@ -290,6 +322,8 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .r-btn.horn { left: 14px; bottom: calc(26px + var(--safe-b)); width: 72px; height: 72px; }
 .r-btn.horn .ic { width: 40px; height: 40px; }
 .r-btn.hop { right: 128px; bottom: calc(30px + var(--safe-b)); width: 84px; height: 84px; border-color: #ffd56b; }
+/* the autopilot in portrait: STOP takes the middle of the bottom row, HOP goes up over TURBO (clear of its charge ring) */
+#ridehud.auto .r-btn.hop { right: 26px; bottom: calc(146px + var(--safe-b)); }
 .r-btn.hop .ic { width: 44px; height: 44px; margin-top: -10px; }
 .r-btn.hop.hint { border-color: #fff; animation: pulse .6s infinite; }
 .r-btn.hop.perfect { border-color: #6fff5a; background: radial-gradient(circle at 50% 30%, #4fbf3a, #1f6a12); }
@@ -301,13 +335,85 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .r-btn .ring { position: absolute; inset: -13px; border-radius: 50%; pointer-events: none; background: conic-gradient(#57e0ff var(--e, 100%), rgba(255,255,255,.22) 0);
   -webkit-mask: radial-gradient(closest-side, #0000 calc(100% - 7px), #000 calc(100% - 6px)), repeating-conic-gradient(#000 0 26deg, #0000 26deg 30deg); -webkit-mask-composite: source-in;
   mask: radial-gradient(closest-side, #0000 calc(100% - 7px), #000 calc(100% - 6px)) intersect, repeating-conic-gradient(#000 0 26deg, #0000 26deg 30deg); }
+/* the autopilot's STOP (a red light, someone crossing, the door): a red octagon under the thumb */
+.r-btn.stop { left: calc(50% - 48px); bottom: calc(24px + var(--safe-b)); width: 96px; height: 96px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  filter: drop-shadow(0 5px 0 rgba(0,0,0,.3)); animation: popin .2s cubic-bezier(.3,1.6,.5,1); }
+.r-btn.stop::before, .r-btn.stop::after { content: ''; position: absolute; clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%); }
+.r-btn.stop::before { inset: 0; background: #fff; }
+.r-btn.stop::after { inset: 5px; background: radial-gradient(circle at 50% 30%, #ff7565, #d22a1c 70%); }
+.r-btn.stop b { position: relative; z-index: 1; margin-top: -10px; font-family: var(--display); font-weight: 400; font-size: 27px; letter-spacing: .02em; -webkit-text-stroke: 4px #7a140c; paint-order: stroke fill; }
+.r-btn.stop small { position: absolute; z-index: 1; left: 0; right: 0; bottom: 19px; text-align: center; font-size: 10.5px; font-weight: 800; color: #ffe1dd; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* the perfect second: a green rim, pulsing; late: it shakes; tapped: it dims while the bike pulls up and waits */
+.r-btn.stop.now { animation: pulse .45s infinite; filter: drop-shadow(0 0 10px rgba(111, 255, 90, .8)) drop-shadow(0 5px 0 rgba(0,0,0,.3)); }
+.r-btn.stop.now::before { background: #6fff5a; }
+.r-btn.stop.late { animation: stopshake .18s infinite; }
+.r-btn.stop.on { animation: none; }
+.r-btn.stop.on::after { background: radial-gradient(circle at 50% 30%, #b0574d, #6e1f17 70%); }
+.r-btn.stop.on b { opacity: .7; }
+@keyframes stopshake { 25% { transform: translateX(-3px) rotate(-2deg); } 75% { transform: translateX(3px) rotate(2deg); } }
 /* riding yourself: the speed dial warns while the bike slides */
 .r-speed.warn .val { stroke: #ff5a4a; }
 .r-speed.warn { animation: pulse .5s infinite; box-shadow: var(--hud-edge), 0 0 0 3px #ff5a4a; }
 .r-keys { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,.7); text-shadow: 0 1px 2px #000; white-space: nowrap; display: none; }
 @media (hover: hover) and (pointer: fine) { .r-keys { display: block; } }
+#ridehud.flash-camera::after { content: ''; position: fixed; inset: 0; background: rgba(255, 255, 255, .7); animation: fade .35s forwards; pointer-events: none; }
 #ridehud.flash-bump::after { content: ''; position: fixed; inset: 0; box-shadow: inset 0 0 70px rgba(255, 60, 40, .55); animation: fade .45s forwards; pointer-events: none; }
 @keyframes fade { to { opacity: 0; } }
+
+/* ===== lanes & brake (?ctl prototype): no buttons — the dial drops to the corner and glows red on the brake ===== */
+#ridehud.lb .r-btn, #ridehud.lb .r-ctx { display: none; }
+#ridehud.lb .r-speed { bottom: calc(22px + var(--safe-b)); }
+.r-speed.brk { box-shadow: var(--hud-edge), 0 0 0 3px #ff3b2f, 0 0 18px rgba(255, 59, 47, .6); }
+.r-speed.brk b { color: #ffb3aa; }
+.r-speed .gear { position: absolute; right: -10px; top: -12px; min-width: 30px; height: 24px; padding: 0 6px; border-radius: 12px; display: grid; place-items: center; font-family: var(--display); font-style: normal; font-size: 15px;
+  color: #fff; -webkit-text-stroke: 3px #10182a; paint-order: stroke fill; background: linear-gradient(180deg, #8be06f, #3aa31f); border-bottom: 3px solid #237a12; }
+.r-speed .gear.top { background: linear-gradient(180deg, #ffe08a, #e69a12); border-bottom-color: #a86a00; }
+/* late brake: what comes next — a corner's limit as a road sign, a red light, the door */
+.r-limit { position: absolute; left: 108px; bottom: calc(24px + var(--safe-b)); width: 58px; height: 58px; border-radius: 50%; background: #fff; border: 6px solid #e8432f; box-shadow: 0 4px 0 rgba(0,0,0,.3);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #1d2a44; }
+.r-limit b { font-family: var(--display); font-weight: 400; font-size: 21px; line-height: 1; }
+.r-limit small { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #5a6680; margin-top: 1px; }
+.r-limit[data-kind="light"], .r-limit[data-kind="ped"] { background: #e8432f; border-color: #fff; color: #fff; } .r-limit[data-kind="light"] b, .r-limit[data-kind="ped"] b { font-size: 15px; } .r-limit[data-kind="light"] small, .r-limit[data-kind="ped"] small { color: #ffe1dd; }
+.r-limit[data-kind="door"] { border-color: #ffb238; } .r-limit[data-kind="door"] b { color: #d48a12; font-size: 24px; }
+.r-limit.late { animation: pulse .4s infinite; box-shadow: 0 0 0 4px rgba(255, 59, 47, .5), 0 4px 0 rgba(0,0,0,.3); }
+/* courier run: the brake is a pedal of its own under the right thumb (a touch anywhere else is a swipe). Held, it tips
+   forward on the pivot at the top of its arm and the brake lights glow round it */
+.r-btn.brake { display: none; }
+#ridehud.run .r-btn.brake { display: block; right: 12px; bottom: calc(14px + var(--safe-b)); width: 100px; height: 132px; padding: 0; border: 0; border-radius: 0;
+  background: none; box-shadow: none; filter: drop-shadow(0 6px 0 rgba(0,0,0,.35)); transform-origin: 50% 0; transition: transform .07s ease-out, filter .07s; }
+#ridehud.run .r-btn.brake svg { display: block; width: 100%; height: 100%; }
+#ridehud.run .r-btn.brake text { font-family: var(--display); font-size: 13px; letter-spacing: .08em; fill: #9aa2ad; stroke: #0c0e11; stroke-width: 2.5px; paint-order: stroke; }
+#ridehud.run .r-btn.brake.down { transform: perspective(300px) rotateX(-26deg) translateY(3px); filter: brightness(.88) drop-shadow(0 0 10px rgba(255, 59, 47, .8)) drop-shadow(0 2px 0 rgba(0,0,0,.35)); }
+#ridehud.run .r-btn.brake.down text { fill: #ff8a7d; }
+#ridehud .r-btn.brake.coached { box-shadow: none; filter: drop-shadow(0 0 5px #ffd56b) drop-shadow(0 0 5px #ffd56b) drop-shadow(0 5px 0 rgba(0,0,0,.3)); }
+#ridehud.run .r-proto { bottom: calc(150px + var(--safe-b)); }
+/* lane run: the three lanes (oncoming · ours · sidewalk) and the draft filling up behind a car */
+.r-lanes { position: absolute; left: 50%; bottom: calc(24px + var(--safe-b)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.r-lanes .row { display: flex; gap: 6px; padding: 6px 8px; border-radius: 14px; background: var(--hud); box-shadow: var(--hud-edge); }
+.r-lanes i { width: 26px; height: 34px; border-radius: 7px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.25); transition: background .12s, transform .12s; }
+.r-lanes i[data-l="-1"] { border-color: rgba(255, 120, 100, .5); } .r-lanes i[data-l="1"] { border-style: dashed; border-color: rgba(220, 220, 210, .55); }
+.r-lanes i.on { background: linear-gradient(180deg, #ffe08a, var(--gold)); border-color: #fff; transform: scale(1.08); }
+.r-lanes i[data-l="-1"].on { background: linear-gradient(180deg, #ff9d8a, #e8432f); }
+.r-lanes .draft { position: relative; width: 150px; height: 18px; border-radius: 9px; background: rgba(0,0,0,.5); border: 2px solid #fff; overflow: hidden; }
+.r-lanes .draft u { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #8fe8ff, #57e0ff); }
+.r-lanes .draft span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 11.5px; letter-spacing: .06em; color: #fff; -webkit-text-stroke: 3px #10182a; paint-order: stroke fill; }
+.r-lanes .draft.full { animation: pulse .5s infinite; } .r-lanes .draft.full u { background: linear-gradient(90deg, #ffe08a, #ff9d2e); }
+.r-lanes .draft.full span::after { content: ' · SWIPE OUT!'; }
+/* a shortcut on offer: which way to swipe */
+.r-hint { position: absolute; left: 50%; bottom: calc(120px + var(--safe-b)); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 7px 14px 7px 8px; border-radius: 16px; white-space: nowrap;
+  font-family: var(--display); font-size: 17px; color: #fff; -webkit-text-stroke: 3px #1f5e12; paint-order: stroke fill; background: linear-gradient(180deg, #8be06f, #5bd13b 50%, #3aa31f); border-bottom: 4px solid #237a12;
+  box-shadow: 0 4px 10px rgba(0,0,0,.3); animation: popin .25s cubic-bezier(.3,1.6,.5,1); }
+.r-hint .ic { width: 26px; height: 26px; } .r-hint small { font-family: var(--font); font-weight: 700; font-size: 12px; -webkit-text-stroke: 0; margin-left: 2px; }
+.r-proto { position: absolute; right: 10px; bottom: calc(8px + var(--safe-b)); font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.75); text-shadow: 0 1px 2px #000; letter-spacing: .03em; }
+.r-pops .pop.gear { color: #9ff07c; font-size: 24px; }
+/* the junction ahead: three arrows above the bike, the GPS's way lit, each other exit priced */
+.r-turn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -30px); display: flex; gap: 10px; animation: popin .2s cubic-bezier(.3,1.6,.5,1); }
+.r-turn button { pointer-events: auto; display: flex; flex-direction: column; align-items: center; min-width: 62px; padding: 6px 8px 5px; border-radius: 14px; background: var(--hud); box-shadow: var(--hud-edge); color: #fff; opacity: .75; }
+.r-turn button i { font-style: normal; font-size: 26px; line-height: 1; }
+.r-turn button small { font-family: var(--display); font-size: 11px; letter-spacing: .03em; margin-top: 2px; white-space: nowrap; color: #c9d5ef; }
+.r-turn button.on { opacity: 1; background: linear-gradient(180deg, #5fd8ff, #2aa3d8); box-shadow: 0 0 0 3px #fff, 0 4px 0 rgba(0,0,0,.3); } .r-turn button.on small { color: #fff; }
+.r-turn button.good:not(.on) { opacity: 1; background: linear-gradient(180deg, #8be06f, #3aa31f); animation: pulse .7s infinite; } .r-turn button.good:not(.on) small { color: #fff; }
+#ridehud.evmode .r-lanes, #ridehud.evmode .r-limit, #ridehud.evmode .r-hint, #ridehud.evmode .r-turn { opacity: 0; }
 
 /* ===== modals ===== */
 #modals { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
@@ -457,6 +563,13 @@ body[data-mode="ride"] #markers { display: none; }
   body[data-mode="hub"] #toasts { bottom: 30px; left: auto; right: 20px; transform: none; width: 340px; }
   .r-ctx { bottom: 40px; }
 }
+/* any landscape screen (phones on their side too): the autopilot keeps HOP beside TURBO, STOP goes under the left thumb */
+@media (min-aspect-ratio: 1/1) {
+  #ridehud.auto .r-ctx { left: 50%; right: auto; bottom: 40px; transform: translateX(-50%); }
+  #ridehud.auto .ctx { white-space: nowrap; }
+  #ridehud.auto .r-btn.hop { right: 128px; bottom: calc(30px + var(--safe-b)); }
+  .r-btn.stop { left: 100px; bottom: calc(26px + var(--safe-b)); }
+}
 @media (max-height: 640px) { .sheet { height: 40vh; } .r-map { width: 88px; height: 88px; } .r-cond i { height: 58px; } }
 
 /* first-time coaching */
@@ -465,6 +578,7 @@ body[data-mode="ride"] #markers { display: none; }
 .coach b { font-family: var(--display); font-weight: 400; color: #d6461d; }
 #ridehud .coached { animation: coachpulse .7s ease-in-out infinite; z-index: 3; }
 #ridehud .r-btn.coached { box-shadow: 0 0 0 8px rgba(255, 213, 107, .8), 0 5px 0 rgba(0,0,0,.3); }
+#ridehud .r-btn.stop.coached { box-shadow: none; filter: drop-shadow(0 0 5px #ffd56b) drop-shadow(0 0 5px #ffd56b) drop-shadow(0 5px 0 rgba(0,0,0,.3)); }
 #ridehud .ctx.coached { box-shadow: 0 0 0 6px rgba(255, 213, 107, .9); }
 @keyframes coachpulse { 50% { transform: scale(1.08); } }
 

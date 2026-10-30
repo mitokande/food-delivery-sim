@@ -21,6 +21,13 @@ export function lightState(light, t, dir) {
   if (ns) return c < G ? 'g' : c < G + Y ? 'y' : 'r';
   return c < G + Y ? 'r' : c < 2 * G + Y ? 'g' : c < CYCLE ? 'y' : 'r';
 }
+// seconds until the signal changes (the rhythm a rider can read off a countdown)
+export function lightLeft(light, t, dir) {
+  const c = ((t + light.phase) % CYCLE + CYCLE) % CYCLE;
+  const ns = dir === 0 || dir === 2;
+  if (ns) return c < G ? G - c : c < G + Y ? G + Y - c : CYCLE - c;
+  return c < G + Y ? G + Y - c : c < 2 * G + Y ? 2 * G + Y - c : CYCLE - c;
+}
 
 export async function createTraffic(city, scene, { seed = 99 } = {}) {
   const rng = mulberry32(seed);
@@ -46,6 +53,7 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
   const bulbGeo = new THREE.CircleGeometry(0.11, 12); // a disc in front of each lens, seen only from the front
   const bulbs = new THREE.InstancedMesh(bulbGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), Math.max(1, city.lights.length * 12));
   const bulbInfo = [];
+  const heads = new Map(); // signal head per junction approach (tile * 4 + d → [x, z]), for a countdown above it
   {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
     let n = 0;
@@ -59,6 +67,7 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
         const x = (t.x + (f[0] + r[0]) * 0.46) * TILE + lx * Math.cos(rot) + lz * Math.sin(rot);
         const z = (t.z + (f[1] + r[1]) * 0.46) * TILE - lx * Math.sin(rot) + lz * Math.cos(rot);
         q.setFromAxisAngle(up, rot);
+        heads.set(l.tile * 4 + d, [x, z]);
         for (let k = 0; k < 3; k++) { m.compose(p.set(x, LENS[k] + 0.2, z), q, one); bulbs.setMatrixAt(n, m); bulbInfo.push({ light: l, d, k }); n++; }
       }
     }
@@ -143,16 +152,22 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
     return remain;
   }
 
-  // things off the road graph (the player riding freely): a car brakes for one that's in its path
-  const blockers = [];
+  // things off the road graph (the player riding freely, or stopped out in a car's lane): a car brakes for one that's in
+  // its path (pad: how much further off it stops)
+  // (looked for along the car's own path — the rest of its curve through this tile, then straight on the way out — so a
+  // car turning in round a corner sees what stands just past it too)
+  const blockers = [], pp = [0, 0, 0];
   function blockerGap(a) {
     let best = Infinity;
-    const h = a.pos[2], fx = Math.sin(h), fz = Math.cos(h);
     for (const b of blockers) {
       const dx = b.x - a.pos[0], dz = b.z - a.pos[1];
-      const lon = dx * fx + dz * fz;
-      if (lon < 0 || lon > 40 || Math.abs(dx * fz - dz * fx) > 1.15 + b.r) continue;
-      best = Math.min(best, lon - a.len / 2 - b.r);
+      if (dx * dx + dz * dz > 45 * 45) continue;
+      const reach = (1.15 + b.r) ** 2, left = a.curve.len - a.s, out = DIRS[a.dout];
+      sampleCurve(a.curve, a.curve.len, a.cx, a.cz, pp); const ex = pp[0], ez = pp[1];
+      for (let d = 0; d <= 40; d += 0.8) {
+        if (d <= left) sampleCurve(a.curve, a.s + d, a.cx, a.cz, pp); else { pp[0] = ex + out[0] * (d - left); pp[1] = ez + out[1] * (d - left); }
+        if ((pp[0] - b.x) ** 2 + (pp[1] - b.z) ** 2 < reach) { best = Math.min(best, d - a.len / 2 - b.r - (b.pad || 0)); break; }
+      }
     }
     return best;
   }
@@ -223,6 +238,8 @@ export async function createTraffic(city, scene, { seed = 99 } = {}) {
     agents, byTile, update, lightAt, placeAgent, leaderGap, meshes, blockers,
     get time() { return time; },
     light: (tile, dir) => { const L = lightAt.get(tile); return L ? lightState(L, time, dir) : 'g'; },
+    lightLeft: (tile, dir) => { const L = lightAt.get(tile); return L ? lightLeft(L, time, dir) : Infinity; },
+    headAt: (tile, dir) => heads.get(tile * 4 + dir) || null,
     addAgent(a) { agents.push(a); return a; },
     // a rider (fleet courier) that wanders like a car inside a district; obj = Object3D to move
     addRider(obj, district, onDraw) {

@@ -40,7 +40,13 @@ export function createOnboarding(game, ui) {
       let look = { char: S.look.char, helmet: S.look.helmet }, name = S.name || '', skipped = false;
       const slides = [
         { art: `<img src="assets/icons/veh-rustbucket.png" class="ia big" alt="">`, h: 'Welcome to Saffron Bay', p: 'Your uncle left you his old scooter. It rattles, it smokes, it\'s <b>yours</b>. You have <b>$25</b> and big dreams.' },
-        { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-nitro', 'ia')}<i>→</i>${ICON('ui-cash', 'ia')}</span>`, h: 'The scooter rides itself', p: 'You choose when to <b>turbo</b>, <b>hop</b> over potholes and <b>overtake</b>. Fast, careful deliveries earn big tips.' },
+        game.ctl === 'b' // (the brake: phones, and keyboards on auto-drive)
+          ? { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-speed', 'ia')}<i>→</i>${ICON('ui-cash', 'ia')}</span>`, h: 'The gas is always on', p: 'Your scooter steers itself. You <b>hold</b> the screen to brake — for corners, red lights and the door. Brake late, ride smooth, earn big tips.' }
+          : game.ctl === 'run' // (the courier run, ?ctl=run)
+            ? { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-jump', 'ia')}<i>→</i>${ICON('ui-coin', 'ia')}</span>`, h: 'Weave through traffic', p: 'Your scooter rides itself, but it won\'t stop for anything. <b>Swipe</b> between the cars, hold <b>BRAKE</b> for the rest — grab the coins, keep the food in one piece.' }
+            : game.ctl // (the lane run, ?ctl=a)
+              ? { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-overtake', 'ia')}<i>→</i>${ICON('ui-cash', 'ia')}</span>`, h: 'The gas is always on', p: 'You <b>hold</b> the screen to brake and <b>swipe</b> to change lanes. Fast, careful deliveries earn big tips.' }
+              : { art: `<span class="ia-row">${ICON('food-burger', 'ia')}<i>→</i>${ICON('ui-nitro', 'ia')}<i>→</i>${ICON('ui-cash', 'ia')}</span>`, h: 'The scooter rides itself', p: 'You choose when to <b>turbo</b>, <b>hop</b> over potholes and <b>overtake</b>. Fast, careful deliveries earn big tips.' },
         { art: `<span class="ia-row">${ICON('ui-building', 'ia')}${ICON('ui-people', 'ia')}${ICON('ui-trophy', 'ia')}</span>`, h: 'Build a delivery empire', p: 'Buy faster bikes, get hired in better districts, and hire your own couriers who earn while you sleep.' },
       ];
       let i = 0;

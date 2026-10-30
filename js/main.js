@@ -24,15 +24,27 @@ import { createUI, ICON } from './ui/ui.js';
 import { checkAchievements } from './career.js';
 import { createOnboarding } from './ui/onboard.js';
 import { createAudio } from './audio.js';
-import { makeOrder, refreshOrder, etaFor, pathMeters } from './orders.js';
+import { makeOrder, refreshOrder, etaFor, pathMeters, setTimerRide } from './orders.js';
 import * as St from './state.js';
 import { S } from './state.js';
-import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES } from './data.js';
+import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES, ENERGY } from './data.js';
 import { mulberry32 } from './rng.js';
 
 window.__started = true;
 const q = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+// How the ride is controlled. A phone (and a keyboard with Auto-drive on) rides the brake: the scooter steers itself,
+// the gas is always on and the rider holds anywhere to brake ('b'). A keyboard otherwise rides freely. For QA,
+// ?ctl=run (the courier run: swipes only), ?ctl=a (the lane run), ?ctl=b (the brake on any device) or ?ctl=stop (the
+// STOP autopilot) stick to the device until ?ctl=off.
+const CTL_IDS = ['a', 'b', 'run', 'stop'];
+const CTL = (() => {
+  const v = q.get('ctl');
+  try { if (v === 'off') localStorage.removeItem('fds_ctl'); else if (CTL_IDS.includes(v)) localStorage.setItem('fds_ctl', v); const s = localStorage.getItem('fds_ctl'); return CTL_IDS.includes(s) ? s : null; }
+  catch { return CTL_IDS.includes(v) ? v : null; }
+})();
+const scheme = () => (CTL === 'stop' ? null : CTL || (isTouch || S.settings.autodrive === true ? 'b' : null));
+setTimerRide(() => (scheme() === 'b' || scheme() === 'run' ? scheme() : null)); // (no turbo on either: orders.js)
 const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true;
@@ -87,7 +99,9 @@ const markers = createMarkers(document.getElementById('markers'), camera);
 const game = {
   city, audio, board: [], taken: [], selOrder: null, mode: 'hub', isTouch,
   // on a keyboard the player rides the bike freely (steer, gas, brake, reverse) unless they switch auto-drive on in Settings
-  manual: () => !isTouch && S.settings.autodrive !== true,
+  // (a ?ctl the device was given takes over on any device)
+  manual: () => !CTL && !isTouch && S.settings.autodrive !== true,
+  get ctl() { return scheme(); },
   sampleRoute,
   rideInput: (k, d) => ride.input(k, d),
   canOvertake: () => ride.canOvertake(),
@@ -96,8 +110,16 @@ const ui = createUI(game);
 const ob = createOnboarding(game, ui);
 game.ob = ob;
 const world = createWorld(city, view.arch, people.list);
-const ride = createRide({ scene, camera, renderer, city, traffic, world, peds, sky, audio, ui, weather, manual: () => game.manual(), onFinish: (s) => finishJob(s) });
+const ride = createRide({ scene, camera, renderer, city, traffic, world, peds, sky, audio, ui, weather, manual: () => game.manual(), scheme, onFinish: (s) => finishJob(s) });
 game.ride = ride; game.world = world;
+
+// energy: an order costs ENERGY.order ⚡, paid at Start (tests that ride many jobs pass ?energy=off: nothing is spent)
+const freeEnergy = q.get('energy') === 'off';
+game.energyFor = (n) => (freeEnergy ? 0 : n * ENERGY.order);
+function noEnergy(need) {
+  An.track('energy_out', { need, have: S.energy.n, lvl: S.lvl, cash: Math.round(S.cash), coffee: St.coffeeLeft() });
+  audio.play('ui-error'); ui.energy({ need });
+}
 
 const playerTile = () => (S.pos != null && city.tiles[S.pos]?.k === 1 ? S.pos : garageLot.door);
 const playerDir = () => (S.pos != null && S.posDir != null && city.tiles[S.pos]?.k === 1 && city.tiles[S.pos].mask & (1 << S.posDir) ? S.posDir : -1);
@@ -124,10 +146,12 @@ game.toggleOrder = (id) => {
   if (i >= 0) { game.taken.splice(i, 1); audio.play('ui-back'); }
   else {
     const cap = St.vehStats().cap, used = game.taken.reduce((a, x) => a + x.size, 0);
-    if (used + o.size > cap) {
-      if (cap === 1 && game.taken.length === 1) { game.taken = [o]; audio.play('ui-tap'); }
-      else { ui.toast(cap === 1 ? 'Your bike carries one order' : `Box full (${cap})`, 'bad'); audio.play('ui-error'); return; }
-    } else { game.taken.push(o); audio.play('ui-tap'); }
+    const full = used + o.size > cap, swap = full && cap === 1 && game.taken.length === 1; // a one-order bike trades the order it had
+    if (full && !swap) { ui.toast(cap === 1 ? 'Your bike carries one order' : `Box full (${cap})`, 'bad'); audio.play('ui-error'); return; }
+    const need = game.energyFor(swap ? 1 : game.taken.length + 1);
+    if (need > St.tickEnergy()) { noEnergy(need); return; }
+    if (swap) game.taken = [o]; else game.taken.push(o);
+    audio.play('ui-tap');
     ob.event('taken');
   }
   game.selOrder = o.id;
@@ -268,6 +292,8 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 game.startJob = async () => {
   if (!game.taken.length || game.mode !== 'hub') return;
   audio.init();
+  const need = game.energyFor(game.taken.length);
+  if (need && !St.useEnergy(need)) { noEnergy(need); return; }
   const orders = game.taken.slice();
   ob.event('start');
   for (const o of orders) refreshOrder(city, o, playerTile());
@@ -282,7 +308,7 @@ game.startJob = async () => {
       stops++;
     }
   }
-  An.track('job_start', { n: orders.length, veh: S.active, lvl: S.lvl, manual: game.manual() ? 1 : 0, clock: Math.round(S.clock), rain: Math.round(WEATHER.rain * 100) / 100, rush: St.rushMult().m,
+  An.track('job_start', { n: orders.length, energy: S.energy.n, veh: S.active, lvl: S.lvl, manual: game.manual() ? 1 : 0, ctl: scheme(), clock: Math.round(S.clock), rain: Math.round(WEATHER.rain * 100) / 100, rush: St.rushMult().m,
     orders: orders.map((o) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, m: Math.round(o.pickM + o.dropM), eta: Math.round(o.eta), pay: o.base })) });
   game.board = game.board.filter((o) => !orders.includes(o));
   game.taken = []; game.selOrder = null; updatePreview();
@@ -302,14 +328,23 @@ game.startJob = async () => {
   ride.R.takeCamera = true;
   game.mode = 'ride'; ui.setMode('ride');
   await ride.start(job, from, dir0);
-  // the controls tip, once per way of riding (a desktop player who rode on auto-drive still needs the keys)
-  const tip = ride.R.manual ? 'freeTip' : 'rideTip';
+  // the controls tip, once per way of riding (a desktop player who rode on auto-drive still needs the keys; the lane
+  // run explains itself; the brake again since it became the phone's way of riding, the autopilot's since STOP)
+  // (the run's again since its traffic became the rider's, 2026-10-30)
+  const tip = ride.R.scheme === 'b' ? 'brakeTip' : ride.R.scheme === 'run' ? 'lbTip_run2' : ride.R.scheme ? 'lbTip_' + ride.R.scheme : ride.R.manual ? 'freeTip' : 'rideTip2';
   if (!S.seen[tip]) {
     S.seen[tip] = 1; St.save();
     ride.R.timeScale = 0;
-    await ui.tutorial(ride.R.manual
-      ? `You ride the scooter — go anywhere you like.<br><br>${ICON('ui-speed')} <b>W</b> / <b>↑</b> gas, <b>S</b> / <b>↓</b> brake (hold it when stopped to back up).<br>${ICON('ui-route')} <b>A</b> / <b>D</b> steer. The blue arrows are the GPS: take another street and it finds a new way. Stop in the glowing ring at the door.<br>${ICON('ui-jump')} <b>Space</b> hops potholes, <b>Shift</b> is turbo, <b>E</b> takes the button that pops up. Walls, poles and cars hurt — so do corners taken too fast.`
-      : `Your scooter <b>drives itself</b>.<br><br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b>, <b>run lights</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
+    const lb = `The gas is <b>always on</b>. You do two things:<br><br>${ICON('ui-speed')} <b>Hold anywhere</b> on the screen to brake.<br>${ICON('ui-overtake')} <b>Swipe</b> left / right to change lane — or, with arrows up before a junction, to take another street (the GPS finds a new way).<br>${ICON('ui-traffic-light')} The number over a light counts down to its change.<br><br>`;
+    await ui.tutorial(ride.R.scheme === 'run'
+      ? `Your scooter <b>rides itself</b>: the speed and the corners. <b>The traffic is yours</b> — the streets are busy, and it won't stop for anything:<br><br>${ICON('ui-speed')} Hold <b>BRAKE</b> for the car in front, people crossing and red lights.<br>${ICON('ui-overtake')} <b>Swipe left / right</b> to slip between the cars: the oncoming lane (mind what's coming) or the sidewalk (mind the people).<br>${ICON('ui-jump')} <b>Swipe up</b> to hop potholes, puddles, cones and road works.<br>${ICON('ui-traffic-light')} The number over a light counts down to its change. Run a red and a camera may fine you — Downtown has the most.<br>${ICON('ui-coin')} Grab the <b>coins</b> — the risky lanes have the most. Every knock hurts the food: let it hit zero and the order is <b>ruined</b>.`
+      : ride.R.scheme === 'a'
+        ? lb + `<b>The traffic is yours:</b> the car in front, red lights, people crossing. Ride in the oncoming lane, your own, or up on the sidewalk (no cars — mind the people).<br>${ICON('ui-nitro')} Tuck in behind a car to fill your <b>draft</b>, then swipe out to <b>slingshot</b> past.`
+        : ride.R.scheme === 'b'
+          ? `Your scooter <b>steers itself</b> and the gas is <b>always on</b>. You do one thing:<br><br>${ICON('ui-speed')} <b>Hold anywhere</b> to brake, let go to ride on. Brake where the arrows turn <b>red</b>: corners, red lights, people crossing, potholes, the door.<br><br>${ICON('ui-pin')} Stop in the <b>ring</b> at the door — dead centre is perfect.<br>${ICON('ui-nitro')} Brake <b>late</b>: perfect corners and stops build <b>Flow</b> (bigger tips), junctions rolled through climb the <b>gears</b>.<br>${ICON('ui-traffic-light')} The number over a light counts down to green.<br>${ICON('ui-route')} Arrows at a junction? <b>Swipe</b> to take another street.`
+          : ride.R.manual
+            ? `You ride the scooter — go anywhere you like.<br><br>${ICON('ui-speed')} <b>W</b> / <b>↑</b> gas, <b>S</b> / <b>↓</b> brake (hold it when stopped to back up).<br>${ICON('ui-route')} <b>A</b> / <b>D</b> steer. The blue arrows are the GPS: take another street and it finds a new way. Stop in the glowing ring at the door.<br>${ICON('ui-jump')} <b>Space</b> hops potholes, <b>Shift</b> is turbo, <b>E</b> takes the button that pops up. Walls, poles and cars hurt — so do corners taken too fast.`
+            : `Your scooter <b>steers itself</b> — but <b>stopping is your job</b>.<br><br>${ICON('ui-traffic-light')} Tap <b>STOP</b> when it pops up: red lights, people crossing, the door. Tap it just before the arrows turn red for a <b>perfect stop</b>. Miss it and you run the red, scare a pedestrian or ride past the door.<br>${ICON('ui-nitro')} Hold <b>TURBO</b> to go faster.<br>${ICON('ui-jump')} Tap <b>HOP</b> to jump potholes.<br>${ICON('ui-overtake')} Buttons pop up to <b>overtake</b> and take <b>shortcuts</b>.<br>${ICON('ui-route')} <b>Drag</b> the screen to look around.`, { at: 'top', btn: "Let's ride!" });
     ride.R.timeScale = 1;
   }
 };
@@ -326,7 +361,7 @@ async function finishJob(sum) {
   for (const x of sum.orders) {
     const r = x.result; if (!r) continue;
     const o = x.o;
-    lines.push({ label: `${ICON(FOODS[o.food].icon)} ${o.restName} → ${o.name} <span class="rs">${'★'.repeat(r.stars)}</span>`, amount: r.pay + r.bonus });
+    lines.push({ label: `${ICON(FOODS[o.food].icon)} ${o.restName} → ${o.name} <span class="rs">${'★'.repeat(r.stars)}</span>${r.ruined ? ' · food ruined' : ''}`, amount: r.pay + r.bonus, cls: r.ruined ? 'neg' : '' });
     if (r.tip) lines.push({ label: `${ICON('ui-coin')} Tip from ${o.name}`, amount: r.tip, cls: 'pos' });
     total += r.pay + r.bonus + r.tip; tipsT += r.tip; starsSum += r.stars;
     xp += Math.round((14 + o.dropM / 35 + r.stars * 3 + (r.early ? 6 : 0)) * (0.8 + 0.2 * DISTRICT[o.district].pay));
@@ -359,7 +394,8 @@ async function finishJob(sum) {
   const dayOver = St.advanceClock(sum.time * GAME_MIN_PER_SEC + 3 * n);
   unsub();
   An.track('job_end', { secs: Math.round(sum.time), m: Math.round(sum.meters), total, xp, fuel: sum.fuel, fines: sum.fines, cash: sum.stats.cash, levels: levels.length, dayOver: dayOver ? 1 : 0,
-    veh: S.active, lvl: S.lvl, manual: ride.R.manual ? 1 : 0, stats: { ...sum.stats, boostT: Math.round(sum.stats.boostT * 10) / 10, stopT: Math.round(sum.stats.stopT * 10) / 10 },
+    veh: S.active, lvl: S.lvl, manual: ride.R.manual ? 1 : 0, ctl: ride.R.scheme, stats: { ...sum.stats, boostT: Math.round(sum.stats.boostT * 10) / 10, stopT: Math.round(sum.stats.stopT * 10) / 10,
+      ...(ride.R.scheme && { brakeT: Math.round(sum.stats.brakeT * 10) / 10, walkM: Math.round(sum.stats.walkM) }) },
     orders: sum.orders.filter((x) => x.result).map(({ o, result: r }) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, stars: r.stars, early: r.early ? 1 : 0, late: r.late ? 1 : 0,
       ratio: Math.round(r.ratio * 100) / 100, pay: r.pay, tip: r.tip, bonus: r.bonus, cond: Math.round(r.cond) })) });
   await new Promise((r) => setTimeout(r, 350));
@@ -387,6 +423,8 @@ async function backToHub() {
   fillBoard(true);
   updateMarkers(); updatePreview();
   ob.event('hub');
+  // the first ride back: say where the energy went (once)
+  if (!S.seen.energyTip && !freeEnergy) { S.seen.energyTip = 1; St.save(); setTimeout(() => ui.toast(`${ICON('ui-bolt')} Each order uses ${ENERGY.order} energy. It refills by itself — tap ${ICON('ui-bolt')} to see`, ''), 2500); }
 }
 
 // ---------------------------------------------------------------- tabs → camera
@@ -436,7 +474,8 @@ game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV)
 
 // ---------------------------------------------------------------- ride free look: drag to orbit, pinch / wheel to zoom
 const rideLook = { ptrs: new Map(), last: null, start: null, t0: 0, snap: null, pinch: 0, zoom0: 1 };
-const lookAllowed = () => game.mode === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal');
+const rideOpen = () => game.mode === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal:not(.out)');
+const lookAllowed = () => !ride.R.scheme && rideOpen(); // (lanes & brake: a drag is the brake and the swipes, see below)
 canvas.addEventListener('pointerdown', (e) => {
   if (!lookAllowed()) return;
   rideLook.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -466,13 +505,46 @@ const lookUp = (e) => {
 canvas.addEventListener('pointerup', lookUp); canvas.addEventListener('pointercancel', lookUp);
 canvas.addEventListener('wheel', (e) => { if (game.mode !== 'ride') return; e.preventDefault(); ride.camZoom(ride.free.zoom * Math.exp(e.deltaY * 0.0012)); ride.free.idle = 0; }, { passive: false });
 
+// ---------------------------------------------------------------- the brake (and the lane run): hold anywhere = brake, swipe = lane / turn
+// The brake bites the moment a finger lands (no waiting to tell a hold from a swipe); a finger that then slides
+// sideways lets go of it and changes lane instead (upward: a shortcut straight on). Another finger still down brakes on.
+// On the brake there are no lanes: a swipe only counts while there's a street to take (a junction's arrows, a
+// shortcut), so a thumb that drifts while it holds the brake keeps braking.
+// On the courier run the brake is its own button (ui.js): a touch anywhere else is a swipe (left / right a lane or a
+// turn, up a hop), so a second thumb can swipe while one holds the brake.
+const lbPtrs = new Map();
+const holds = () => ride.R.scheme !== 'run';
+const lbBrake = () => { if (holds()) ride.input('brake', [...lbPtrs.values()].some((p) => !p.swiped)); };
+const swipeable = () => ride.R.scheme === 'a' || ride.R.scheme === 'run' || !!ride.R.junc || !!ride.R.offer;
+canvas.addEventListener('pointerdown', (e) => {
+  if (!ride.R.scheme || !rideOpen()) return;
+  lbPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, swiped: false });
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
+  lbBrake();
+});
+canvas.addEventListener('pointermove', (e) => {
+  const p = lbPtrs.get(e.pointerId); if (!p || p.swiped) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (!swipeable()) { if (Math.hypot(dx, dy) > 24) { p.x = e.clientX; p.y = e.clientY; } return; }
+  if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy) * 1.2) { p.swiped = true; lbBrake(); ride.input(dx < 0 ? 'lane-left' : 'lane-right', true); }
+  else if (dy < (holds() ? -40 : -30) && -dy > Math.abs(dx) * 1.3) { p.swiped = true; lbBrake(); ride.input('swipe-up', true); }
+});
+const lbUp = (e) => { if (lbPtrs.delete(e.pointerId)) lbBrake(); };
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, lbUp);
+canvas.addEventListener('contextmenu', (e) => { if (ride.R.scheme) e.preventDefault(); }); // (a long hold on the brake is no long-press)
+
 // ---------------------------------------------------------------- keyboard
-const KEYS = { Space: 'boost', KeyW: 'hop', ArrowUp: 'hop', KeyH: 'horn', KeyA: 'overtake', ArrowLeft: 'overtake', KeyG: 'go', KeyS: 'shortcut' };
+const KEYS = { Space: 'boost', KeyW: 'hop', ArrowUp: 'hop', KeyH: 'horn', KeyA: 'overtake', ArrowLeft: 'overtake', KeyS: 'stop', ArrowDown: 'stop', KeyD: 'shortcut', ArrowRight: 'shortcut' };
 // riding yourself: pedals on W/S (or the arrows), steering on A/D, hop on Space, turbo on Shift
 const KEYS_RIDE = { KeyW: 'gas', ArrowUp: 'gas', KeyS: 'brake', ArrowDown: 'brake', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   Space: 'hop', ShiftLeft: 'boost', ShiftRight: 'boost', KeyH: 'horn' };
+// lanes & brake: the arrows (or A/D) change lane (on the brake: take a junction's other street), down / S / Space
+// brake, up takes a shortcut straight on
+const KEYS_LB = { ArrowLeft: 'lane-left', KeyA: 'lane-left', ArrowRight: 'lane-right', KeyD: 'lane-right', ArrowDown: 'brake', KeyS: 'brake', Space: 'brake', ArrowUp: 'swipe-up', KeyW: 'swipe-up' };
+// the courier run: the arrows (or A/D) a lane, up / W the hop, down / S / Space the brake
+const KEYS_RUN = { ArrowLeft: 'lane-left', KeyA: 'lane-left', ArrowRight: 'lane-right', KeyD: 'lane-right', ArrowUp: 'swipe-up', KeyW: 'swipe-up', ArrowDown: 'brake', KeyS: 'brake', Space: 'brake' };
 const HELD = new Set(['gas', 'brake', 'boost', 'left', 'right']);
-const keyMap = () => (ride.R.manual ? KEYS_RIDE : KEYS);
+const keyMap = () => (ride.R.scheme === 'run' ? KEYS_RUN : ride.R.scheme ? KEYS_LB : ride.R.manual ? KEYS_RIDE : KEYS);
 addEventListener('keydown', (e) => {
   if (game.mode !== 'ride') return;
   const k = keyMap()[e.code];
@@ -485,7 +557,7 @@ addEventListener('keydown', (e) => {
   ride.input(k, true);
 });
 addEventListener('keyup', (e) => { const k = keyMap()[e.code]; if (HELD.has(k)) ride.input(k, false); });
-addEventListener('blur', () => { for (const k of HELD) ride.input(k, false); });
+addEventListener('blur', () => { lbPtrs.clear(); for (const k of HELD) ride.input(k, false); });
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); game.amb = undefined; } }, { capture: true });
 
 // ---------------------------------------------------------------- boot finish

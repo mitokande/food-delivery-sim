@@ -1,5 +1,5 @@
 // Things on the road during a delivery: potholes, puddles, cones, barriers, double-parked cars,
-// jaywalkers, cash and energy pickups. Spawning (pure-ish) + simple visuals.
+// jaywalkers, cash and energy pickups (and the courier run's coins). Spawning (pure-ish) + simple visuals.
 import * as THREE from 'three';
 import { pieceParts, makeChar } from '../assets.js';
 import { TILE, DPROFILE } from '../data.js';
@@ -16,6 +16,7 @@ export const HZ = {
   crates: { hop: true, block: true, dmg: 10, len: 1.5, label: 'Crates' },
   cash: { pickup: true },
   energy: { pickup: true },
+  coin: { pickup: true },
 };
 const MIX = {
   oldtown: [['pothole', 3], ['puddle', 2], ['cones', 1], ['parked', 2], ['ped', 2], ['cash', 2.5], ['energy', 1]],
@@ -57,6 +58,7 @@ const M = {
   cash: new THREE.MeshStandardMaterial({ color: 0x5fcf4a, roughness: 0.5, emissive: 0x1f6a12, emissiveIntensity: 0.6 }),
   band: new THREE.MeshStandardMaterial({ color: 0xf2e7c4, roughness: 0.6 }),
   energy: new THREE.MeshStandardMaterial({ color: 0x3fa9ff, roughness: 0.3, metalness: 0.4, emissive: 0x0b4a8a, emissiveIntensity: 0.6 }),
+  coin: new THREE.MeshStandardMaterial({ color: 0xffc93c, roughness: 0.35, metalness: 0.55, emissive: 0x7a5200, emissiveIntensity: 0.55 }),
   ring: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false }),
   hazard: new THREE.MeshBasicMaterial({ color: 0xffa21f, toneMapped: false }),
   crate: new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: 0.9 }),
@@ -68,6 +70,7 @@ const geo = {
   bill: new THREE.BoxGeometry(0.9, 0.32, 0.5),
   band: new THREE.BoxGeometry(0.18, 0.34, 0.52),
   can: new THREE.CylinderGeometry(0.28, 0.28, 0.7, 14),
+  coin: (() => { const g = new THREE.CylinderGeometry(0.44, 0.44, 0.1, 20); g.rotateX(Math.PI / 2); return g; })(),
   ring: (() => { const g = new THREE.RingGeometry(0.8, 0.95, 24); g.rotateX(-Math.PI / 2); return g; })(),
   crate: new THREE.BoxGeometry(0.8, 0.8, 0.8),
   light: new THREE.BoxGeometry(0.18, 0.1, 0.06),
@@ -108,6 +111,11 @@ export function makeHazardMesh(h) {
       s.add(new THREE.Mesh(geo.bill, M.cash)); const b = new THREE.Mesh(geo.band, M.band); s.add(b);
       s.position.y = 1.1; g.add(s); h.spin = s;
       const r = new THREE.Mesh(geo.ring, M.ring); r.position.y = 0.05; g.add(r);
+      break;
+    }
+    case 'coin': {
+      const s = new THREE.Group(); s.add(new THREE.Mesh(geo.coin, M.coin));
+      s.position.y = 1; g.add(s); h.spin = s;
       break;
     }
     case 'energy': {

@@ -9,7 +9,7 @@ try { puppeteer = require('puppeteer-core'); } catch { puppeteer = require('/roo
 const CHROME = process.env.CHROME || '/root/.cache/puppeteer/chrome/linux-148.0.7778.97/chrome-linux64/chrome';
 const sizes = (process.argv[2] || '360x640,375x667,390x844,412x915,430x932,360x560,844x390,768x1024,1280x720').split(',').map((s) => s.split('x').map(Number));
 const SAVE = JSON.stringify({ v: 1, cash: 12450, xp: 400, lvl: 7, skills: { riding: 2, navigation: 1, charm: 1, reflexes: 0, stamina: 0 }, districts: { oldtown: true, downtown: true, harbor: true },
-  stats: { deliveries: 60 }, seen: { rideTip: 1, manualTip: 1, freeTip: 1 }, active: 'vespetta', vehicles: { rustbucket: { parts: { engine: 2, suspension: 1, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 1, suspension: 0, box: 0, tires: 0 }, count: 2 } },
+  stats: { deliveries: 60 }, seen: { rideTip: 1, rideTip2: 1, manualTip: 1, freeTip: 1 }, active: 'vespetta', vehicles: { rustbucket: { parts: { engine: 2, suspension: 1, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 1, suspension: 0, box: 0, tires: 0 }, count: 2 } },
   fleet: { office: true, level: 1, couriers: [{ id: 'x1', name: 'Mert', char: 'male-c', skill: 2, veh: 'rustbucket', own: true, ownVeh: 'rustbucket', district: 'oldtown' }, { id: 'x2', name: 'Zeynep', char: 'female-a', skill: 4, veh: 'vespetta', own: false, district: 'downtown' }], last: Date.now(), bank: 42, applicants: [{ id: 'a1', name: 'Lena', char: 'female-b', skill: 2, fee: 180, ownVeh: 'rustbucket' }] } });
 const { server, base } = await serve();
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -22,7 +22,16 @@ const screens = {
   jobs: () => game.ui.setTab('jobs'),
   fleet: () => game.ui.setTab('fleet'),
   ride: () => { game.ui.setTab('city'); document.querySelector('.ocard')?.click(); game.startJob(); return 1; },
-  event: () => { game.testEvent('granny', 1); game.sim(0.4); },
+  // the autopilot's STOP and the context buttons all up at once (the ride held still so its frame doesn't redraw them)
+  stop: () => {
+    if (game.ride.R.manual) return 0;
+    game.ride.R.active = false;
+    document.querySelector('.r-btn.stop').hidden = false;
+    const ic = (n) => `<img class="ic" src="assets/icons/${n}.webp" alt="">`;
+    document.querySelector('.r-ctx').innerHTML = [[ic('ui-overtake'), 'Overtake'], [ic('ui-shortcut'), 'Shortcut <small>skip 2 lights</small>'], [ic('ui-horn'), 'Honk!']].map(([i, t]) => `<button class="ctx safe">${i}<span>${t}</span></button>`).join('');
+    return 1;
+  },
+  event: () => { game.ride.R.active = true; game.testEvent('granny', 1); game.sim(0.4); },
   receipt: () => { game.ui.receipt({ lines: [{ label: 'Sunny Burger → Emma ★★★★★', amount: 12 }, { label: 'Tip from Emma', amount: 3.5, cls: 'pos' }, { label: 'Fuel (0.42 km)', amount: -0.46, cls: 'neg' }], total: 15.04, xp: 34, avgStars: 5, goals: '1 goal done!' }); },
 };
 let bad = 0;
@@ -31,7 +40,7 @@ for (const [w, h] of sizes) {
   const touch = w < 700 || h > w;
   await page.setViewport({ width: w, height: h, isMobile: touch, hasTouch: touch, deviceScaleFactor: 1 });
   await page.evaluateOnNewDocument((s) => localStorage.setItem('fds_save_v1', s), SAVE);
-  await page.goto(`${base}/index.html?noti=1`, { waitUntil: 'networkidle0', timeout: 180000 });
+  await page.goto(`${base}/index.html?noti=1&energy=off`, { waitUntil: 'networkidle0', timeout: 180000 });
   await page.waitForFunction('window.ready', { timeout: 90000, polling: 200 });
   await page.evaluate(() => document.querySelectorAll('.modal').forEach((m) => m.remove()));
   for (const [name, fn] of Object.entries(screens)) {

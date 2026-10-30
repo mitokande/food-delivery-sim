@@ -51,7 +51,7 @@ for (const mode of MODES) {
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
   await page.evaluateOnNewDocument((s) => localStorage.setItem('fds_save_v1', s), JSON.stringify(SAVE));
-  await page.goto(`${base}/index.html?noti=1&clock=600`, { waitUntil: 'networkidle0', timeout: 240000 });
+  await page.goto(`${base}/index.html?noti=1&energy=off&clock=600`, { waitUntil: 'networkidle0', timeout: 240000 });
   await page.waitForFunction('window.ready', { timeout: 120000 });
   console.log(`--- ${mode} (riding freely: ${await page.evaluate(() => game.manual())})`);
   for (const name of PLAN[mode]) {

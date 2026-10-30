@@ -141,6 +141,7 @@ export function pickEvent(rng, ctx) {
     if (e.breakdown && !(rng() < ctx.breakdown * 2.5)) return false;
     if (e.minClock && (ctx.clock < e.minClock || ctx.clock > e.maxClock)) return false;
     if (e.dry && ctx.raining) return false;
+    if (e.actor === 'light' && ctx.noLight) return false; // (the autopilot's lights are its STOP button's)
     if (ctx.recent.includes(e.id)) return false;
     return true;
   });
