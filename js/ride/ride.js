@@ -930,11 +930,11 @@ export function createRide(ctx) {
     ctx.ui.toast('Watch the crossing!', 'bad');
   }
   // a red the rider didn't stop for: the flow is over, and if the junction has a camera (the district's odds) it
-  // flashes — a small fine (only a warning in the first two deliveries, while STOP is new). Cross traffic is left to
-  // the city: a car that's really there is the T-bone in drive.
+  // flashes — a small fine (only a warning in the first two deliveries, while STOP is new); with none, nothing is said.
+  // Cross traffic is left to the city: a car that's really there is the T-bone in drive.
   function redCamera(st, cam) {
     flowBreak();
-    if (!cam) return ctx.ui.toast('No camera at this one — lucky!', '');
+    if (!cam) return;
     ctx.audio?.play('camera-shutter'); ctx.ui.flash?.('camera'); buzz(40);
     if (St.S.stats.deliveries < 2) return ctx.ui.toast('Red-light camera! Just a warning this time', 'warn');
     const fine = Math.round(1 + 2 * (DISTRICT[city.tiles[st.tile].d]?.pay || 1));

@@ -72,7 +72,7 @@ Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sok
   durur; durunca alım/teslim sahnesi başlar (çalışan/müşteri motora yürür).
 - Kırmızıda kavşağa girmek ışık ihlali (kamera cezası şansı, sağ salim çıkınca Flow). **Kamera şansı bölgeye göre**
   (her sürüşte aynı, `DPROFILE.cams`): Downtown %70, Harbor %45, Old Town %35, Green Hills %20; kamera yoksa ceza yok
-  ("No camera at this one — lucky!"). Sollama: aynı yöne giden aracı
+  (ekranda bir şey de yazmaz). Sollama: aynı yöne giden aracı
   geçmek. Ara sokaktan geçmek kestirme. Sollama ve "Go" butonları serbest sürüşte yok.
 
 Güçler yalnız `?ctl=stop` otopilotunda (Turbo, Zıpla, Korna serbest sürüşte de); frende hiçbiri yok:
@@ -687,6 +687,8 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   bitiyor, rehberin ilk yükseltmesi alınamıyordu → ilk teslimatta yemek en kötü %35'te kalır (yıldız düşer, ücret
   kalır; `ride.js` `foodFloor`); (2) koşunun ilk sürüş kartı 360×560'ta ekrandan taşıyordu → kısa ekranlarda üstteki
   ipucu kartı 64 px'ten başlar ve kendi içinde kayar.
+- 2026-10-30: Kamerasız kırmızıda "No camera at this one — lucky!" yazısı kalktı (kullanıcı: "dont print no camera at
+  this one lucky text in red lights without a fine, no need to say anything"); kamera yoksa hiçbir şey yazmaz.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
