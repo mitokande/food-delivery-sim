@@ -571,7 +571,7 @@ export function createUI(game) {
       <label class="set">Sound<input type="range" min="0" max="1" step="0.05" value="${S.settings.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${S.settings.quality === q ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
       <label class="set">Vibration<input type="checkbox" data-k="haptics" ${S.settings.haptics ? 'checked' : ''}></label>
-      ${game.isTouch ? '' : `<label class="set">Auto-drive <small>(on: it steers, you brake with ↓; off: you ride with the keyboard)</small><input type="checkbox" data-k="autodrive" ${S.settings.autodrive === true ? 'checked' : ''}></label>`}
+      ${game.isTouch ? '' : `<label class="set">Auto-drive <small>(on: it rides, you brake with ↓ and dodge with ← →; off: you ride with the keyboard)</small><input type="checkbox" data-k="autodrive" ${S.settings.autodrive === true ? 'checked' : ''}></label>`}
       <p class="small">Progress is saved on this device. Use a save code to move it to another phone.</p>
       <div class="set-more"><button class="btn ghost sm" data-x="export">Copy save code</button><button class="btn ghost sm" data-x="import">Load save code</button></div>
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
@@ -721,8 +721,8 @@ export function createUI(game) {
     rh.lanes.querySelector('.row').hidden = R.scheme === 'run'; // the run shows only the draft
     rh.gear.hidden = R.scheme !== 'b';
     if (R.scheme !== 'b') rh.limit.hidden = true;
-    rh.proto.hidden = R.scheme !== 'a' && R.scheme !== 'run';
-    rh.proto.textContent = R.scheme === 'a' ? 'Prototype A · lane run' : R.scheme === 'run' ? 'Prototype · courier run' : '';
+    rh.proto.hidden = R.scheme !== 'a' && R.scheme !== 'b'; // (the run is the game: the label is for the ?ctl prototypes)
+    rh.proto.textContent = R.scheme === 'a' ? 'Prototype A · lane run' : R.scheme === 'b' ? 'Prototype B · brake' : '';
     routeChanged(R);
   }
   let mapPts = [];

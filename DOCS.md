@@ -38,12 +38,13 @@ yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←
 
 ## 3. Sürüş (teslimat)
 
-Motor rotayı A* ile bulur ve direksiyonu kendisi kırar. **Telefonda tek fiil fren:** gaz hep açık, oyuncu ekranın
-herhangi bir yerine basılı tutarak yavaşlar. Viraj, kırmızı ışık, karşıdan karşıya geçen yaya, çukur ve kapı oyuncunun
-(aşağıda *Fren*). QA için başka sürüşler `?ctl` ile: `?ctl=a` şerit koşusu, `?ctl=stop` eski otopilot (güçler + STOP).
+Motor rotayı A* ile bulur ve direksiyonu kendisi kırar. **Telefonda Kurye Koşusu** (30 Ekim'den beri): yol kendini
+sürer (hız, virajlar, kapı), kalabalık trafik oyuncunun — **BRAKE** pedalı ve şerit kaydırma; kırmızı ışık ve karşıdan
+karşıya geçen yaya da oyuncunun (aşağıda *Kurye Koşusu*). QA için başka sürüşler `?ctl` ile: `?ctl=b` fren (basılı tut,
+28–30 Ekim telefonun sürüşü), `?ctl=a` şerit koşusu, `?ctl=stop` eski otopilot (güçler + STOP).
 
 **Masaüstünde serbest sürersin** (Ayarlar → *Auto-drive* kapalıyken; masaüstünde varsayılan kapalı). *Auto-drive* açıkken
-masaüstü de frenle sürer (↓ / S / Space).
+masaüstü de Kurye Koşusu'nu sürer (↓ / S / Space fren, ← → şerit, ↑ zıplama).
 Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sokak, park çimi); rota yalnızca GPS.
 
 | Tuş | İş |
@@ -103,7 +104,9 @@ Teslimatların bir kısmında olay çıkar; zaman yavaşlar, kart veya QTE gelir
 - *Ritim QTE*: külüstür motor stop etti (yeşil bölgede bas, marş), lastik patladı (pompala).
 - Külüstüre özel arızalar; araç iyileştikçe arıza olayları azalır.
 
-### Fren (telefon; masaüstünde *Auto-drive*)
+### Fren (`?ctl=b`; 28–30 Ekim telefonda varsayılan)
+
+30 Ekim'den beri telefonun sürüşü *Kurye Koşusu* (aşağıda); fren `?ctl=b` ile duruyor, sağ altta "Prototype B · brake".
 
 Denetim raporunun "ustalaşılacak tek bir hareket yok" bulgusu üzerine (2026-10-28, kullanıcı: "yap"): telefonda dört ayrı
 sürüş biçimi yerine tek fiil, **basılı tut = fren**. Aşağıdaki *Şerit ve fren prototipi*nin B'si ("Geç Fren") varsayılan
@@ -151,14 +154,16 @@ B'nin kuralları (viraj sınırı, vites, halka, geri sayım, kavşakta dönüş
   değeri (frende işe yaramıyor; fren gücü / viraj tutuşuna dönmeli), parçalara "Fren", tıklama QTE'leri (köpek, stop
   eden motor, patlak lastik), enerji kutuları paraya döner, kırmızıyı geçince kameranın çapraz trafiği göstermesi.
 
-### Kurye Koşusu (`?ctl=run`, prototip)
+### Kurye Koşusu (telefon; masaüstünde *Auto-drive*)
 
 Kullanıcı (2026-10-29): "bu dönüşlerin de hızını ayarlama olayını hiç sevmedim ya, biraz subway surfers, temple run gibi
 oyunlardan ilham alalım" → önerdiğim *Kurye Koşusu*: "yap". İlk hâli yalnız kaydırmaydı: otopilot kendi şeridinde
 mesafeyi koruyor, kırmızıda bekliyordu (↑ ile geçilirdi). Kullanıcı (2026-10-30): "sürüş yapısı şöyle olsun, yol auto
 drive olsun, şeritlerde sağ sol yapmak zorunda kalalım, araba sıklığı artsın gerçek hayattaki gibi, kuryeler arabaların
 arasından geçmiş olacak. frenleme butonu olsun hem ışıklarda hem de çarpışma önlemek için". Şimdiki hâli bu: **yol
-kendini sürer, trafik oyuncunun.** `?ctl=run` cihaza yazılır (sağ altta "Prototype · courier run"). Kod: `ride.js` "the
+kendini sürer, trafik oyuncunun.** 30 Ekim'den beri telefonun ve masaüstü *Auto-drive*'ın sürüşü (denetim raporundan
+çıkan yol haritasının 1. maddesi "tek sürüşe karar ver"; kullanıcı: "Kurye Koşusu"); `?ctl=run` her cihazda zorlar.
+Yeni oyuncunun ilk iki teslimatında trafik daha seyrek (arabalar yarı yarıya, sonra dörtte üç). Kod: `ride.js` "the
 courier run" bölümü ve `R.scheme === 'run'` dalları (şerit koşusunun şeritleri, kaldırımı, sapanı ve kavşakta dönüşü
 üstüne), test `tools/ctl.mjs run`.
 
@@ -275,11 +280,11 @@ cümle: *motor kendi sürer ama durmak senin işin*. Kod: `ride.js` "STOP is the
 - **İpuçları:** ilk sürüşte yeni kart (`seen.rideTip2`: "stopping is your job"); her durak türünün ilk karşılaşmasında
   ağır çekimli ipucu (`seen.c_stop_light / c_stop_ped / c_stop_door`), deneyimli oyunculara da (STOP herkese yeni).
 
-### Şerit ve fren prototipi (`?ctl=a`; B 28 Ekim'den beri varsayılan, yukarıda *Fren*)
+### Şerit ve fren prototipi (`?ctl=a`, `?ctl=b`; B 28–30 Ekim varsayılandı, yukarıda *Fren*)
 
 QA geri bildirimi (2026-10-25): "turbo buton falan olmadan tüm mekaniği sağ sola geçme ve fren üzerinden kurgula".
-`?ctl=a` / `?ctl=b` / `?ctl=stop` cihaza yazılır (`localStorage` `fds_ctl`), `?ctl=off` siler. Her cihazda çalışır
-(masaüstünde serbest sürüşün yerine geçer; `?ctl=b` masaüstünde freni zorlar); sağ altta yalnız A'da "Prototype A · lane run"
+`?ctl=a` / `?ctl=b` / `?ctl=run` / `?ctl=stop` cihaza yazılır (`localStorage` `fds_ctl`), `?ctl=off` siler. Her cihazda
+çalışır (masaüstünde serbest sürüşün yerine geçer); sağ altta A'da "Prototype A · lane run", B'de "Prototype B · brake"
 yazar. Kod: `ride.js` "Lanes & brake" bölümü. B'nin aşağıdaki kurallarını *Fren* bölümündeki farklarla oku (yayalar,
 çukurlar, kırmızı ışık kamerası, şerit yok).
 
@@ -402,7 +407,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/city/backdrop.js` · `train.js` | ufuk dağları (sis renginde), doğu tepesindeki evler, körfez (mendirek + deniz feneri, iskele + dönme dolap), saat kulesi; viyadükte giden metro |
 | `js/look.js` | renk derecelendirme (özel tone mapping: doygunluk, sıcak ışık/serin gölge, kontrast) ve parlak malzemeler için ortam haritası |
 | `js/city/traffic.js` | instanced arabalar, trafik ışıkları, yayalar, filo kuryeleri (rider ajanları) |
-| `js/ride/ride.js` | telefonun freni, Kurye Koşusu (`?ctl=run`) ve şerit koşusu prototipi (§3 *Fren*, *Kurye Koşusu*, `?ctl=a`), otomatik pilot ve STOP'u (`?ctl=stop`), masaüstünde serbest sürüş (fizik, çarpışma, GPS, varış halkası), güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
+| `js/ride/ride.js` | telefonun Kurye Koşusu, fren (`?ctl=b`) ve şerit koşusu (`?ctl=a`) prototipleri (§3 *Kurye Koşusu*, *Fren*), otomatik pilot ve STOP'u (`?ctl=stop`), masaüstünde serbest sürüş (fizik, çarpışma, GPS, varış halkası), güçler, sollama/kırmızıda geçme/kestirme, engeller, olaylar, teslim sahneleri, takip kamerası |
 | `js/ride/world.js` | serbest sürüş için şehir: zemin (asfalt/kaldırım/çim ve yüksekliği), çarpılabilir her şey (10 m ızgarada), rota başlatılacak yol karosu |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
@@ -672,6 +677,16 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   Üst barda ⚡ çipi ve geri sayım, START barında bedel, enerji paneli ("Out of energy!"), seviye kartında "Energy full",
   hedef butonunda +2 ⚡. Dayanıklılık becerisi telefonda da işe yarıyor. Analitik: `energy_out`, `buy` (`k: 'coffee'`),
   `job_start.energy`. Çok iş süren test araçları `?energy=off` ile koşar. Test: `tools/energy.mjs`.
+- 2026-10-30: **Kurye Koşusu telefonun varsayılanı** (denetim raporundan çıkan yol haritasının 1. maddesi "tek sürüşe
+  karar ver ve onu varsayılan yap"; kullanıcı: "Kurye Koşusu"). Telefonda ve masaüstü *Auto-drive*'da `scheme()` artık
+  `'run'`; fren `?ctl=b` prototipi oldu (sağ altta "Prototype B · brake"), koşunun "Prototype" etiketi kalktı. Yeni
+  oyuncunun ilk iki teslimatında koşunun trafiği daha seyrek (yarı, sonra dörtte üç; olay ve engellerdeki `tutorial`
+  gibi). Fren ipucunu görmüş oyuncu ilk koşusunda koşunun ipucunu bir kez görür. Reklam/klip araçları (`feelclip`,
+  `fleetclip`, `loserclip`) frenle çekildiği için `?ctl=b` ile sabitlendi. Admin: sürüş modları notu güncellendi.
+  Onboarding testinde bulunan iki şey: (1) hiç dokunmadan sürülen rehberli ilk teslimat koşuda "food ruined, −$0.74" ile
+  bitiyor, rehberin ilk yükseltmesi alınamıyordu → ilk teslimatta yemek en kötü %35'te kalır (yıldız düşer, ücret
+  kalır; `ride.js` `foodFloor`); (2) koşunun ilk sürüş kartı 360×560'ta ekrandan taşıyordu → kısa ekranlarda üstteki
+  ipucu kartı 64 px'ten başlar ve kendi içinde kayar.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
@@ -687,7 +702,7 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
 - **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
   Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.
 - **Olaylar:** `session_start`, `boot` (yükleme süresi), `boot_fail`, `error`, `intro_done`, `onboard_step`, `onboard_done`, `tab`,
-  `job_start` (siparişler, araç, yağmur, `manual`, `ctl`: `b` fren — 28 Ekim'den beri telefonda varsayılan, öncesi prototip —, `a` şerit koşusu, boş: otopilot / elle), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
+  `job_start` (siparişler, araç, yağmur, `manual`, `ctl`: `run` Kurye Koşusu — 30 Ekim'den beri telefonda varsayılan, öncesi prototip —, `b` fren — 28–30 Ekim varsayılan —, `a` şerit koşusu, boş: otopilot / elle), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
   zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği; prototipte fren süresi `brakeT`, şerit değişimi `lanes`, sapan `slings`, kusursuz viraj `corners`, dışa kayma `wide`, kusursuz duruş `stops`, kapıyı geçme `overshoots`, en yüksek vites `gearMax`, kaldırımda metre `walkM`, kırmızıda geçiş `reds`, kavşakta dönüş `turns`, yeşil dalga `waves`, frende ayrıca kamera cezası `tickets`, ürkütülen yaya `pedHits`, çukura yumuşak geçiş `smooth`; otopilotta STOP ile duruş `halts` (kapıyı geçip geri gelmek sayılmaz), kusursuz duruş `stops`, kırmızıda geçiş `reds`, kapıyı geçme `overshoots`, ürkütülen yaya `pedHits`, kamera cezası `tickets` (27 Ekim öncesi kayıtlarda yerine `crossCalls`: frene basan çapraz trafik)), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
   `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
   `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,

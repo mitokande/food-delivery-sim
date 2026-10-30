@@ -1,8 +1,8 @@
 // Delivery ride: the bike drives itself along the route (or, riding freely on desktop, the player steers it anywhere
-// in the city and the route is only the GPS). On a phone the gas is always open and the rider only brakes: corners,
-// red lights, people crossing, potholes and the door are theirs (the late brake, 'b'). For QA, `?ctl=a` is the lane
-// run (brake and change lanes), `?ctl=run` the courier run (swipes only: lanes, hops, a red light run) and `?ctl=stop`
-// the autopilot with powers and a STOP button.
+// in the city and the route is only the GPS). On a phone it rides the courier run ('run'): the autopilot keeps the
+// pace and takes the corners, the busy traffic, people crossing and red lights are the rider's (the BRAKE pedal, lane
+// swipes, a swipe up to hop). For QA, `?ctl=b` is the late brake (gas always open, hold anywhere to brake: corners
+// too), `?ctl=a` the lane run (brake and change lanes) and `?ctl=stop` the autopilot with powers and a STOP button.
 import * as THREE from 'three';
 import { TILE, FOODS, GAME_MIN_PER_SEC, VEHICLE, DISTRICT, DPROFILE } from '../data.js';
 import { DIRS, OPP, RIGHT, LEFT, K } from '../city/gen.js';
@@ -486,8 +486,11 @@ export function createRide(ctx) {
   }
 
   // ---------- damage ----------
+  // the guided first delivery's food takes knocks but always arrives (35% at worst: fewer stars, the pay stays), so a
+  // new rider's first pay is never a ruined order and the guide's first upgrade stays in reach
+  const foodFloor = () => (St.S.stats.deliveries < 1 ? 35 : 0);
   function hurtFood(amount, why) {
-    for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(0, x.integrity - amount * x.o.fragile * R.vs.bump);
+    for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(foodFloor(), x.integrity - amount * x.o.fragile * R.vs.bump);
     if (R.scheme === 'run') for (const x of R.orders) if (x.picked && !x.done && x.integrity <= 0 && !x.ruined) ruin(x);
     if (amount > 0) { R.stats.bumps++; kick(Math.min(1.6, 0.35 + amount / 9)); ctx.ui.flash?.('bump'); buzz(amount > 12 ? 60 : 30); }
   }
@@ -1297,8 +1300,8 @@ export function createRide(ctx) {
     pfx.boostStart(wp.x, wp.y, wp.z, Math.sin(hd), Math.cos(hd), R.vs.v.engine === 'engine-electric');
     if (k > 0.85) flow('SLINGSHOT!');
   }
-  // ---- the courier run (`?ctl=run`): the road rides itself, the traffic is the rider's. The autopilot keeps the pace and
-  // takes the corners (and pulls up at the door); the cars in front, a double-parked car, people crossing and red
+  // ---- the courier run (the phone's ride since 2026-10-30): the road rides itself, the traffic is the rider's. The
+  // autopilot keeps the pace and takes the corners (and pulls up at the door); the cars in front, a double-parked car, people crossing and red
   // lights are the rider's: hold BRAKE (the button, ↓ / S / Space) or swipe to another lane — the oncoming lane and the
   // sidewalk are quicker and hold the coins. The streets are busy: slow cars in our lane, a stream coming the other way,
   // so getting anywhere means slipping between them. A swipe up hops what's low in the lane (potholes, puddles, cones,
@@ -1310,7 +1313,7 @@ export function createRide(ctx) {
     return R.hazards.some((h) => !h.done && HZ[h.type].hop && h.inPath && h.ahead > -0.5 && h.ahead < v * 0.62 + 2);
   }
   // the run's traffic: the city's cars gather round the route. Every 0.4 s, while the 160 m ahead holds fewer than the
-  // district's share, the car furthest from the bike (out of sight, 170 m+) is lifted and put down on the route 105–160 m
+  // district's share (less on a new rider's first two runs), the car furthest from the bike (out of sight, 170 m+) is lifted and put down on the route 105–160 m
   // on (inside the fog): in our lane at a crawl, or coming the other way. They keep that pace until the ride is over.
   const DENSE = { own: 30, onc: 40 }; // metres between cars ahead in Downtown's traffic (quieter districts: further apart)
   function denseTick(dt) {
@@ -1323,7 +1326,8 @@ export function createRide(ctx) {
       const st = steps[k];
       for (const a of traffic.byTile.get(st.tile) || []) if (a.kind === 'car') { if (a.din === st.din) own++; else if (a.din === OPP(st.dout)) onc++; }
     }
-    const busy = 0.45 + 0.55 * (DISTRICT[city.tiles[stepAt().tile].d]?.traffic ?? 0.7);
+    // (a new rider's first two runs are quieter: half the cars, then three quarters)
+    const busy = (0.45 + 0.55 * (DISTRICT[city.tiles[stepAt().tile].d]?.traffic ?? 0.7)) * Math.min(1, 0.5 + 0.25 * St.S.stats.deliveries);
     const mine = own < Math.floor(reach * busy / DENSE.own);
     if (!mine && onc >= Math.floor(reach * busy / DENSE.onc)) return;
     const at = R.s + 105 + rng() * Math.min(55, reach - 105);
@@ -2280,7 +2284,7 @@ export function createRide(ctx) {
       if (sb > 0.3 && F.slideCd <= 0) { F.slideCd = 5; flowBreak(); ctx.ui.toast('Sliding! Ease off before corners', 'warn'); }
     } else if (F.slide && sb < 0.1) F.slide = false;
     if (sb > 0.1 && R.v > 3) {
-      for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(0, x.integrity - sb * R.v * 0.12 * dt * x.o.fragile * R.vs.bump);
+      for (const x of R.orders) if (x.picked && !x.done) x.integrity = Math.max(foodFloor(), x.integrity - sb * R.v * 0.12 * dt * x.o.fragile * R.vs.bump);
       F.skid += ds;
       if (F.skid > 0.3) { F.skid = 0; pfx.skidMark(F.x - Math.sin(F.h) * 0.66, F.z - Math.cos(F.h) * 0.66, F.h - F.beta * 0.5); }
     }

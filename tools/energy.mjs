@@ -7,7 +7,7 @@ import { serve } from './serve.mjs';
 const require = createRequire(import.meta.url);
 let puppeteer; try { puppeteer = require('puppeteer-core'); } catch { puppeteer = require('/root/.npm/_npx/110f701c48e68d66/node_modules/puppeteer-core'); }
 const prefix = process.argv[2] || 'tools/shots/energy';
-const SAVE = { v: 1, lvl: 4, cash: 400, xp: 0, districts: { oldtown: true }, stats: { deliveries: 12 }, seen: { brakeTip: 1, rideTip2: 1, energyTip: 1 }, onboard: { step: 99 },
+const SAVE = { v: 1, lvl: 4, cash: 400, xp: 0, districts: { oldtown: true }, stats: { deliveries: 12 }, seen: { lbTip_run2: 1, brakeTip: 1, rideTip2: 1, energyTip: 1 }, onboard: { step: 99 },
   settings: { music: 0, sfx: 0, quality: 'low', haptics: false }, active: 'vespetta',
   vehicles: { rustbucket: { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, count: 1 }, vespetta: { parts: { engine: 0, suspension: 0, box: 0, tires: 0 }, count: 1 } } };
 
