@@ -32,7 +32,9 @@ const screens = {
     return 1;
   },
   event: () => { game.ride.R.active = true; game.testEvent('granny', 1); game.sim(0.4); },
-  receipt: () => { game.ui.receipt({ lines: [{ label: 'Sunny Burger → Emma ★★★★★', amount: 12 }, { label: 'Tip from Emma', amount: 3.5, cls: 'pos' }, { label: 'Fuel (0.42 km)', amount: -0.46, cls: 'neg' }], total: 15.04, xp: 34, avgStars: 5, goals: '1 goal done!' }); },
+  receipt: () => { game.ui.receipt({ lines: [{ label: 'Sunny Burger → Emma ★★★★★', amount: 12 }, { label: 'Tip from Emma', amount: 3.5, cls: 'pos' }, { label: 'Fuel (0.42 km)', amount: -0.46, cls: 'neg' }], total: 15.04, xp: 34, avgStars: 5, goals: '1 goal done!',
+    // (with the offer to ride on: an order near the door)
+    next: { o: { food: 'coffee', restName: 'Bean There', name: 'Sofia', type: 'vip', base: 17, pickM: 125 }, need: 1 } }); },
 };
 let bad = 0;
 for (const [w, h] of sizes) {

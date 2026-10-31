@@ -83,13 +83,15 @@ for (const mode of MODES) {
         const r = game.ride, R = r.R, T = window.__T;
         const door = (lot) => { const L = game.city.lots[lot]; if (L.doorPos) return L.doorPos; const t = game.city.tiles[L.door]; return [t.x * 10, t.z * 10]; };
         if (!T.p0 && R.bike) T.p0 = [R.bike.root.position.x, R.bike.root.position.z];
-        if (R.phase === 'scene' && T.t0 == null) T.t0 = performance.now();
+        // (from the bike stopping, or from the last scene's card closing: two orders to one door play back to back)
+        if (R.phase === 'scene' && T.t0 == null && !document.querySelector('.modal.scene:not(.out)')) T.t0 = performance.now();
         if (R.phase === 'ride') T.t0 = null;
         const sc = document.querySelector('.modal.scene:not(.out)');
         if (sc && !sc.__seen) {
           sc.__seen = true;
           const wait = T.t0 == null ? 0 : performance.now() - T.t0;
           const leg = R.job.legs[R.leg], b = R.bike.root.position, d = door(leg.lot);
+          T.t0 = null;
           T.scenes.push({ wait, x: b.x, z: b.z, fromStart: T.p0 ? Math.hypot(b.x - T.p0[0], b.z - T.p0[1]) : null, kind: leg.kind, lot: leg.lot, dist: Math.hypot(b.x - d[0], b.z - d[1]), y: b.y, toEnd: R.route.length - R.s, ot: !!R.ot, ev: !!document.querySelector('.evdock.in'),
             text: sc.textContent.replace(/\s+/g, ' ').slice(0, 90), picked: R.orders.filter((x) => x.picked).length, done: R.orders.filter((x) => x.done).length });
           setTimeout(() => sc.querySelector('[data-x]')?.click(), 250);

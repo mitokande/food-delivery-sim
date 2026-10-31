@@ -291,6 +291,11 @@ function tweenCam(toPos, toQuat, toFov, dur = 1.4) {
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 // ---------------------------------------------------------------- start / finish a job
+// (`chain`: ridden on from the last customer's door, not started in the hub)
+function trackStart(orders, chain = false) {
+  An.track('job_start', { n: orders.length, energy: S.energy.n, veh: S.active, lvl: S.lvl, manual: game.manual() ? 1 : 0, ctl: scheme(), clock: Math.round(S.clock), rain: Math.round(WEATHER.rain * 100) / 100, rush: St.rushMult().m,
+    ...(chain && { chain: 1 }), orders: orders.map((o) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, m: Math.round(o.pickM + o.dropM), eta: Math.round(o.eta), pay: o.base })) });
+}
 game.startJob = async () => {
   if (!game.taken.length || game.mode !== 'hub') return;
   audio.init();
@@ -310,8 +315,7 @@ game.startJob = async () => {
       stops++;
     }
   }
-  An.track('job_start', { n: orders.length, energy: S.energy.n, veh: S.active, lvl: S.lvl, manual: game.manual() ? 1 : 0, ctl: scheme(), clock: Math.round(S.clock), rain: Math.round(WEATHER.rain * 100) / 100, rush: St.rushMult().m,
-    orders: orders.map((o) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, m: Math.round(o.pickM + o.dropM), eta: Math.round(o.eta), pay: o.base })) });
+  trackStart(orders);
   game.board = game.board.filter((o) => !orders.includes(o));
   game.taken = []; game.selOrder = null; updatePreview();
   showroom.on = false;
@@ -326,7 +330,7 @@ game.startJob = async () => {
   ride.R.bike.rider?.play('drive', 0.3);
   audio.loop('music', 'music-ride');
   ride.R.takeCamera = false;
-  await tweenCam(pose.pos, pose.quat, pose.fov, 1.5);
+  await tweenCam(pose.pos, pose.quat, pose.fov, 1.0);
   ride.R.takeCamera = true;
   game.mode = 'ride'; ui.setMode('ride');
   await ride.start(job, from, dir0);
@@ -401,13 +405,32 @@ async function finishJob(sum) {
     orders: sum.orders.filter((x) => x.result).map(({ o, result: r }) => ({ type: o.type, food: o.food, rest: o.rest, d: o.district, stars: r.stars, early: r.early ? 1 : 0, late: r.late ? 1 : 0,
       ratio: Math.round(r.ratio * 100) / 100, pay: r.pay, tip: r.tip, bonus: r.bonus, cond: Math.round(r.cond) })) });
   await new Promise((r) => setTimeout(r, 350));
-  await ui.receipt({ lines, total, xp, avgStars: starsSum / n, goals: goalsHit.length ? `${goalsHit.length} goal${goalsHit.length > 1 ? 's' : ''} done!` : '' });
+  // keep riding: once the guide is done (and the day isn't over), the receipt offers an order near this door
+  const next = !ob.active && !dayOver ? nextOffer() : null;
+  const how = await ui.receipt({ lines, total, xp, avgStars: starsSum / n, goals: goalsHit.length ? `${goalsHit.length} goal${goalsHit.length > 1 ? 's' : ''} done!` : '', next });
+  if (next) An.track('next_offer', { take: how === 'next' ? 1 : 0, pick: Math.round(next.o.pickM), pay: next.o.base, energy: S.energy.n });
   for (const l of levels) await ui.levelUp(l, LEVEL_UNLOCKS[l] || []);
   for (const n of empNews) ui.employerNews(n);
   for (const a of checkAchievements()) ui.achievement(a);
   if (dayOver) { const rep = St.newDay(); An.track('day_end', { ...rep, earned: Math.round(rep.earned), fuel: Math.round(rep.fuel), tips: Math.round(rep.tips), fleet: Math.round(rep.fleet) }); await ui.dayReport(rep); }
   St.save(true);
-  backToHub();
+  if (how === 'next') rideOn(next.o); else backToHub();
+}
+// the next order offered at a customer's door: of a few from around here, the one whose restaurant is nearest
+function nextOffer() {
+  const cap = St.vehStats().cap;
+  let best = null;
+  for (let i = 0; i < 4; i++) { const o = makeOrder(city, rng, { from: playerTile() }); if (o.size <= cap && (!best || o.pickM < best.pickM)) best = o; }
+  return best && { o: best, need: game.energyFor(1) };
+}
+// riding on: no hub and no camera flight — the order starts where the bike stands, and the bike eases onto its route
+async function rideOn(o) {
+  const need = game.energyFor(1);
+  if (need && !St.useEnergy(need)) { noEnergy(need); backToHub(); return; }
+  refreshOrder(city, o, playerTile());
+  trackStart([o], true);
+  game.mode = 'ride'; ui.setMode('ride');
+  await ride.start({ orders: [o], legs: planLegs([o]) }, playerTile(), playerDir(), { blend: true });
 }
 async function backToHub() {
   game.mode = 'tween';
@@ -418,7 +441,7 @@ async function backToHub() {
   ride.R.takeCamera = false;
   cullChunks(view, 0, 0, null);
   sky.set(S.clock);
-  await tweenCam(pose.pos, pose.quat, 30, 1.3);
+  await tweenCam(pose.pos, pose.quat, 30, 0.9);
   hubCam.snap(x, z, 230); hubCam.st.enabled = true;
   game.mode = 'hub'; ui.setMode('hub'); ui.setTab('city');
   game.board.forEach((o) => refreshOrder(city, o, playerTile()));
@@ -476,7 +499,7 @@ game.applySettings = () => { audio.apply(); const nq = quality(); if (nq !== QV)
 
 // ---------------------------------------------------------------- ride free look: drag to orbit, pinch / wheel to zoom
 const rideLook = { ptrs: new Map(), last: null, start: null, t0: 0, snap: null, pinch: 0, zoom0: 1 };
-const rideOpen = () => game.mode === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal:not(.out)');
+const rideOpen = () => game.mode === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal:not(.out):not(.rated)');
 const lookAllowed = () => !ride.R.scheme && rideOpen(); // (lanes & brake: a drag is the brake and the swipes, see below)
 canvas.addEventListener('pointerdown', (e) => {
   if (!lookAllowed()) return;
@@ -557,7 +580,7 @@ addEventListener('keydown', (e) => {
   if (game.mode !== 'ride') return;
   const k = keyMap()[e.code];
   // pedals and steering keep working under an event card (the ride goes on in slow motion); everything else waits for it
-  if (document.querySelector('.modal, .evdock') && !(k === 'gas' || k === 'brake' || k === 'left' || k === 'right')) return;
+  if (document.querySelector('.modal:not(.rated), .evdock') && !(k === 'gas' || k === 'brake' || k === 'left' || k === 'right')) return;
   if (e.code === 'KeyE') { const b = document.querySelector('.r-ctx .ctx'); if (b) ride.input(b.dataset.ride, true); e.preventDefault(); return; }
   if (!k) return;
   e.preventDefault();

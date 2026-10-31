@@ -1007,31 +1007,26 @@ export function createUI(game) {
     });
   }
 
-  function pickup(orders, R) {
-    return new Promise((resolve) => {
-      const o = orders[0];
-      const m = modal(`<div class="ribwrap top"><span class="ribbon">Pick up</span></div><div class="sc-row">${ICON(FOODS[o.food].icon, 'scf')}<span><small>Pick up order${orders.length > 1 ? 's' : ''}</small><b>${esc(o.restName)}</b>
+  // the door scenes play by themselves (ride.js): these cards say what's going on, and close when the bag has changed
+  // hands — `close()` on what they return
+  function sceneCard(html, opened, closed) {
+    const m = modal(html, { cls: 'scene' });
+    game.ob?.event(opened);
+    return { close() { m.close(); game.ob?.event(closed); } };
+  }
+  function pickup(orders) {
+    const o = orders[0];
+    return sceneCard(`<div class="ribwrap top"><span class="ribbon">Pick up</span></div><div class="sc-row">${ICON(FOODS[o.food].icon, 'scf')}<span><small>Pick up order${orders.length > 1 ? 's' : ''}</small><b>${esc(o.restName)}</b>
         <em>${orders.map((x) => `${FOODS[x.food].name} for ${esc(x.name)}`).join(' · ')}</em></span></div>
-        <button class="btn green big" data-x="ok">Confirm Pickup</button>`, { cls: 'scene' });
-      game.ob?.event('pickup');
-      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); game.ob?.event('picked'); resolve(); };
-      const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') go(); };
-      addEventListener('keydown', kh);
-      m.card.querySelector('[data-x]').onclick = go;
-    });
+        <p class="sc-wait">Coming out to your scooter<i>.</i><i>.</i><i>.</i></p>`, 'pickup', 'picked');
   }
-  function drop(o, R) {
-    return new Promise((resolve) => {
-      const m = modal(`<div class="ribwrap top"><span class="ribbon">Delivery</span></div><div class="sc-row">${ICON('char-' + o.char, 'scc')}<span><small>Deliver to</small><b>${esc(o.name)}</b><em>${FOODS[o.food].name} from ${esc(o.restName)}</em></span><span class="check">✓</span></div>
-        <button class="btn green big" data-x="ok">Complete Delivery</button>`, { cls: 'scene' });
-      game.ob?.event('drop');
-      const go = () => { tap(); removeEventListener('keydown', kh); m.close(); game.ob?.event('dropped'); resolve(); };
-      const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') go(); };
-      addEventListener('keydown', kh);
-      m.card.querySelector('[data-x]').onclick = go;
-    });
+  function drop(o) {
+    return sceneCard(`<div class="ribwrap top"><span class="ribbon">Delivery</span></div><div class="sc-row">${ICON('char-' + o.char, 'scc')}<span><small>Deliver to</small><b>${esc(o.name)}</b><em>${FOODS[o.food].name} from ${esc(o.restName)}</em></span><span class="check">✓</span></div>
+        <p class="sc-wait">Handing it over<i>.</i><i>.</i><i>.</i></p>`, 'drop', 'dropped');
   }
-  function rated(o, r) {
+  // the customer's stars: between drops a beat while the ride goes on (the card fades by itself, and lets touches
+  // through to the road); after the last drop a moment before the receipt
+  function rated(o, r, { last = false } = {}) {
     return new Promise((resolve) => {
       const lines = [];
       if (r.early) lines.push(`<span class="good">Early bonus +${money(r.bonus)}</span>`);
@@ -1040,27 +1035,37 @@ export function createUI(game) {
       if (r.cond < 85) lines.push(`<span class="bad">Food ${r.cond < 35 ? 'ruined' : r.cond < 60 ? 'damaged' : 'a bit shaken'}</span>`);
       const quote = r.stars >= 5 ? ['Perfect, thank you!!', 'Still hot! You\'re the best.', 'Wow, that was fast!'] : r.stars >= 4 ? ['Thanks!', 'Great, cheers!'] : r.stars >= 3 ? ['Okay… thanks.', 'Bit late, but fine.'] : ['Seriously?', 'It\'s all cold…', 'What happened to my food?!'];
       const m = modal(`<div class="stars big">${stars(r.stars)}</div><p class="quote">“${quote[Math.floor(Math.random() * quote.length)]}” <small>— ${esc(o.name)}</small></p>
-        <div class="paid"><span>${money(r.pay + r.bonus)}</span>${r.tip ? `<span class="tip">+ ${money(r.tip)} tip</span>` : ''}</div><div class="notes">${lines.join('')}</div>`, { cls: 'rated', dismiss: true });
+        <div class="paid"><span>${money(r.pay + r.bonus)}</span>${r.tip ? `<span class="tip">+ ${money(r.tip)} tip</span>` : ''}</div><div class="notes">${lines.join('')}</div>`, { cls: 'rated' });
       m.el.querySelectorAll('.stars .st').forEach((s, i) => { s.style.animationDelay = i * 0.08 + 's'; });
-      const t = setTimeout(done, 2300);
-      function done() { clearTimeout(t); m.close(); resolve(); }
+      let over = false;
+      const done = () => { if (over) return; over = true; clearTimeout(t1); clearTimeout(t2); m.close(); resolve(); };
+      const t1 = setTimeout(last ? done : resolve, last ? 1300 : 700), t2 = setTimeout(done, 2000);
       m.el.addEventListener('click', done);
     });
   }
 
+  // the receipt; with `sum.next` ({ o, need }: an order near the customer's door) it offers to ride on to it instead of
+  // going back to the hub. Resolves 'next' or 'hub'.
   function receipt(sum) {
     return new Promise((resolve) => {
       const rows = sum.lines.map((l) => `<div class="rl ${l.cls || ''}"><span>${l.label}</span><b>${l.amount >= 0 ? '+' : ''}${money(l.amount, Math.abs(l.amount) < 10 && l.amount % 1 !== 0)}</b></div>`).join('');
       // XP bar: what you had before this run (gold) and what it added (blue); a level-up starts the new level's bar
       const need = St.xpNeed(), before = S.xp - sum.xp, up = before < 0;
       const w0 = up ? 0 : before / need * 100, w1 = Math.min(100 - w0, (up ? S.xp : sum.xp) / need * 100);
-      const m = modal(`<div class="ribwrap top"><span class="ribbon">${sum.total >= 0 ? 'Delivered!' : 'Rough ride'}</span></div>
+      const nx = sum.next, no = nx?.o, T = no && ORDER_TYPES[no.type];
+      // (two blocks: what was earned, and what's next — side by side on a short, wide screen)
+      const m = modal(`<div class="rmain"><div class="ribwrap top"><span class="ribbon">${sum.total >= 0 ? 'Delivered!' : 'Rough ride'}</span></div>
         <div class="stars arc">${stars(Math.round(sum.avgStars))}</div>
         <div class="ramt ${sum.total < 0 ? 'neg' : ''}">${sum.total >= 0 ? '+' : ''}${money(sum.total, Math.abs(sum.total) < 100)}</div>
         <div class="rlines">${rows}</div>
         <div class="rxp2"><span class="shield"><b>${S.lvl}</b></span><span class="bar"><u style="width:${w0.toFixed(1)}%"></u><s style="left:${w0.toFixed(1)}%;width:${w1.toFixed(1)}%"></s><em>+${sum.xp} XP${up ? ' · Level up!' : ''}</em></span><span class="shield next"><b>${S.lvl + 1}</b></span></div>
-        ${sum.goals ? `<div class="rgoal">${ICON('ui-trophy')} ${sum.goals}</div>` : ''}
-        <button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`, { cls: 'receipt' });
+        ${sum.goals ? `<div class="rgoal">${ICON('ui-trophy')} ${sum.goals}</div>` : ''}</div>
+        <div class="rside">${nx ? `<div class="rnext"><small>Next order nearby · pick-up ${Math.round(no.pickM)} m</small>
+          <div class="rn-row">${ICON(FOODS[no.food].icon, 'rnf')}<span><b>${esc(no.restName)}</b><em>${FOODS[no.food].name} for ${esc(no.name)}${T.badge ? ` · <i class="rn-b">${T.badge}</i>` : ''}</em></span><b class="rn-pay">${money(no.base)}</b></div></div>
+          <button class="btn green big" data-next></button>
+          <button class="btn ghost rhub" data-x="ok">${ICON('ui-cash')} Collect &amp; back to hub</button>`
+        : `<button class="btn green big" data-x="ok">${ICON('ui-cash')} Collect</button>`}</div>`, { cls: 'receipt' });
+      m.card.classList.toggle('rn', !!nx);
       game.ob?.event('receipt');
       const amt = m.card.querySelector('.ramt');
       if (!calm && sum.total > 0) {
@@ -1068,10 +1073,18 @@ export function createUI(game) {
         const step = () => { const f = Math.max(0, Math.min(1, (performance.now() - t0) / 900)); amt.textContent = '+' + money(sum.total * (1 - Math.pow(1 - f, 3)), dec); if (f < 1 && amt.isConnected) requestAnimationFrame(step); };
         step();
       }
-      const go = () => { game.audio?.play('ui-coins'); if (sum.total > 0) coinsTo(m.card.querySelector('[data-x]'), 10); removeEventListener('keydown', kh); m.close(); resolve(); };
-      const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter') go(); };
+      // riding on costs the order's energy: short of it, the button says so and opens the energy panel (a coffee bought
+      // there lights it up again)
+      const nb = m.card.querySelector('[data-next]');
+      const short = () => !!nx && nx.need > St.tickEnergy();
+      const paint = () => { if (!nb) return; const sh = short(); nb.classList.toggle('short', sh); nb.innerHTML = sh ? `${ICON('ui-bolt')} Out of energy` : `${ICON('ui-cash')} Collect &amp; ride on${nx.need ? ` <em class="rn-cost">${ICON('ui-bolt')}${nx.need}</em>` : ''}`; };
+      paint();
+      const unsub = nb ? St.on((w) => { if (w === 'energy') paint(); }) : null;
+      const go = (how, b) => { game.audio?.play('ui-coins'); if (sum.total > 0) coinsTo(b, 10); removeEventListener('keydown', kh); unsub?.(); m.close(); resolve(how); };
+      const kh = (e) => { if (e.code === 'Space' || e.code === 'Enter') { if (nb && !short()) go('next', nb); else go('hub', m.card.querySelector('[data-x]')); } };
       addEventListener('keydown', kh);
-      m.card.querySelector('[data-x]').onclick = go;
+      m.card.querySelector('[data-x]').onclick = (e) => go('hub', e.currentTarget);
+      if (nb) nb.onclick = (e) => { if (short()) { game.audio?.play('ui-error'); energy({ need: nx.need }); } else go('next', e.currentTarget); };
     });
   }
   function levelUp(lvl, unlocks) {
