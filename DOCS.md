@@ -390,7 +390,7 @@ H korna, 1–3 olay seçimi).
 - Analitik: `js/analytics.js` olayları toplayıp 15 sn'de bir (sayfa gizlenince `sendBeacon` ile) `api/collect.php`'ye yollar;
   PHP + SQLite (`api/`), panel `admin/` (şifreli). Ayrıntı: §10.
 - Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
-- Mağaza uygulamaları: `mobile/` (Capacitor 8; Android + iOS, `com.mitokande.fooddeliverysim`, ana ekranda "Delivery Sim").
+- Mağaza uygulamaları: `mobile/` (Capacitor 8; Android + iOS, `com.mithatcanturan.fooddeliverysim`, ana ekranda "Delivery Sim").
   `mobile/scripts/build-web.mjs` oyunun dosyalarını `www/`'ye kopyalar, CDN'den gelenleri (three, Draco, es-module-shims,
   Google fontları) pakete koyar: uygulama internetsiz açılır ve oynanır. Oyunun uygulamaya özel tek kodu `js/native.js`:
   telefonun titreşimi (iOS'ta `navigator.vibrate` yok), Android geri tuşu (üstteki kartı kapatır, kart yoksa oyunu arka

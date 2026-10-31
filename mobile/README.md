@@ -11,7 +11,7 @@ The web game wrapped as native apps with [Capacitor 8](https://capacitorjs.com).
   the Android back button (closes the top card, else sends the game to the background), a second copy of the save in
   the app's own preferences (put back if the web view's storage is ever emptied), and the site's address for analytics.
   On the web it does nothing.
-- `android/`, `ios/` are the native projects (in git). The app id is `com.mitokande.fooddeliverysim`; the home-screen
+- `android/`, `ios/` are the native projects (in git). The app id is `com.mithatcanturan.fooddeliverysim`; the home-screen
   name is "Delivery Sim" (`android/app/src/main/res/values/strings.xml`, `CFBundleDisplayName` in `ios/App/App/Info.plist`).
 - This folder is in the web root, so `.htaccess` keeps it off the site.
 

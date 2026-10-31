@@ -7,10 +7,10 @@ def keystore = new Properties()
 if (keystoreFile.exists()) keystoreFile.withInputStream { keystore.load(it) }
 
 android {
-    namespace = "com.mitokande.fooddeliverysim"
+    namespace = "com.mithatcanturan.fooddeliverysim"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mitokande.fooddeliverysim"
+        applicationId "com.mithatcanturan.fooddeliverysim"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
