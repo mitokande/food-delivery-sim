@@ -321,7 +321,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Food Delivery Simulator";
+				INFOPLIST_KEY_CFBundleDisplayName = "Food Delivery Sim";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.simulation-games";
 				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -345,7 +345,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Food Delivery Simulator";
+				INFOPLIST_KEY_CFBundleDisplayName = "Food Delivery Sim";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.simulation-games";
 				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
