@@ -4,7 +4,7 @@ Everything shipped with the game is **CC0 1.0 / public domain** or was made for 
 except the code library and fonts below. Nothing requires attribution; it is all listed anyway.
 No real brands, restaurants or delivery apps appear in the game (Sunny Burger, ZipEats, Saffron Bay … are invented).
 
-## Code and fonts (loaded from CDNs)
+## Code and fonts (loaded from CDNs; the store apps in `mobile/` bundle the same files)
 
 | What | Author | Licence | URL |
 |---|---|---|---|
@@ -12,6 +12,7 @@ No real brands, restaurants or delivery apps appear in the game (Sunny Burger, Z
 | es-module-shims 1.10.0 (import maps on older Safari) | Guy Bedford | MIT | https://github.com/guybedford/es-module-shims |
 | Lilita One (titles, numbers) | Juan Montoreano | SIL OFL 1.1 | https://fonts.google.com/specimen/Lilita+One |
 | Fredoka (UI text) | Milena Brandão, Hafontia | SIL OFL 1.1 | https://fonts.google.com/specimen/Fredoka |
+| Capacitor 8 and its App, Haptics, Preferences, Splash Screen plugins (store apps only) | Ionic | MIT | https://github.com/ionic-team/capacitor |
 
 ## Assets
 

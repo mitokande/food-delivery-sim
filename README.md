@@ -7,6 +7,7 @@ get hired in better districts, and grow your own courier fleet.
 **Play:** https://mithatck.com/food-delivery-sim/
 
 - **Courier run** — on phones the road rides itself (pace, corners, the door) and the busy traffic is yours: hold the BRAKE pedal for the car in front, people crossing and red lights, swipe left / right to slip between the cars (the oncoming lane or the sidewalk), swipe up to hop potholes; grab the coins, keep the food in one piece, and react to random events.
+- **Keep riding** — pickups and hand-overs play out at the bike by themselves, and the receipt offers an order near the customer's door: "Collect & ride on" (1 ⚡) starts it right there, no trip back to the hub.
 - **Free riding on desktop** — steer anywhere in the city with the keyboard (W/S gas, brake and reverse, A/D steer); walls, poles, cars and people are solid, the GPS re-plans when you take another street, and you stop in the ring at the door.
 - **Progression** — 6 vehicles with 4 upgradeable parts and paint, 5 courier skills, 4 districts to unlock, daily goals, day/night cycle with rush hours.
 - **Energy** — every order costs 1 ⚡ at Start; it refills one every 6 minutes (even while the game is closed), a level-up fills the tank, daily goals and coffee top it up.
@@ -22,6 +23,11 @@ to brake for corners, lights and the door (the phone's ride before the courier r
 swipe to change lane; `stop` the earlier autopilot with turbo, hop and a STOP button; `run` the courier run on a keyboard
 too; it sticks to the device until `?ctl=off`).
 
+## Store apps
+
+`mobile/` wraps the game as Android and iOS apps with Capacitor: the same files, bundled to play offline, plus
+native haptics, the Android back button and a backup of the save. Build and release steps: [mobile/README.md](mobile/README.md).
+
 ## Analytics
 
 The game reports gameplay events (with the session's IP address and device) to `api/collect.php` (PHP + SQLite); the password-protected panel is at `admin/`.
@@ -34,5 +40,6 @@ Locally: `php -S 127.0.0.1:8000` from the repo root (static server alone has no 
 - `assets/` — packed models, icons, audio (all CC0 or made for this project, see `CREDITS.md`); `assets/src/kenney/` holds the source kits.
 - `tools/` — asset build scripts (Blender, gltf-transform, audio) and headless test tools (`play.mjs`, `sweep.mjs`, `tabs.mjs`).
 - `api/`, `admin/` — analytics collector and admin panel (PHP 8 + SQLite, no dependencies).
+- `mobile/` — the store apps (Capacitor 8 project; `js/native.js` is the game's side of it).
 - `DOCS.md` — design document and code map (Turkish).
 - `design/ad-research.md` — ad research: competitor ad teardowns, idle ad formats, ideas for our own ads (Turkish).

@@ -1,0 +1,28 @@
+{
+  "name": "food-delivery-sim-mobile",
+  "private": true,
+  "type": "module",
+  "description": "Food Delivery Simulator store apps: the web game bundled into Android and iOS with Capacitor",
+  "scripts": {
+    "web": "node scripts/build-web.mjs",
+    "sync": "node scripts/build-web.mjs && cap sync",
+    "android": "node scripts/build-web.mjs && cap sync android",
+    "ios": "node scripts/build-web.mjs && cap sync ios",
+    "assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#f39a5b' --iconBackgroundColorDark '#f39a5b' --splashBackgroundColor '#f39a5b' --splashBackgroundColorDark '#f39a5b'"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/splash-screen": "8.0.2",
+    "es-module-shims": "1.10.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.6.0"
+  }
+}

@@ -90,7 +90,9 @@ export function createRide(ctx) {
   }
 
   // ---------- job flow ----------
-  async function start(job, fromTile, fromDir) {
+  // (`blend`: a job that starts where the last one ended, at a customer's door — the bike eases onto the new route
+  // the way it does between legs)
+  async function start(job, fromTile, fromDir, { blend = false } = {}) {
     await Promise.all([ensureBike(), warmPeds(), loadKit('roads')]);
     loadKit('food').catch(() => {}); // the takeaway bag the restaurant hands over; ready long before the first door
     const vs = St.vehStats();
@@ -121,7 +123,9 @@ export function createRide(ctx) {
     if (!ringMk.parent) scene.add(ringMk);
     R.curTile = fromTile; R.curDir = fromDir;
     if (R.manual) initFree();
+    R.blendIn = blend; R.camMode = 'chase';
     beginLeg();
+    R.blendIn = false;
   }
 
   function legTarget(leg) { return city.lots[leg.lot].door; }
@@ -148,7 +152,7 @@ export function createRide(ctx) {
     // after resetting s: ease the bike from where it stands onto the start of the new route (riding freely, the bike
     // stays where the rider left it and the GPS finds it there)
     if (R.manual) { project(40); F.ringIn = false; F.told = false; F.gpsT = 0.6; F.offT = F.wrongT = 0; }
-    else if (R.leg > 0) startBlend();
+    else if (R.leg > 0 || R.blendIn) startBlend();
     // hazards
     for (const h of R.hazards) freeHazard(h);
     const tutorial = St.S.stats.deliveries < 2;
@@ -691,6 +695,11 @@ export function createRide(ctx) {
   }
 
   // ---------- arrival scenes ----------
+  // No tap at the door: the cook (or the customer) walks out to the bike and the bag changes hands there, while a card
+  // says what's happening (at least `SCENE_MS`, for reading it). Between drops the rating is a short beat over the ride
+  // that's going on; after the last one it holds a moment before the receipt.
+  const SCENE_MS = 900;
+  const beat = (ms) => new Promise((r) => setTimeout(r, ms));
   let npc = null;
   async function arrive() {
     const leg = R.job.legs[R.leg];
@@ -713,8 +722,9 @@ export function createRide(ctx) {
       const orders = R.orders.filter((x) => leg.orders.includes(x.o.id));
       npc = await spawnNpc(orders[0].o.rest === 'sultan' ? 'male-d' : 'female-c', dx, dz, bx, bz, true);
       sceneCam(dx, dz);
-      await ctx.ui.pickup(orders.map((x) => x.o), R);
-      await reachBike(npc); // the bag changes hands at the bike, even when Confirm Pickup came early
+      const card = ctx.ui.pickup(orders.map((x) => x.o), R);
+      await Promise.all([reachBike(npc), beat(SCENE_MS)]); // the bag changes hands at the bike
+      card.close();
       R.bike.openLid(true); ctx.audio?.play('bag-rustle');
       for (const x of orders) x.picked = true;
       await walkAway(npc, dx, dz);
@@ -725,18 +735,20 @@ export function createRide(ctx) {
       sceneCam(dx, dz);
       ctx.audio?.play('doorbell');
       setTimeout(() => ctx.audio?.play('door-open', { vol: 0.6 }), 900);
-      await ctx.ui.drop(x.o, R, x);
+      const card = ctx.ui.drop(x.o, R, x);
+      // (the customer gets most of the way to the bike, at most 1.6 s: one still on the way reacts once there)
+      await Promise.all([beat(SCENE_MS), Promise.race([reachBike(npc), beat(1600)])]);
+      card.close();
       R.bike.openLid(true); ctx.audio?.play('bag-rustle');
       x.done = true;
       x.flow = R.flow.mult;
       x.result = scoreOrder(x.o, { elapsed: x.elapsed, heat: x.heat, integrity: x.integrity, tipMult: x.tipMult * R.flow.mult, ratingAdj: x.ratingAdj });
       x.result.flow = R.flow.mult;
       if (x.ruined) Object.assign(x.result, { ruined: true, stars: 1, pay: 0, tip: 0, bonus: 0, early: false });
-      // a customer still on the way keeps walking and reacts once they reach the bike
       if (npc) { npc.emote = x.result.stars >= 4 ? 'emote-yes' : 'emote-no'; if (!npc.walking) npc.c.play(npc.emote, 0.2, { once: true }); }
       if (x.result.stars >= 4) { const at = npc ? { x: npc.tx, z: npc.tz } : R.bike.root.position; pfx.celebrate(at.x, at.z, { stars: x.result.stars, tip: x.result.tip }); }
       ctx.audio?.play(x.result.stars >= 3 ? 'order-complete' : 'order-late');
-      await ctx.ui.rated(x.o, x.result, R);
+      await ctx.ui.rated(x.o, x.result, { last: R.leg === R.job.legs.length - 1 });
       R.bike.openLid(false);
       if (npc) { npc.c.obj.removeFromParent(); npc = null; }
     }

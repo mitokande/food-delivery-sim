@@ -39,14 +39,13 @@ console.log('riding', await step());
 await page.evaluate(() => { game.ride.R.event = null; });
 for (let i = 0; i < 80 && !(await page.evaluate(() => !!document.querySelector('.modal.scene'))); i++) await sim(1);
 await sleep(600); console.log('pickup', await step()); await shot('05-pickup');
-await click('.modal.scene [data-x]');
-await sleep(3500);
-for (let i = 0; i < 120 && !(await page.evaluate(() => !!document.querySelector('.modal.scene'))); i++) { await page.evaluate(() => { if (game.ride.R.event && !game.ride.R.event.fired) game.ride.R.event = null; }); await sim(1); }
+// (the door scenes play by themselves: the bag changes hands, then the ride goes on)
+await waitFor(() => game.ride.R.phase === 'ride' && !document.querySelector('.modal.scene:not(.out)'), 30000);
+for (let i = 0; i < 120 && !(await page.evaluate(() => !!document.querySelector('.modal.scene:not(.out)'))); i++) { await page.evaluate(() => { if (game.ride.R.event && !game.ride.R.event.fired) game.ride.R.event = null; }); await sim(1); }
 await sleep(600); console.log('drop', await step()); await shot('06-drop');
-await click('.modal.scene [data-x]');
 await waitFor(() => !!document.querySelector('.modal.rated'), 30000).catch(() => {}); await sleep(400); await click('.modal.rated');
 await waitFor(() => !!document.querySelector('.modal.receipt'), 30000); await sleep(600);
-console.log('receipt', await step()); await shot('07-receipt');
+console.log('receipt', await step(), 'next order offered:', await page.evaluate(() => !!document.querySelector('.modal.receipt [data-next]'))); await shot('07-receipt');
 await click('.modal.receipt [data-x]');
 await sleep(1500); await page.evaluate(() => game.skipTween());
 await waitFor(() => game.mode === 'hub', 60000); await sleep(800);

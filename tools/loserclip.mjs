@@ -272,9 +272,9 @@ async function shot(page, name, script, arg) {
       if (R.event && !R.event.fired) R.event = null;
       if (!st.tapped && R.stopUi?.kind === 'door') { game.rideInput('stop', true); st.tapped = true; }
       if (R.stopUi?.kind === 'light' && R.stopUi.timing !== 'early') game.rideInput('stop', true);
-      const b = document.querySelector('.modal.scene [data-x]'), npc = game.ride.npc;
+      const b = document.querySelector('.modal.scene:not(.out)'), npc = game.ride.npc; // (the scene plays by itself)
       if (b && st.scene < 0) { st.scene = t; T.mark('door'); }
-      if (b && st.handed < 0 && t > st.scene + 0.6 && ((npc && !npc.walking) || t > st.scene + 1.8)) { b.click(); st.handed = t; }
+      if (b && st.handed < 0 && t > st.scene + 0.6 && ((npc && !npc.walking) || t > st.scene + 1.8)) st.handed = t;
       if (st.rated < 0 && document.querySelector('.modal.rated')) {
         st.rated = t; T.mark('rated');
         const r = R.orders[0].result; console.log('clip d-door', `${r.stars}★ $${(r.pay + r.bonus).toFixed(0)} + $${r.tip.toFixed(0)} tip`, r.late ? 'late' : 'on time', `food ${r.cond.toFixed(0)}%`, `fines $${R.fines}`);
@@ -377,9 +377,9 @@ const EVENT_SHOT = ({ id, read = 1.1, hold = 1.6, lead = 2.5 }) => {
       if (t > 25) { console.error('clip h-door stuck', R.phase); return 'end'; }
       if (R.event && !R.event.fired) R.event = null;
       if (R.phase === 'ride') game.ride.autoBot({ hop: true });
-      const b = document.querySelector('.modal.scene [data-x]'), npc = game.ride.npc;
+      const b = document.querySelector('.modal.scene:not(.out)'), npc = game.ride.npc; // (the scene plays by itself)
       if (b && st.scene < 0) { st.scene = t; T.mark('door'); }
-      if (b && st.handed < 0 && t > st.scene + 0.6 && ((npc && !npc.walking) || t > st.scene + 1.8)) { b.click(); st.handed = t; }
+      if (b && st.handed < 0 && t > st.scene + 0.6 && ((npc && !npc.walking) || t > st.scene + 1.8)) st.handed = t;
       if (st.rated < 0 && document.querySelector('.modal.rated')) {
         st.rated = t; T.mark('rated');
         const r = R.orders[0].result; console.log('clip h-door', `${r.stars}★ $${(r.pay + r.bonus).toFixed(0)} + $${r.tip.toFixed(0)} tip`, r.late ? 'late' : 'on time', `food ${r.cond.toFixed(0)}%`);

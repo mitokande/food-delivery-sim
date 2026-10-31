@@ -11,16 +11,19 @@ header('X-Content-Type-Options: nosniff');
 
 function reply(int $code, array $body): never { http_response_code($code); echo json_encode($body); exit; }
 
-// only pages of this site (plus any configured embed hosts) may post
+// only pages of this site (plus the store apps and any configured embed hosts) may post
+// the store apps (mobile/) serve the game from the phone: Android as https://localhost, iOS as capacitor://localhost
+const APP_ORIGINS = ['https://localhost', 'capacitor://localhost'];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin !== '' && $origin !== 'null') {
   $self = explode(':', $_SERVER['HTTP_HOST'] ?? '')[0];
   if (parse_url($origin, PHP_URL_HOST) !== $self) {
-    if (!in_array($origin, (array) cfg('allowed_origins'), true)) reply(403, ['ok' => false]);
-    // an embed host: a JSON body makes its browser ask first (preflight)
+    if (!in_array($origin, [...APP_ORIGINS, ...(array) cfg('allowed_origins')], true)) reply(403, ['ok' => false]);
+    // an app or embed host: a JSON body makes its browser ask first (preflight)
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Methods: POST');
     header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Credentials: true'); // sendBeacon always sends with credentials (no cookies are read here)
     header('Vary: Origin');
   }
 }

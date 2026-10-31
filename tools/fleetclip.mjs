@@ -241,8 +241,9 @@ await p1.evaluate((RIDE) => {
       }
     }
     if (st.stage === 'door') {
-      const npc = game.ride.npc, b = document.querySelector('.modal.scene [data-x]');
-      if (b && st.clicked < 0 && t > st.arrAt + 0.6 && ((npc && !npc.walking) || t > st.arrAt + 1.8)) { A.tap(b); b.click(); st.clicked = t; A.cue.push({ n: 'bag-rustle', vol: 0.9 }); }
+      // (the hand-over plays by itself once the customer reaches the bike)
+      const npc = game.ride.npc, b = document.querySelector('.modal.scene:not(.out)');
+      if (b && st.clicked < 0 && t > st.arrAt + 0.6 && ((npc && !npc.walking) || t > st.arrAt + 1.8)) { st.clicked = t; A.cue.push({ n: 'bag-rustle', vol: 0.9 }); }
       if (st.ratedAt < 0 && document.querySelector('.modal.rated')) {
         st.ratedAt = t; A.cue.push({ n: 'order-complete', vol: 0.9 });
         const r = R.orders[0].result; console.log('clip courier delivered', `${r.stars}★ $${(r.pay + r.bonus).toFixed(0)} + $${r.tip.toFixed(0)} tip`, r.late ? 'late' : 'on time', `food ${r.cond.toFixed(0)}%`);

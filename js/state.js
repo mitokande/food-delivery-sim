@@ -1,8 +1,9 @@
 // Save game + derived stats + economy actions. No three.js, no DOM.
 import { VEHICLE, VEHICLES, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICT, DISTRICTS, FLEET, fleetRate,
   xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, CONTRACT_DAYS, ENERGY } from './data.js';
+import { keep } from './native.js';
 
-const KEY = 'fds_save_v1';
+export const KEY = 'fds_save_v1'; // (the store apps keep a copy: native.js)
 const listeners = new Set();
 export const on = (fn) => (listeners.add(fn), () => listeners.delete(fn));
 export const emit = (what, data) => { for (const fn of listeners) fn(what, data); };
@@ -59,11 +60,11 @@ export function load() {
 let saveT = 0;
 export function save(now = false) {
   clearTimeout(saveT);
-  const w = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
+  const w = () => { const j = JSON.stringify(S); keep(KEY, j); try { localStorage.setItem(KEY, j); } catch (e) { /* private mode */ } };
   if (now) w(); else saveT = setTimeout(w, 400);
 }
 // erase everything on this device and start a brand-new career (the caller reloads the page)
-export function wipe() { clearTimeout(saveT); try { localStorage.removeItem(KEY); } catch {} S = fresh(); emit('reset'); }
+export function wipe() { clearTimeout(saveT); keep(KEY, null); try { localStorage.removeItem(KEY); } catch {} S = fresh(); emit('reset'); }
 
 // ---------- derived ----------
 export const rating = () => S.ratings.reduce((a, b) => a + b, 0) / S.ratings.length;
@@ -356,6 +357,7 @@ export function importCode(code) {
   if (!d || typeof d !== 'object' || d.v !== 1 || typeof d.cash !== 'number' || !d.vehicles || !d.districts) return false;
   clearTimeout(saveT);
   try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { return false; }
+  keep(KEY, JSON.stringify(d));
   return true;
 }
 export function claimGoal(i) {

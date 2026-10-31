@@ -12,8 +12,9 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const STEPS = {
   1: { target: '.sheet-body .ocard', text: 'Tap an order to take it.<br><small>Short ones are easiest on your old scooter.</small>', on: 'taken', place: 'above' },
   2: { target: '#startbar .sb-go', text: 'Now tap <b>Start</b> and hop on!', on: 'start', place: 'above' },
-  3: { target: '.modal.scene [data-x]', text: 'Grab the food!', on: 'picked', place: 'above', waitFor: 'pickup' },
-  4: { target: '.modal.scene [data-x]', text: 'Hand it over — and hope for a tip!', on: 'dropped', place: 'above', waitFor: 'drop' },
+  // (the door scenes play by themselves: nothing to tap, so no hand)
+  3: { target: '.modal.scene .card', text: 'The cook brings the food out to your scooter.', on: 'picked', place: 'above', waitFor: 'pickup', noHand: true },
+  4: { target: '.modal.scene .card', text: 'Hand it over — and hope for a tip!', on: 'dropped', place: 'above', waitFor: 'drop', noHand: true },
   5: { target: '.modal.receipt [data-x]', text: 'Your first pay! Fast, careful rides earn bigger tips.', on: 'hub', place: 'above', waitFor: 'receipt' },
   6: { target: '.tabs [data-tab="garage"]', text: 'Spend it! Open the <b>Garage</b>.', on: 'tab:garage', place: 'above' },
   7: { target: '.rows [data-act="part"]', text: 'A faster engine = shorter deliveries.', on: 'part', place: 'above', fallback: true },
@@ -119,7 +120,7 @@ export function createOnboarding(game, ui) {
     // bring a target inside a scrolling list into view once
     if (!cur.scrolled) { cur.scrolled = true; const sc = t.closest('.sheet-body'); if (sc) { const a = t.getBoundingClientRect(), b = sc.getBoundingClientRect(); if (a.bottom > b.bottom - 90 || a.top < b.top) t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }
     const r = t.getBoundingClientRect(), pad = 6;
-    hole.style.opacity = 1; hand.style.opacity = 1; bubble.style.opacity = 1;
+    hole.style.opacity = 1; hand.style.opacity = cur.noHand ? 0 : 1; bubble.style.opacity = 1;
     Object.assign(hole.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px', borderRadius: Math.min(22, r.height / 2 + pad) + 'px' });
     hand.style.left = r.left + r.width * 0.5 + 'px'; hand.style.top = r.top + r.height * 0.55 + 'px';
     const bw = Math.min(innerWidth - 24, 300), bh = bubble.offsetHeight || 80;

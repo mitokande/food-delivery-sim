@@ -4,8 +4,10 @@
 // ?an=off stops sending, ?an=on back to normal. Headless test runs send nothing unless ?an=force.
 import * as St from './state.js';
 import { S } from './state.js';
+import { app, SITE } from './native.js';
 
-const ENDPOINT = new URL('../api/collect.php', import.meta.url).href;
+// the store apps load the game from the phone, so their events go to the site
+const ENDPOINT = app ? SITE + 'api/collect.php' : new URL('../api/collect.php', import.meta.url).href;
 const FLUSH_MS = 15000, PING_MS = 30000, NEW_SESSION_MS = 30 * 60000, BATCH = 200, MAX_QUEUE = 1000;
 
 const store = {

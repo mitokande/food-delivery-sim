@@ -119,7 +119,7 @@ function fmtEvent(e) {
     case 'onboard_step': return { c: 'prog', t: `Tutorial: ${esc(STEP_TR[p.step] ?? p.step)} <small>adım ${esc(p.step)}</small>` };
     case 'onboard_done': return { c: 'prog', t: p.skipped ? `Tutorial atlandı <small>${esc(STEP_TR[p.at] ?? p.at)} adımında</small>` : 'Tutorial tamamlandı' };
     case 'tab': return { c: 'sys', dim: 1, t: `Sekme: ${esc(TAB_TR[p.tab] || p.tab)}` };
-    case 'job_start': return { c: 'ride', t: `<b>Sürüş başladı</b> <small>${num(p.n)} sipariş${p.energy != null ? ` · kalan enerji ${num(p.energy)}` : ''} · ${esc(vehName(p.veh))}${p.manual ? ' · elle sürüş (klavye)' : ''}${p.ctl ? ` · ${ctlName(p.ctl)}` : ''}${p.rain > 0.35 ? ' · yağmur' : ''}${p.rush > 1 ? ' · yoğun saat' : ''}</small>
+    case 'job_start': return { c: 'ride', t: `<b>Sürüş başladı</b> <small>${p.chain ? 'kapıdan devam · ' : ''}${num(p.n)} sipariş${p.energy != null ? ` · kalan enerji ${num(p.energy)}` : ''} · ${esc(vehName(p.veh))}${p.manual ? ' · elle sürüş (klavye)' : ''}${p.ctl ? ` · ${ctlName(p.ctl)}` : ''}${p.rain > 0.35 ? ' · yağmur' : ''}${p.rush > 1 ? ' · yoğun saat' : ''}</small>
       <div class="orders">${(p.orders || []).map((o) => `<span>${esc(restName(o.rest))} · ${esc(distName(o.d))} · ${esc(typeName(o.type))} · ${num(o.m)} m · süre ${num(o.eta)} sn · ${money(o.pay)}</span>`).join('')}</div>` };
     case 'job_end': {
       const s = p.stats || {};
@@ -136,6 +136,7 @@ function fmtEvent(e) {
     case 'level_up': return { c: 'prog', t: `<b>Seviye ${num(p.lvl)}</b> <small>${num1(p.pm)} dk oyunda · ${num(p.del)} teslimat</small>` };
     case 'buy': { const w = buyWhat(p); return { c: 'money', t: `Satın aldı: ${esc(BUY_TR[p.k] || p.k)}${w ? ` · ${esc(w)}` : ''} <small>${money(p.cost)} · kalan ${money(p.cash)}</small>` }; }
     case 'claim': return { c: 'money', t: `Ödül aldı: ${esc(CLAIM_TR[p.k] || p.k)} <small>${money(p.reward)}</small>` };
+    case 'next_offer': return { c: p.take ? 'ride' : '', t: `Fişte yakın sipariş: ${p.take ? '<b>sürmeye devam</b>' : 'hub\'a döndü'} <small>alış ${num(p.pick)} m · ${money(p.pay)} · kalan enerji ${num(p.energy)}</small>` };
     case 'energy_out': return { c: 'bad', t: `Enerji yetmedi <small>${num(p.need)} gerekli · ${num(p.have)} vardı · ${money(p.cash)} nakit · ${num(p.coffee)} kahve hakkı</small>` };
     case 'equip': return { c: 'money', t: `Araç değiştirdi: ${esc(vehName(p.id))}` };
     case 'fleet': {

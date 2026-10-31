@@ -1,11 +1,12 @@
 """Renders for assets/models/vehicles.glb (Blender 5.2 headless).
 
     blender -b --factory-startup -P tools/blender/vehicles_render.py -- --glb assets/models/vehicles.glb \
-        --mode icons|cells|preview --out DIR [--only vespetta,zippy] [--engine CYCLES|EEVEE] [--samples 64]
+        --mode icons|cells|preview|appicon --out DIR [--only vespetta,zippy] [--engine CYCLES|EEVEE] [--samples 64]
 
 mode icons    -> DIR/veh-<id>.png + DIR/helmet.png (768 px raw; vehicles_sheet.py downsamples to 384)
 mode cells    -> DIR/cell-<id>.png, DIR/cell-<id>-rider.png, DIR/cell-helmet-drive.png, DIR/cell-helmet-idle.png
 mode preview  -> DIR/pv-<id>-{side,top,front,q,chase}.png (with rider, for iterating on fit)
+mode appicon  -> DIR/app-<id>.png (1536 px, with rider: the store apps' icon, finished by mobile/scripts/icon.py)
 
 The rider is Kenney's character-male-a.glb scaled x2.2 with the `drive` action, its root object
 placed exactly at the vehicle's `seat` empty (no rotation: both face glTF +Z / Blender -Y).
@@ -26,7 +27,7 @@ GLB = os.path.abspath(_arg('--glb', os.path.join(ROOT, 'assets', 'models', 'vehi
 MODE = _arg('--mode', 'preview')
 OUTD = os.path.abspath(_arg('--out', '/tmp/fds-veh-render'))
 ONLY = [s for s in (_arg('--only', '') or '').split(',') if s]
-ENGINE = _arg('--engine', 'CYCLES' if MODE == 'icons' else 'EEVEE')
+ENGINE = _arg('--engine', 'CYCLES' if MODE in ('icons', 'appicon') else 'EEVEE')
 SAMPLES = int(_arg('--samples', '64'))
 CHARNAME = _arg('--char', 'character-male-a')
 os.makedirs(OUTD, exist_ok=True)
@@ -215,6 +216,8 @@ veh_ids = [v for v in VEHICLES if v in roots and (not ONLY or v in ONLY)]
 helmet = roots.get('helmet')
 ICON_DIR = Vector((math.sin(math.radians(40)), -math.cos(math.radians(40)), 0.62))   # front-left, above
 RIDER_DIR = Vector((math.sin(math.radians(58)), -math.cos(math.radians(58)), 0.30))  # lower, more lateral
+APP_ANGLE, APP_UP = (float(x) for x in (_arg('--app-angle', '62'), _arg('--app-up', '0.34')))
+APP_DIR = Vector((math.sin(math.radians(APP_ANGLE)), -math.cos(math.radians(APP_ANGLE)), APP_UP))  # front-left: rider and food box
 
 if MODE == 'icons':
     for vid in veh_ids:
@@ -229,7 +232,7 @@ if MODE == 'icons':
         frame_persp(world_verts(hobj), hdir, lens=70, margin=0.06)
         render(os.path.join(OUTD, 'helmet.png'))
 
-elif MODE in ('cells', 'preview'):
+elif MODE in ('cells', 'preview', 'appicon'):
     arm, cobjs = import_char()
     cmesh = [o for o in cobjs if o.type == 'MESH' and o.parent is not None]
     if helmet:
@@ -244,7 +247,11 @@ elif MODE in ('cells', 'preview'):
         if helmet:
             attach_helmet(helmet, arm)
         riders = cmesh + (hobj if helmet else [])
-        if MODE == 'cells':
+        if MODE == 'appicon':
+            isolate(objs + riders)
+            frame_persp(world_verts(objs + riders), APP_DIR, lens=50, margin=0.02, res=(1536, 1536))
+            render(os.path.join(OUTD, f'app-{vid}.png'))
+        elif MODE == 'cells':
             isolate(objs)
             frame_persp(world_verts(objs), ICON_DIR, lens=55, margin=0.075, res=(720, 720))
             render(os.path.join(OUTD, f'cell-{vid}.png'))

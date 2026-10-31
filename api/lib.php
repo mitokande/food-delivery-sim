@@ -160,6 +160,7 @@ function describe_device(string $ua, array $c = []): array {
   }
 
   [$browser, $bv] = match (true) {
+    (bool) preg_match('/FDSApp\/(\d+)/', $ua, $m) => ['App', $m[1]], // the store apps (mobile/capacitor.config.json)
     (bool) preg_match('/Instagram ([\d]+)/', $ua, $m) => ['Instagram', $m[1]],
     (bool) preg_match('/FBAN|FBAV|FB_IAB/', $ua) => ['Facebook', preg_match('/FBAV\/(\d+)/', $ua, $x) ? $x[1] : null],
     (bool) preg_match('/(?:TikTok|musical_ly|BytedanceWebview)[ _\/]?(\d+)?/', $ua, $m) => ['TikTok', $m[1] ?? null],

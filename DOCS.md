@@ -19,11 +19,22 @@ Tek teslimat ≈ 40–90 sn. Mobil oturum: 3–5 teslimat + yükseltme.
 Şehir (hub, izometrik)  →  sipariş seç (1..kapasite)  →  sürüş: restorana git  →  teslim al
      ↑                                                           ↓
 yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←  sürüş: müşteriye git → kapı sahnesi
+                                        ↓ "Collect & ride on" (1 ⚡)
+                                   yakındaki sipariş, kapıdan sürüş devam (hub'a dönmeden)
 ```
 
 - **Şehir** tek ve gerçek: hub'da yukarıdan gördüğümüz sokaklar, sürüşte içinden geçtiğimiz sokaklarla aynı.
   Sürüş başlarken kamera izometrikten motorun arkasına iner, bitince geri kalkar.
 - Konum önemli: teslimattan sonra müşterinin sokağındayız; yakın restoranların siparişleri daha verimli.
+- **Sürmeye devam** (2026-10-30): kapı sahneleri kendiliğinden oynar (dokunuş yok: çalışan / müşteri motora yürür,
+  poşet orada el değiştirir; kart en az 0,9 sn ne olduğunu söyler). Teslimat arasında müşterinin yıldızları kısa bir an
+  (sürüş 0,7 sn sonra devam eder, kart 2 sn'de kendiliğinden kalkar ve dokunuşları yola geçirir); son teslimattan sonra
+  1,3 sn, sonra fiş. Fiş, rehber bittiyse ve gün bitmediyse, **kapının yakınında bir sipariş** önerir (4 adaydan restoranı
+  en yakın olan): "Collect & ride on" (1 ⚡) hub'a dönmeden, kamera uçuşu olmadan, motorun durduğu yerden yeni işi başlatır;
+  "Collect & back to hub" eskisi gibi. Enerji yetmezse buton "Out of energy" der ve enerji panelini açar (kahve alınınca
+  buton yeniden yanar). Hub'a iniş/kalkış kamerası 1,5 / 1,3 sn'den 1,0 / 0,9 sn'ye kısaldı. Kod: `main.js` `nextOffer`,
+  `rideOn`, `ui.js` `receipt` / `rated` / `sceneCard`, `ride.js` "arrival scenes" (`SCENE_MS`, `start(..., { blend })`).
+  Test: `tools/keepriding.mjs`. Analitik: `next_offer` (`take`), `job_start.chain`.
 - **Gün** 08:00'de başlar, 24:00'te biter. Saat sadece sürerken ilerler (1 gerçek sn ≈ 20 oyun sn). Öğle (11:30–13:30)
   ve akşam (18:30–21:00) yoğunluğu: daha çok sipariş, ücret çarpanı. Işık sabah → öğle → gün batımı → gece (sokak
   lambaları, neon). Gün sonu: rapor (kazanç, gider, filo geliri, günlük hedefler).
@@ -69,7 +80,7 @@ Ray yok: motor şehirde gidebildiği her yere gider (asfalt, kaldırım, ara sok
   tane daha eklenir; gelecek olay yeni yola taşınır. "GPS shortcut" butonu ara sokağı GPS'e koyar; kestirme ancak ara
   sokaktan öbür caddeye çıkınca sayılır.
 - **Varış:** kapının önünde parlayan halka (iki şerit + kaldırım, 4,6 m). Halkada gaz bırakılınca motor kendiliğinden
-  durur; durunca alım/teslim sahnesi başlar (çalışan/müşteri motora yürür).
+  durur; durunca alım/teslim sahnesi başlar (çalışan/müşteri motora yürür, poşet motorda el değiştirir; dokunuş yok).
 - Kırmızıda kavşağa girmek ışık ihlali (kamera cezası şansı, sağ salim çıkınca Flow). **Kamera şansı bölgeye göre**
   (her sürüşte aynı, `DPROFILE.cams`): Downtown %70, Harbor %45, Old Town %35, Green Hills %20; kamera yoksa ceza yok
   (ekranda bir şey de yazmaz). Sollama: aynı yöne giden aracı
@@ -379,6 +390,13 @@ H korna, 1–3 olay seçimi).
 - Analitik: `js/analytics.js` olayları toplayıp 15 sn'de bir (sayfa gizlenince `sendBeacon` ile) `api/collect.php`'ye yollar;
   PHP + SQLite (`api/`), panel `admin/` (şifreli). Ayrıntı: §10.
 - Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
+- Mağaza uygulamaları: `mobile/` (Capacitor 8; Android + iOS, `com.mitokande.fooddeliverysim`, ana ekranda "Delivery Sim").
+  `mobile/scripts/build-web.mjs` oyunun dosyalarını `www/`'ye kopyalar, CDN'den gelenleri (three, Draco, es-module-shims,
+  Google fontları) pakete koyar: uygulama internetsiz açılır ve oynanır. Oyunun uygulamaya özel tek kodu `js/native.js`:
+  telefonun titreşimi (iOS'ta `navigator.vibrate` yok), Android geri tuşu (üstteki kartı kapatır, kart yoksa oyunu arka
+  plana alır), kaydın uygulamanın kendi ayarlarında ikinci kopyası (web görünümünün deposu boşalırsa geri konur),
+  analitiğin site adresi. Webde hiçbir şey yapmaz. Analitik uygulamadan da gelir: `collect.php` `https://localhost` ve
+  `capacitor://localhost` kökenlerini kabul eder, panelde tarayıcı "App". Yayın adımları: `mobile/README.md`.
 
 ## 7. Varlıklar
 
@@ -418,7 +436,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/stop.mjs` (`?ctl=stop` otopilotunun STOP'u telefonda: ilk sürüş kartı, buton ve etiketleri, "Run it!" yok, kırmızıda basınca çizgide durup yeşilde devam, hiç dokunmadan kırmızı geçme + her birine kamera cezası, yaya ürkütme, kapıyı geçip geri dönme, dikkatli sürücü `game.ride.autoBot()` ile aynı siparişlerde kıyas; `JOBS=n`), `node tools/ctl.mjs [a|b|run|both|all]` (telefonun freni — `?ctl` olmadan varsayılan —, şerit koşusu ve Kurye Koşusu — basılı tutmak frenlemez, ↑ zıplar —: butonsuz HUD, basılı tut → fren, A'da kaydır → şerit, B'de kayan başparmak freni bırakmaz, B'de aynı siparişlerde dikkatli ve hiç dokunmayan sürücü kıyası (`PAIRS=n`), A'da draft → sapan ve kaldırım, kavşakta kaydırarak dönüş + GPS'in yeniden rotası, ışık geri sayımının döngüyle tutması, dikkatli sürücü botu `game.ride.schemeBot()` ile ve hiç dokunmadan tam teslimat), `node tools/tabs.mjs W H` (sekme görüntüleri),
-`node tools/energy.mjs` (enerji: START bedeli, yetmeyince sipariş/START yerine panel, zamanla ve kapalıyken dolma, kahve fiyatları ve günlük sınır, seviye/hedef/Dayanıklılık), `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (bir sürüşün gerçek ortalama hızı — süre kalibrasyonu için; telefonda fren, `CTL=stop|a` başka sürüş, `BOT=1` dikkatli sürücü, yoksa hiç dokunmadan; `BOOST=1` turbo ile). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok, `?energy=off` enerji harcanmaz (çok iş süren testler).
+`node tools/keepriding.mjs` (sürmeye devam: kapı sahneleri butonsuz ve dokunuşsuz, puan kartı dokunuşları yola geçirir, fişte yakın sipariş, "ride on" hub'a dönmeden kapıdan başlar ve 1 ⚡ harcar, enerji yokken panel, kahveyle yeniden yanar), `node tools/energy.mjs` (enerji: START bedeli, yetmeyince sipariş/START yerine panel, zamanla ve kapalıyken dolma, kahve fiyatları ve günlük sınır, seviye/hedef/Dayanıklılık), `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (bir sürüşün gerçek ortalama hızı — süre kalibrasyonu için; telefonda fren, `CTL=stop|a` başka sürüş, `BOT=1` dikkatli sürücü, yoksa hiç dokunmadan; `BOOST=1` turbo ile). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok, `?energy=off` enerji harcanmaz (çok iş süren testler).
 Reklam klibi: `node tools/fleetclip.mjs [oyun-kökü] [çıktı.mp4]` — 9:16, iki bölüm. Önce kurye sensin: 1. gün kaydında külüstürle
 sürüş, gerçek "Engine stalled!" olayı + KICK, kapıda 5 yıldızlı teslim (aradaki yol `game.sim` ile kesilir; acelesi olan oyuncu gibi
 turbo + kırmızıda geçiş, sipariş geç kalmasın). Sonra filo: tek kuryeden dört bölgede 10 kuryeye, gün batımı, oyunun kendi
@@ -689,6 +707,21 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   ipucu kartı 64 px'ten başlar ve kendi içinde kayar.
 - 2026-10-30: Kamerasız kırmızıda "No camera at this one — lucky!" yazısı kalktı (kullanıcı: "dont print no camera at
   this one lucky text in red lights without a fine, no need to say anything"); kamera yoksa hiçbir şey yazmaz.
+- 2026-10-30: **Sürmeye devam** (denetimden çıkan yol haritasının 2. maddesi, kullanıcı: "1. maddeyi yap"): kapıda
+  "Confirm Pickup" / "Complete Delivery" dokunuşları kalktı (sahne kendiliğinden oynar, rehberin 3. ve 4. adımı el
+  işaretsiz anlatır), teslimat arası puan kartı sürüşü durdurmuyor, son puan kartı 2,3 sn + dokunuş yerine 1,3 sn, fişte
+  kapının yakınındaki sipariş ("Collect & ride on", 1 ⚡; rehber sürerken ve gün biterken yok), kamera uçuşları ~%30 kısa
+  (§2 *Sürmeye devam*). Klip araçları (`fleetclip`, `loserclip`) kapı sahnesini artık tıklamadan izliyor. Yeni test
+  `tools/keepriding.mjs`; `tools/sweep.mjs` fişi teklifle de ölçüyor.
+- 2026-10-31: **Mağaza uygulamaları** (kullanıcı: "let's make a React Native mobile app version of this game, because I
+  want to distribute this game in Google Play and App Store"). React Native bu three.js + DOM oyununu ancak bir WebView
+  içinde ya da baştan yazılarak çalıştırabileceği için kullanıcı Capacitor'ı seçti: `mobile/` (§6). Simge kurye ile
+  kırmızı Vespetta (`tools/blender/vehicles_render.py --mode appicon`, `mobile/scripts/icon.py`), açılış ekranının gün
+  batımı renkleri. Emülatörde (Android 15) denendi: açılış, fontlar, WebGL, titreşim, kaydın geri gelmesi, geri tuşu,
+  arka plana alınca analitik, sürüşte gerçek dokunuşla fren ve şerit. Bulunan iki şey: (1) `sendBeacon` kimlik bilgisiyle
+  gider, `collect.php` başka kökene `Access-Control-Allow-Credentials` demiyordu (gömülü sayfalarda da kayıptı) →
+  eklendi; (2) yavaş bir karede hızlı bir kaydırma `pointermove`'suz `pointerup` olarak geliyordu ve şerit değişmiyordu
+  → parmak kalkınca da bakılıyor (`main.js` `slide`).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
@@ -704,10 +737,11 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
 - **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
   Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.
 - **Olaylar:** `session_start`, `boot` (yükleme süresi), `boot_fail`, `error`, `intro_done`, `onboard_step`, `onboard_done`, `tab`,
-  `job_start` (siparişler, araç, yağmur, `manual`, `ctl`: `run` Kurye Koşusu — 30 Ekim'den beri telefonda varsayılan, öncesi prototip —, `b` fren — 28–30 Ekim varsayılan —, `a` şerit koşusu, boş: otopilot / elle), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
+  `job_start` (siparişler, araç, yağmur, `chain: 1` fişten "ride on" ile başlayan iş, `manual`, `ctl`: `run` Kurye Koşusu — 30 Ekim'den beri telefonda varsayılan, öncesi prototip —, `b` fren — 28–30 Ekim varsayılan —, `a` şerit koşusu, boş: otopilot / elle), `job_end` (sipariş başına yıldız/ücret/bahşiş/erken-geç, sürüş istatistikleri: sollama,
   zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği; prototipte fren süresi `brakeT`, şerit değişimi `lanes`, sapan `slings`, kusursuz viraj `corners`, dışa kayma `wide`, kusursuz duruş `stops`, kapıyı geçme `overshoots`, en yüksek vites `gearMax`, kaldırımda metre `walkM`, kırmızıda geçiş `reds`, kavşakta dönüş `turns`, yeşil dalga `waves`, frende ayrıca kamera cezası `tickets`, ürkütülen yaya `pedHits`, çukura yumuşak geçiş `smooth`; otopilotta STOP ile duruş `halts` (kapıyı geçip geri gelmek sayılmaz), kusursuz duruş `stops`, kırmızıda geçiş `reds`, kapıyı geçme `overshoots`, ürkütülen yaya `pedHits`, kamera cezası `tickets` (27 Ekim öncesi kayıtlarda yerine `crossCalls`: frene basan çapraz trafik)), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
   `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
   `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,
+  `energy_out` (enerji yetmedi), `next_offer` (fişteki yakın sipariş: `take` 1 = "ride on", 0 = hub'a döndü; `pick` m, `pay`, `energy`),
   `save_export` / `save_import` / `save_reset`. Her pakette kaydın özeti de gider (seviye, para, teslimat, bölgeler, bulunulan ekran).
 - **Botlar:** önizleme/tarama tarayıcıları oturum açar ama oynamaz; `api/lib.php` `bot_reason()` her pakette oturumu yeniden
   değerlendirir (`sessions.bot`, `bot_why`): bot user agent (`ua`), Meta'nın IP aralığı (`meta-ip`), cihaz taklidi — 2000×2000
