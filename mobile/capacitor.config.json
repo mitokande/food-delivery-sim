@@ -1,0 +1,20 @@
+{
+  "appId": "com.mitokande.fooddeliverysim",
+  "appName": "Food Delivery Simulator",
+  "webDir": "www",
+  "backgroundColor": "#f39a5b",
+  "appendUserAgent": "FDSApp/1",
+  "plugins": {
+    "SystemBars": {
+      "hidden": true,
+      "style": "DARK"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 400,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 200,
+      "backgroundColor": "#f39a5b",
+      "showSpinner": false
+    }
+  }
+}

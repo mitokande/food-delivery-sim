@@ -379,6 +379,13 @@ H korna, 1–3 olay seçimi).
 - Analitik: `js/analytics.js` olayları toplayıp 15 sn'de bir (sayfa gizlenince `sendBeacon` ile) `api/collect.php`'ye yollar;
   PHP + SQLite (`api/`), panel `admin/` (şifreli). Ayrıntı: §10.
 - Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
+- Mağaza uygulamaları: `mobile/` (Capacitor 8; Android + iOS, `com.mitokande.fooddeliverysim`, ana ekranda "Delivery Sim").
+  `mobile/scripts/build-web.mjs` oyunun dosyalarını `www/`'ye kopyalar, CDN'den gelenleri (three, Draco, es-module-shims,
+  Google fontları) pakete koyar: uygulama internetsiz açılır ve oynanır. Oyunun uygulamaya özel tek kodu `js/native.js`:
+  telefonun titreşimi (iOS'ta `navigator.vibrate` yok), Android geri tuşu (üstteki kartı kapatır, kart yoksa oyunu arka
+  plana alır), kaydın uygulamanın kendi ayarlarında ikinci kopyası (web görünümünün deposu boşalırsa geri konur),
+  analitiğin site adresi. Webde hiçbir şey yapmaz. Analitik uygulamadan da gelir: `collect.php` `https://localhost` ve
+  `capacitor://localhost` kökenlerini kabul eder, panelde tarayıcı "App". Yayın adımları: `mobile/README.md`.
 
 ## 7. Varlıklar
 
@@ -689,6 +696,15 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   ipucu kartı 64 px'ten başlar ve kendi içinde kayar.
 - 2026-10-30: Kamerasız kırmızıda "No camera at this one — lucky!" yazısı kalktı (kullanıcı: "dont print no camera at
   this one lucky text in red lights without a fine, no need to say anything"); kamera yoksa hiçbir şey yazmaz.
+- 2026-10-31: **Mağaza uygulamaları** (kullanıcı: "let's make a React Native mobile app version of this game, because I
+  want to distribute this game in Google Play and App Store"). React Native bu three.js + DOM oyununu ancak bir WebView
+  içinde ya da baştan yazılarak çalıştırabileceği için kullanıcı Capacitor'ı seçti: `mobile/` (§6). Simge kurye ile
+  kırmızı Vespetta (`tools/blender/vehicles_render.py --mode appicon`, `mobile/scripts/icon.py`), açılış ekranının gün
+  batımı renkleri. Emülatörde (Android 15) denendi: açılış, fontlar, WebGL, titreşim, kaydın geri gelmesi, geri tuşu,
+  arka plana alınca analitik, sürüşte gerçek dokunuşla fren ve şerit. Bulunan iki şey: (1) `sendBeacon` kimlik bilgisiyle
+  gider, `collect.php` başka kökene `Access-Control-Allow-Credentials` demiyordu (gömülü sayfalarda da kayıptı) →
+  eklendi; (2) yavaş bir karede hızlı bir kaydırma `pointermove`'suz `pointerup` olarak geliyordu ve şerit değişmiyordu
+  → parmak kalkınca da bakılıyor (`main.js` `slide`).
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 

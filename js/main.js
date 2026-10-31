@@ -26,6 +26,7 @@ import { createOnboarding } from './ui/onboard.js';
 import { createAudio } from './audio.js';
 import { makeOrder, refreshOrder, etaFor, pathMeters, setTimerRide } from './orders.js';
 import * as St from './state.js';
+import { restore } from './native.js';
 import { S } from './state.js';
 import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES, ENERGY } from './data.js';
 import { mulberry32 } from './rng.js';
@@ -54,6 +55,7 @@ const scene = new THREE.Scene();
 makeEnvironment(renderer); // reflections for glossy toy materials only (scene.environment would also light Lambert)
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
 
+await restore(St.KEY); // the store apps' copy, if the phone emptied the web view's storage
 const fresh = !St.load();
 function quality() {
   const qv = S.settings.quality === 'auto' ? (isTouch ? 'medium' : 'high') : S.settings.quality;
@@ -522,14 +524,20 @@ canvas.addEventListener('pointerdown', (e) => {
   try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
   lbBrake();
 });
-canvas.addEventListener('pointermove', (e) => {
-  const p = lbPtrs.get(e.pointerId); if (!p || p.swiped) return;
+// moves come once a frame: on a slow frame a quick flick lands as down → up with none between, so a lifted finger
+// is checked too
+function slide(p, e) {
   const dx = e.clientX - p.x, dy = e.clientY - p.y;
   if (!swipeable()) { if (Math.hypot(dx, dy) > 24) { p.x = e.clientX; p.y = e.clientY; } return; }
   if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy) * 1.2) { p.swiped = true; lbBrake(); ride.input(dx < 0 ? 'lane-left' : 'lane-right', true); }
   else if (dy < (holds() ? -40 : -30) && -dy > Math.abs(dx) * 1.3) { p.swiped = true; lbBrake(); ride.input('swipe-up', true); }
-});
-const lbUp = (e) => { if (lbPtrs.delete(e.pointerId)) lbBrake(); };
+}
+canvas.addEventListener('pointermove', (e) => { const p = lbPtrs.get(e.pointerId); if (p && !p.swiped) slide(p, e); });
+const lbUp = (e) => {
+  const p = lbPtrs.get(e.pointerId);
+  if (p && !p.swiped && e.type === 'pointerup') slide(p, e);
+  if (lbPtrs.delete(e.pointerId)) lbBrake();
+};
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, lbUp);
 canvas.addEventListener('contextmenu', (e) => { if (ride.R.scheme) e.preventDefault(); }); // (a long hold on the brake is no long-press)
 

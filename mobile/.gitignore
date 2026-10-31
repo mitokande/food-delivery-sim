@@ -1,0 +1,3 @@
+node_modules/
+# built by scripts/build-web.mjs from the game (npm run web)
+www/

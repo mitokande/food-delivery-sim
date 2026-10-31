@@ -117,7 +117,7 @@ export function createUI(game) {
     modals.append(wrap);
     requestAnimationFrame(() => wrap.classList.add('in'));
     const close = () => { wrap.classList.remove('in'); wrap.classList.add('out'); setTimeout(() => wrap.remove(), 250); };
-    if (dismiss) wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+    if (dismiss) { wrap.dataset.dismiss = ''; wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); }); } // (the app's back button too)
     return { el: wrap, card: wrap.firstElementChild, close };
   }
   const tap = () => game.audio?.play('ui-tap');
