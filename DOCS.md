@@ -429,7 +429,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ride/world.js` | serbest sürüş için şehir: zemin (asfalt/kaldırım/çim ve yüksekliği), çarpılabilir her şey (10 m ızgarada), rota başlatılacak yol karosu |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
-| `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi |
+| `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
 | `admin/` | analitik paneli: `index.php` giriş + kabuk, `api.php` salt-okunur sorgular, `app.js` görünümler + SVG grafikler (isimleri oyunun `data.js`'inden alır) |
@@ -574,7 +574,10 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   (eski rastgele titreme yalnızca kazada). Sürücü virajda gövdesini içeri atar, frende öne, gazda geriye kayar.
   Kamera: gazda geride kalır, frende yaklaşır; yatışın %15'i kadar ufuk eğilir; hızla artan ince yol titreşimi;
   ivmede FOV açılır. Ses: gaz açıkken motor parlak/yüksek, kapalıyken boğuk (lowpass); hızla artan yol uğultusu ve
-  rüzgâr (gürültüden sentez); manuelde viraj sınırında lastik sesi; yüksek devirde gaz kesilince egzoz patlaması
+  rüzgâr (gürültüden sentez, telefon hoparlöründe motorun 4–11 dB altında); motor örnekleri enerjisinin neredeyse
+  tamamını telefon hoparlörünün çalamadığı 400 Hz altında tutar, bu yüzden scooter/spor/kargo motoru `tanh` ile yumuşak
+  kırpılır (üst harmonikler; moped zaten parlak, elektrik temiz sentez); manuelde viraj sınırında lastik sesi; yüksek
+  devirde gaz kesilince egzoz patlaması
   (spor motorda bol); sert frende `brake` sesi + kısa titreşim. Otopilot: kalkışta güçlü, tepe hıza yaklaşınca
   yumuşar (ortalama hız eskisiyle aynı tutuldu: `SEED=n node tools/speed.mjs`), fren birkaç onda birde oturur, son
   metre yumuşak durur. Önce/sonra klibi: `node tools/feelclip.mjs <oyun-kökü> <çıktı.mp4>` (sanal zaman, 360x640).

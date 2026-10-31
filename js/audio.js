@@ -14,8 +14,16 @@ export function createAudio() {
 
   fetch('assets/audio/manifest.json').then((r) => (r.ok ? r.json() : {})).then((m) => { manifest = m || {}; }).catch(() => {});
 
+  // A trip to the background leaves the context 'suspended', or on iOS 'interrupted' (WebKit's own state), and only a
+  // resume() brings it back; iOS may take that only inside a tap, and a touch counts as one on the way up, not down.
+  // Hidden, the context is put to sleep on purpose, so nothing plays behind the home screen.
+  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) ctx.resume().catch(() => {}); }
+  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else wake(); });
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, wake, { capture: true, passive: true });
+  addEventListener('pageshow', wake); addEventListener('focus', wake);
+
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { wake(); return; }
     ctx = new AC();
     master = ctx.createGain(); master.connect(ctx.destination);
     sfxBus = ctx.createGain(); sfxBus.connect(master);
@@ -28,7 +36,8 @@ export function createAudio() {
   function apply() {
     if (!ctx) return;
     sfxBus.gain.value = S.settings.sfx;
-    musicBus.gain.value = S.settings.music * 0.55;
+    // the slider's 0.5 puts the music about level with the engine at cruise, ~15 dB under the UI sounds
+    musicBus.gain.value = S.settings.music * 1.75;
   }
   async function load(name) {
     if (buffers.has(name)) return buffers.get(name);
@@ -95,6 +104,19 @@ export function createAudio() {
     s.start(0, off);
     if (kind === 'music') music = { s, g }; else amb = { s, g };
   }
+  // A phone speaker plays almost nothing below ~400 Hz, where these engine recordings keep nearly all their energy, so on a
+  // phone only the wind noise was left. A soft clip adds the upper harmonics that carry the putt there. (The moped
+  // recording is bright already; the electric one is a clean synth.)
+  const DRIVE = { 'engine-scooter': 6, 'engine-sport': 6, 'engine-cargo': 6 };
+  // tanh(k·x) over the sample's own peak, scaled back to that peak: the same level in, the harmonics added
+  function clipper(k, peak, to) {
+    const pre = ctx.createGain(); pre.gain.value = 1 / peak;
+    const ws = ctx.createWaveShaper(), n = 1024, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) c[i] = Math.tanh(k * (i / (n - 1) * 2 - 1)) / Math.tanh(k) * peak;
+    ws.curve = c; ws.oversample = '2x';
+    pre.connect(ws); ws.connect(to);
+    return pre;
+  }
   // engine voice
   async function engine(on, vehId) {
     if (!ctx) return;
@@ -116,7 +138,11 @@ export function createAudio() {
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; lp.Q.value = 0.5; lp.connect(g);
     let src;
     let off = 0;
-    if (b) { src = ctx.createBufferSource(); src.buffer = b; src.loop = true; off = loopTrim(src, name); src.connect(lp); }
+    if (b) {
+      src = ctx.createBufferSource(); src.buffer = b; src.loop = true; off = loopTrim(src, name);
+      const k = DRIVE[name];
+      src.connect(k ? clipper(k, 10 ** ((manifest[name]?.peak ?? -10) / 20), lp) : lp);
+    }
     else {
       // synthesized putt: sawtooth through a lowpass, amplitude-modulated
       src = ctx.createOscillator(); src.type = 'sawtooth'; src.frequency.value = 38;
@@ -180,9 +206,10 @@ export function createAudio() {
     }
     eng.load = load;
     if (rush && eng.on) {
-      rush.road.g.gain.setTargetAtTime(0.11 * Math.min(1, v / 12), t, 0.1);
+      // kept under the engine: at cruise the wind sits 4–11 dB below it on a phone speaker (closest on the fast bikes)
+      rush.road.g.gain.setTargetAtTime(0.066 * Math.min(1, v / 12), t, 0.1);
       rush.road.fl.frequency.setTargetAtTime(180 + v * 14, t, 0.1);
-      rush.wind.g.gain.setTargetAtTime(0.2 * Math.min(1.3, (v / 15) ** 2) + (boost ? 0.05 : 0), t, 0.12);
+      rush.wind.g.gain.setTargetAtTime(0.03 * Math.min(1.3, (v / 15) ** 2) + (boost ? 0.01 : 0), t, 0.12);
       rush.wind.fl.frequency.setTargetAtTime(600 + v * 40, t, 0.12);
       if (rush.squeal) rush.squeal.g.gain.setTargetAtTime(0.32 * Math.min(1, Math.max(0, (slip - 1.03) / 0.15)), t, 0.05);
     }
