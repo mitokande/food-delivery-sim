@@ -1,7 +1,7 @@
 // The store apps (mobile/, Capacitor) run this same game from files on the phone. This is the little they need on
 // top: the phone's own haptics (iOS has no navigator.vibrate), the Android back button, a second copy of the
-// career and the site's address. On the web `app` is null and nothing here loads; @capacitor/core is only in the
-// apps' import map.
+// career, the site's address and the in-app purchase SDK. On the web `app` is null and nothing here loads;
+// @capacitor/core and @adapty/capacitor are only in the apps' import map.
 const cap = globalThis.Capacitor;
 export const app = cap?.isNativePlatform?.() ? cap.getPlatform() : null; // 'android' | 'ios' | null
 export const SITE = 'https://mithatck.com/food-delivery-sim/';
@@ -39,3 +39,15 @@ plugins?.then(({ App }) => App.addListener('backButton', () => {
   if (b) return b.click();
   if (!m && dispatchEvent(new Event('appback', { cancelable: true }))) App.minimizeApp();
 })).catch(() => { /* no App plugin */ });
+
+// In-app purchases go through Adapty, activated once at launch; `adapty` resolves to the ready SDK, or null. The key is
+// the app's Public SDK key (Adapty dashboard → App settings → General → API keys), which ships inside the app anyway.
+// While it is empty the SDK is in the apps but never starts, so nothing reaches Adapty.
+const ADAPTY_KEY = '';
+export const adapty = app && ADAPTY_KEY ? import('@adapty/capacitor').then(async ({ adapty }) => {
+  // verbose (Xcode / Logcat only) is what Adapty asks for until the first release is out. The SDK stays activated
+  // natively when the game reloads its page (a career import or wipe, the tutorial replay); the __ flag skips that
+  // second activate instead of failing it
+  await adapty.activate({ apiKey: ADAPTY_KEY, params: { logLevel: 'verbose', __ignoreActivationOnFastRefresh: true } });
+  return adapty;
+}).catch((e) => { console.warn('adapty:', e); return null; }) : null;

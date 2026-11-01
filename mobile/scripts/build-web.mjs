@@ -1,8 +1,8 @@
 // Builds mobile/www: the web game as the store apps ship it. The game's own files are copied unchanged; what the
 // site loads from CDNs (three.js and its addons, the Draco decoder, es-module-shims, the Google fonts) comes from
-// node_modules / mobile/fonts instead, so the apps start and play offline. @capacitor/core joins the import map for
-// js/native.js. Anything that changes shape here (index.html, the three version) stops the build instead of
-// shipping a half-offline app.
+// node_modules / mobile/fonts instead, so the apps start and play offline. @capacitor/core and @adapty/capacitor join
+// the import map for js/native.js. Anything that changes shape here (index.html, the three version, Adapty's build)
+// stops the build instead of shipping a half-offline app.
 //
 //   node scripts/build-web.mjs        (npm run web; npm run android / ios also sync the native projects)
 import fs from 'node:fs';
@@ -54,13 +54,23 @@ copy(path.join(NM, 'es-module-shims/dist/es-module-shims.js'), path.join(V, 'es-
 copy(path.join(NM, '@capacitor/core/dist/index.js'), path.join(V, 'capacitor-core.js'));
 copy(path.join(MOBILE, 'fonts'), path.join(WWW, 'fonts'));
 
+// ---- @adapty/capacitor (in-app purchases): its module build is many files with extensionless imports, which only a
+// bundler loads. Its one-file build (the SDK and @adapty/core in one script) wants @capacitor/core as a global
+// `capacitorExports`, so it becomes a module that imports @capacitor/core and exports what the script returns
+let adapty = read(path.join(NM, '@adapty/capacitor/dist/plugin.js'));
+adapty = swap(adapty, 'var capacitorAdaptyCapacitorPlugin = (function (exports, core) {', 'const Adapty = (function (exports, core) {', '@adapty/capacitor');
+adapty = swap(adapty, '})({}, capacitorExports);', '})({}, CapacitorCore);', '@adapty/capacitor').replace(/\/\/# sourceMappingURL=.*\s*$/, '');
+const names = [...adapty.matchAll(/^\texports\.(\w+) = /gm)].map((m) => m[1]);
+if (!names.includes('adapty')) die('@adapty/capacitor: its one-file build no longer exports adapty');
+fs.writeFileSync(path.join(V, 'adapty-capacitor.js'), `import * as CapacitorCore from '@capacitor/core';\n${adapty}\nexport const { ${names.join(', ')} } = Adapty;\n`);
+
 // ---- index.html
 const CDN_THREE = `https://cdn.jsdelivr.net/npm/three@${ver}/`;
 html = html.replace(/<link rel="preconnect"[^>]*>\n/g, '');
 html = html.replace(/<link rel="manifest"[^>]*>\n/, ''); // an app, not an installable page
 html = html.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/[^"]*">/, '<link rel="stylesheet" href="fonts/fonts.css">');
 html = html.replace(/<script async src="https:\/\/cdn\.jsdelivr\.net\/npm\/es-module-shims@[^"]*"><\/script>/, '<script async src="vendor/es-module-shims.js"></script>');
-html = swap(html, `"three": "${CDN_THREE}build/three.module.js",`, `"three": "./vendor/three/build/three.module.js",\n  "@capacitor/core": "./vendor/capacitor-core.js",`, 'import map');
+html = swap(html, `"three": "${CDN_THREE}build/three.module.js",`, `"three": "./vendor/three/build/three.module.js",\n  "@capacitor/core": "./vendor/capacitor-core.js",\n  "@adapty/capacitor": "./vendor/adapty-capacitor.js",`, 'import map');
 html = swap(html, `"three/addons/": "${CDN_THREE}examples/jsm/"`, '"three/addons/": "./vendor/three/examples/jsm/"', 'import map');
 html = swap(html, "'api/collect.php'", `'${SITE}api/collect.php'`, 'boot beacon'); // a failed start still reaches the site
 fs.writeFileSync(path.join(WWW, 'index.html'), html);
