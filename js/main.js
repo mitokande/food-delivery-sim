@@ -610,7 +610,7 @@ const off = St.tickFleet(Date.now(), true);
 if (off && off.gain >= 1) { ui.offline(off); An.track('offline_earn', { gain: Math.round(off.gain), away: Math.round(off.away), capped: off.capped ? 1 : 0 }); }
 // first launch: intro + guided first delivery (tests pass ?noti to skip it)
 if (q.has('noti')) { if (S.onboard.step < 99) S.onboard.step = 99; }
-else ob.start();
+else { ob.start(); if (S.onboard.step >= 99) ui.privacyNote(); } // (mid-tutorial careers see it on a later launch)
 // careers from before achievements existed get theirs at once, in one note
 { const got = checkAchievements(); if (got.length && !fresh) setTimeout(() => ui.toast(`🏆 ${got.length} achievement${got.length > 1 ? 's' : ''} unlocked from your career so far — see Courier`, 'good'), 1800); }
 

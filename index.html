@@ -42,7 +42,7 @@
       msg = String(msg).slice(0, 200);
       if (window.__an) return window.__an('boot_fail', { msg: msg });
       var an = localStorage.getItem('fds_an');
-      if (navigator.webdriver || an === 'off' || !navigator.sendBeacon || document.visibilityState !== 'visible') return; // unseen = no visit
+      if (navigator.webdriver || an === 'off' || localStorage.getItem('fds_share') === '0' || !navigator.sendBeacon || document.visibilityState !== 'visible') return; // unseen = no visit; the player turned sharing off
       var id = function (p) { return p + Math.random().toString(36).slice(2) + Date.now().toString(36); };
       var pid = localStorage.getItem('fds_pid'); if (!pid) { pid = id('p'); localStorage.setItem('fds_pid', pid); }
       var data = JSON.stringify({ v: 1, pid: pid, sid: id('s'), now: Date.now(), dev: an === 'dev' ? 1 : 0,

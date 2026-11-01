@@ -37,6 +37,7 @@ if (!is_array($b) || ($b['v'] ?? null) !== 1) reply(400, ['ok' => false]);
 
 try {
   $n = ingest($b, $_SERVER['HTTP_USER_AGENT'] ?? '', client_ip());
+  try { housekeep(); } catch (Throwable $e) { error_log('fds analytics housekeep: ' . $e->getMessage()); } // (never costs the batch)
   reply(200, ['ok' => true, 'n' => $n]);
 } catch (InvalidArgumentException $e) {
   reply(400, ['ok' => false]);

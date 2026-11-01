@@ -3,7 +3,7 @@
 import * as St from '../state.js';
 import { S } from '../state.js';
 import { CHAR_IDS, PAINTS, DISTRICT, FLEET } from '../data.js';
-import { ICON } from './ui.js';
+import { ICON, PRIVACY } from './ui.js';
 import { track } from '../analytics.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -56,7 +56,8 @@ export function createOnboarding(game, ui) {
           const sl = slides[i];
           el.innerHTML = `<div class="i-card"><div class="i-art">${sl.art}</div><h2>${sl.h}</h2><p>${sl.p}</p>
             <div class="i-dots">${slides.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}<i></i></div>
-            <div class="i-btns">${i === 0 ? '<button class="btn ghost sm" data-i="skip">Skip</button>' : '<button class="btn ghost sm" data-i="back">Back</button>'}<button class="btn green big" data-i="next">${i === slides.length - 1 ? 'Choose my courier' : 'Next'}</button></div></div>`;
+            <div class="i-btns">${i === 0 ? '<button class="btn ghost sm" data-i="skip">Skip</button>' : '<button class="btn ghost sm" data-i="back">Back</button>'}<button class="btn green big" data-i="next">${i === slides.length - 1 ? 'Choose my courier' : 'Next'}</button></div>
+            ${i === 0 ? `<p class="i-legal">No account, no ads. The game sends anonymous play data to help us fix and balance it (<a href="${PRIVACY}" target="_blank" rel="noopener">privacy</a>); you can turn it off in Settings.</p>` : ''}</div>`;
         } else {
           el.innerHTML = `<div class="i-card pick"><h2>Who's riding?</h2>
             <div class="i-preview">${ICON('char-' + look.char, 'ip')}<span class="i-helm" style="--c:${look.helmet}"></span></div>
@@ -78,7 +79,7 @@ export function createOnboarding(game, ui) {
         if (a === 'back') { i = Math.max(0, i - 1); render(); }
         if (a === 'skip') { i = slides.length; skipped = true; render(); }
         if (a === 'go') {
-          S.look.char = look.char; S.look.helmet = look.helmet; S.name = name.trim();
+          S.look.char = look.char; S.look.helmet = look.helmet; S.name = name.trim(); S.seen.privacy = 1; // (the first slide's note)
           track('intro_done', { char: look.char, helmet: look.helmet, named: S.name ? 1 : 0, skipped: skipped ? 1 : 0 });
           St.save(true); St.emit('look');
           el.classList.add('out'); setTimeout(() => el.remove(), 350);

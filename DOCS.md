@@ -725,6 +725,11 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   gider, `collect.php` başka kökene `Access-Control-Allow-Credentials` demiyordu (gömülü sayfalarda da kayıptı) →
   eklendi; (2) yavaş bir karede hızlı bir kaydırma `pointermove`'suz `pointerup` olarak geliyordu ve şerit değişmiyordu
   → parmak kalkınca da bakılıyor (`main.js` `slide`).
+- 2026-11-01: **Gizlilik** (Linear MIT-11, kullanıcı: "lineardaki MIT-11 yap"; iki mağaza da gizlilik politikası adresi
+  istiyor). `privacy/index.html` → `mithatck.com/food-delivery-sim/privacy/`, İngilizce + Türkçe (tarayıcının diline
+  göre, `#en` / `#tr`). Oyunda: tanıtımın ilk sayfasında küçük bir not; tanıtımı görmemiş eski kariyerlere bir kerelik
+  "Your privacy" kartı (`S.seen.privacy`); Settings'te **Share play data** anahtarı, Player ID ve politika bağlantısı
+  (uygulamalarda telefonun tarayıcısında açılır). Saklama süresi, IP silme, `forget` ve Apple'a bildirilenler: §10.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
@@ -734,9 +739,17 @@ Oyun olaylar yollar; panel `mithatck.com/food-delivery-sim/admin/` (tek şifre).
 isim = oyuncunun oyunda girdiği kurye adı. Her oturumla **IP adresi** (oturumun ilk adresi; oyuncuda son adres) ve cihaz bilgisi
 saklanır: tür, model, OS ve tarayıcı sürümü. Model önce tarayıcının client hint'inden (`navigator.userAgentData`, Android
 Chrome), sonra uygulama içi tarayıcı etiketlerinden (Instagram, Facebook `FBDV`), sonra Android UA'dan; iPhone'da ekran
-boyutu + piksel oranından tahmin (`≈`). IP kişisel veridir (KVKK/GDPR): oyunda bir gizlilik notu olması iyi olur.
+boyutu + piksel oranından tahmin (`≈`). IP kişisel veridir (KVKK/GDPR); oyuncuya ne toplandığını `privacy/` sayfası
+anlatır. O sayfa, `mobile/ios/App/App/PrivacyInfo.xcprivacy` ve mağaza formları (`mobile/README.md`) aynı şeyi söylemeli:
+toplanan veri değişirse üçü birlikte değişir.
 Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarlanmalı (ör. Cloudflare: `HTTP_CF_CONNECTING_IP`).
 
+- **Oyuncunun anahtarı:** Settings → Share play data (`fds_share` = `'0'`, kayıttan ayrı, "Reset progress" onu
+  değiştirmez). Kapanınca kuyruktaki olaylar atılır ve hiçbir şey gitmez (açılıştaki hata işareti de); yeniden açılınca
+  hemen yeni oturum başlar (`why: optin`). Settings oyuncunun `fds_pid`'ini de gösterir: silme isteğinde bu yazılır.
+- **Saklama:** `api/lib.php` `housekeep()`, `collect.php`'den günde en fazla bir kez (veri klasöründe
+  `housekeep.stamp`): 30 günden eski oturum/oyuncu IP'lerini siler, 2 yıldır gelmeyen oyuncuyu bütün oturum ve
+  olaylarıyla siler. Silme isteği: `php api/cli.php forget <player_id>`. Elle çalıştırmak: `php api/cli.php housekeep`.
 - **Oturum:** her sayfa açılışı; telefon 30 dakikadan uzun arka planda kalıp dönerse yeni oturum (`why: resume`).
   Süre = görünür kalınan süre (`active_ms`). 15 sn'de bir paket, boşsa 30 sn'de bir sinyal; "şu an oynuyor" = son 75 sn.
 - **Olaylar:** `session_start`, `boot` (yükleme süresi), `boot_fail`, `error`, `intro_done`, `onboard_step`, `onboard_done`, `tab`,

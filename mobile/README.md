@@ -82,11 +82,17 @@ questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (th
 
 ## Store listing checklist
 
-- **Privacy policy URL**: both stores require one, because the game sends analytics (anonymous gameplay events, error
-  reports, device model / OS / screen, the IP address; see `js/analytics.js` and `api/`). It needs a page on the site.
-- **Play Data safety / App Store privacy**: app activity (gameplay interactions), app info and performance (crash logs,
-  diagnostics), device or other IDs (a random per-install id). Not linked to the player's identity, no tracking, no ads
-  SDK, nothing shared with third parties. Data is encrypted in transit.
+- **Privacy policy URL**: `https://mithatck.com/food-delivery-sim/privacy/` (`../privacy/index.html`, English and
+  Turkish). Both stores require one, because the game sends analytics (`js/analytics.js`, `api/`). The page, the forms
+  below and `PrivacyInfo.xcprivacy` must say the same thing: change them together.
+- **Play Data safety / App Store privacy**, all of it *not linked to the player's identity*, no tracking, no ads SDK,
+  nothing shared with third parties, encrypted in transit:
+  - personal info: name (the optional courier name typed in the intro)
+  - device or other IDs: the random per-install player id
+  - app activity: gameplay interactions
+  - app info and performance: crash logs, diagnostics, performance (load time, frame rate)
+  - collected by default; the player can turn it off in Settings → Share play data. Deletion: by email with the Player
+    ID that Settings shows (`php api/cli.php forget <id>`); IPs go after 30 days, the rest 2 years after the last visit.
 - **Content rating**: cartoon scooter crashes, no blood, no purchases with real money (yet), no chat.
 - **Screenshots**: Play needs 2–8 phone screenshots and a 1024×500 feature graphic. The App Store needs 6.9" iPhone
   screenshots (1320×2868). The headless tools in `../tools/` (`shot.mjs`, `play.mjs`) can make them at any size.

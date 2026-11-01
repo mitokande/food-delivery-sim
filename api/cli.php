@@ -4,6 +4,8 @@
 //   php api/cli.php set-password        ask for a new admin password and store its hash in config.local.php
 //   php api/cli.php info                database location and row counts
 //   php api/cli.php prune <days>        delete raw events older than <days> (sessions and players are kept)
+//   php api/cli.php forget <player_id>… delete everything stored under these ids (a player's deletion request)
+//   php api/cli.php housekeep           clear IPs older than 30 days, delete players gone 2 years (the collector does it daily)
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require __DIR__ . '/lib.php';
@@ -51,7 +53,18 @@ switch ($cmd) {
     echo "deleted $n events\n";
     break;
   }
+  case 'forget': {
+    $ids = array_slice($argv, 2);
+    if (!$ids || array_filter($ids, fn($id) => !preg_match(ID_RE, $id))) { fwrite(STDERR, "usage: forget <player_id> [player_id…]  (ids look like p0a1b2…)\n"); exit(1); }
+    echo 'deleted ' . forget($ids) . " of " . count($ids) . " players\n";
+    break;
+  }
+  case 'housekeep': {
+    $r = housekeep(true);
+    echo "cleared {$r['ips']} session IPs, deleted {$r['players']} inactive players\n";
+    break;
+  }
   default:
-    fwrite(STDERR, "usage: php api/cli.php init [data_dir] | set-password | info | prune <days>\n");
+    fwrite(STDERR, "usage: php api/cli.php init [data_dir] | set-password | info | prune <days> | forget <player_id>… | housekeep\n");
     exit(1);
 }

@@ -7,8 +7,11 @@ import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
 import { autoSpeed } from '../orders.js';
 import { achValue, achDone } from '../career.js';
-import { track } from '../analytics.js';
+import { track, sharing, setSharing, playerId } from '../analytics.js';
+import { app, SITE } from '../native.js';
 
+// the privacy policy lives on the site (privacy/); the apps open it in the phone's browser
+export const PRIVACY = (app ? SITE : '') + 'privacy/';
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 // pointer capture throws for pointers that already ended (and for synthetic ones): never let that break input
 const capture = (el, e) => { try { el.setPointerCapture(e.pointerId); } catch { /* fine without */ } };
@@ -575,9 +578,12 @@ export function createUI(game) {
       <p class="small">Progress is saved on this device. Use a save code to move it to another phone.</p>
       <div class="set-more"><button class="btn ghost sm" data-x="export">Copy save code</button><button class="btn ghost sm" data-x="import">Load save code</button></div>
       <div class="set-more"><button class="btn ghost sm" data-x="replay">Replay tutorial</button><button class="btn ghost sm danger" data-x="reset">Reset progress</button></div>
+      <label class="set">Share play data<input type="checkbox" data-share ${sharing() ? 'checked' : ''}></label>
+      <p class="small set-priv">Anonymous: what happens in the game, errors and the device type. <a href="${PRIVACY}" target="_blank" rel="noopener">Privacy policy</a><br>
+        Player ID <code class="pid">${esc(playerId())}</code><br>Send it to us to have this device's data deleted.</p>
       <button class="btn green big" data-x="close">Done</button>`, { dismiss: true, cls: 'settings' });
     m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S.settings[k] = e.target.type === 'range' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value; St.save(); game.applySettings?.(); });
-    m.card.addEventListener('change', (e) => { const k = e.target.dataset.k; if (k) track('setting', { k, v: S.settings[k] }); });
+    m.card.addEventListener('change', (e) => { const k = e.target.dataset.k; if (k) track('setting', { k, v: S.settings[k] }); if (e.target.dataset.share != null) setSharing(e.target.checked); });
     m.card.addEventListener('click', (e) => {
       const x = e.target.closest('[data-x]')?.dataset.x;
       if (x === 'close') m.close();
@@ -586,6 +592,16 @@ export function createUI(game) {
       if (x === 'export') { m.close(); saveCode(); }
       if (x === 'import') { m.close(); loadCode(); }
     });
+  }
+  // once: what the game sends, for careers that started before the intro said so (new players read it there)
+  function privacyNote() {
+    if (S.seen.privacy) return;
+    S.seen.privacy = 1; St.save();
+    const m = modal(`<h2>Your privacy</h2>
+      <p>The game sends <b>anonymous play data</b>: what happens in your shifts, errors and the device type. It helps us fix bugs and balance the game. No account, no ads, nothing sold or shared.</p>
+      <p class="small">You can turn it off in Settings.</p>
+      <button class="btn green big" data-x="close">OK</button><a class="btn ghost" href="${PRIVACY}" target="_blank" rel="noopener">Privacy policy</a>`, { dismiss: true, cls: 'privacy' });
+    m.card.querySelector('[data-x="close"]').onclick = () => { tap(); m.close(); };
   }
   function saveCode() {
     St.save(true);
@@ -1197,7 +1213,7 @@ export function createUI(game) {
   });
 
   return {
-    setMode, setTab, render, refreshTop, toast, modal, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
+    setMode, setTab, render, refreshTop, toast, modal, privacyNote, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
     rideLeg, rideFrame, routeChanged, flash, coach, flowPop, pop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };
