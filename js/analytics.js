@@ -2,6 +2,7 @@
 // (seen in admin/). No DOM beyond page visibility; game code calls track(name, props).
 // URL flags (remembered on this device): ?an=dev marks it as the developer's (kept out of the stats),
 // ?an=off stops sending, ?an=on back to normal. Headless test runs send nothing unless ?an=force.
+// The player's own switch is Settings → Share play data (fds_share, kept apart from the save so a reset keeps it).
 import * as St from './state.js';
 import { S } from './state.js';
 import { app, SITE } from './native.js';
@@ -19,8 +20,10 @@ const flag = new URLSearchParams(location.search).get('an');
 if (flag === 'dev' || flag === 'off') store.set('fds_an', flag);
 else if (flag === 'on') store.del('fds_an');
 const mode = store.get('fds_an');
-const enabled = flag === 'force' || (mode !== 'off' && !navigator.webdriver);
+const capable = flag === 'force' || (mode !== 'off' && !navigator.webdriver);
 const dev = mode === 'dev';
+let share = store.get('fds_share') !== '0';
+let enabled = capable && share;
 
 const rid = (p) => p + (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Date.now().toString(36));
 let pid = store.get('fds_pid');
@@ -33,6 +36,19 @@ let where = () => 'boot', gpu = '', hints = {};
 // Chromium hides the phone model and real OS version from the user agent; it still tells the page when asked
 navigator.userAgentData?.getHighEntropyValues?.(['model', 'platformVersion']).then((h) => { hints = h; }).catch(() => { /* not offered */ });
 const errSeen = new Set();
+
+// what the privacy page and Settings show: whether this device sends, and the id a deletion request names
+export const sharing = () => share;
+export const playerId = () => pid;
+// off: nothing more leaves the device (what is still queued is dropped); on again: a new session starts at once
+export function setSharing(on) {
+  if (on === share) return;
+  share = on; enabled = capable && share;
+  if (on) store.del('fds_share'); else store.set('fds_share', '0');
+  if (!capable) return;
+  if (!on) { queue = []; return; }
+  newSession('optin'); flush();
+}
 
 const activeNow = () => activeMs + (document.hidden ? 0 : performance.now() - visSince);
 // minutes this device has played in total, for "how long until …" charts
@@ -126,7 +142,7 @@ function newSession(why, extra = {}) {
 }
 
 // ---------- wiring ----------
-if (enabled) {
+if (capable) {
   window.__an = track; // index.html's boot-error guard reports through this when the module loaded
   // a page loaded unseen (link preview, prefetch, prerender) is not a visit: the session starts when it is first shown
   const saved = !!store.get('fds_save_v1'); // before the game writes its first save
@@ -176,7 +192,7 @@ if (enabled) {
 
 // main.js, once the game is on screen: where the player is (for quit points and errors) and the GPU name
 export function ready({ fresh, gl, at }) {
-  if (!enabled) return;
+  if (!capable) return; // (kept while sharing is off, for a session that starts when it's turned back on)
   where = at;
   try { const x = gl.getExtension('WEBGL_debug_renderer_info'); gpu = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 160); } catch { /* no GL info */ }
   track('boot', { ms: Math.round(performance.now()), fresh: !!fresh, lvl: S.lvl, del: S.stats.deliveries, pm: playMinutes() });

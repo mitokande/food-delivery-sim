@@ -33,6 +33,9 @@ native haptics, the Android back button and a backup of the save. Build and rele
 The game reports gameplay events (with the session's IP address and device) to `api/collect.php` (PHP + SQLite); the password-protected panel is at `admin/`.
 Server setup: `php api/cli.php init <data dir outside the web root>` writes `api/config.local.php` and prints the panel password.
 Locally: `php -S 127.0.0.1:8000` from the repo root (static server alone has no backend; events are then simply dropped).
+What players are told is `privacy/` (the privacy policy, also the stores' privacy URL); players can turn sending off in
+Settings. IPs are cleared after 30 days and players gone for 2 years are deleted (`housekeep()` in `api/lib.php`);
+a deletion request: `php api/cli.php forget <player id from Settings>`.
 
 ## Project layout
 
@@ -40,6 +43,7 @@ Locally: `php -S 127.0.0.1:8000` from the repo root (static server alone has no 
 - `assets/` — packed models, icons, audio (all CC0 or made for this project, see `CREDITS.md`); `assets/src/kenney/` holds the source kits.
 - `tools/` — asset build scripts (Blender, gltf-transform, audio) and headless test tools (`play.mjs`, `sweep.mjs`, `tabs.mjs`).
 - `api/`, `admin/` — analytics collector and admin panel (PHP 8 + SQLite, no dependencies).
+- `privacy/` — the privacy policy page (English + Turkish).
 - `mobile/` — the store apps (Capacitor 8 project; `js/native.js` is the game's side of it).
 - `DOCS.md` — design document and code map (Turkish).
 - `design/ad-research.md` — ad research: competitor ad teardowns, idle ad formats, ideas for our own ads (Turkish).

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d2a44">
+<title>Privacy Policy · Food Delivery Simulator</title>
+<meta name="description" content="What Food Delivery Simulator collects, why, how long it is kept and how to turn it off or have it deleted.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Lilita+One&display=swap">
+<!-- What this page says must match what the game does: js/analytics.js (what is sent, the Settings switch),
+     api/lib.php (what is stored, housekeep(): 30-day IPs, 2-year players), mobile/ios/App/App/PrivacyInfo.xcprivacy
+     and the store forms (mobile/README.md). Change them together, and the date. -->
+<script>
+  // one language at a time: #en / #tr, else the browser's language
+  (function () {
+    var pick = function () {
+      var h = location.hash.slice(1), l = h === 'tr' || h === 'en' ? h : /^tr/i.test(navigator.language || '') ? 'tr' : 'en';
+      document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l;
+    };
+    pick(); addEventListener('hashchange', pick);
+  })();
+</script>
+<style>
+  :root { --navy: #1d2a44; --cream: #fbf3e4; --cream-2: #f3e6cc; --ink: #2b2233; --ink-2: #6b5d6e; --gold: #ffc53d; --link: #2f6fd6;
+    --font: 'Fredoka', system-ui, sans-serif; --display: 'Lilita One', 'Fredoka', system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; min-height: 100vh; background: radial-gradient(120% 60% at 50% 0%, #f39a5b 0, #c86b5a 30%, var(--navy) 75%) fixed, var(--navy);
+    color: var(--ink); font: 400 16px/1.55 var(--font); padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(32px + env(safe-area-inset-bottom, 0px)); }
+  main { max-width: 720px; margin: 0 auto; background: var(--cream); border-radius: 24px; padding: 22px 22px 26px;
+    box-shadow: 0 0 0 4px #ffd56b, 0 10px 0 4px rgba(0,0,0,.18), 0 24px 50px rgba(0,0,0,.35); }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; font-weight: 600; }
+  .langs a { padding: 3px 10px; border-radius: 10px; color: var(--ink-2); text-decoration: none; }
+  [data-l="en"] .langs a[href="#en"], [data-l="tr"] .langs a[href="#tr"] { background: var(--cream-2); color: var(--ink); }
+  [data-l="en"] section[lang="tr"], [data-l="tr"] section[lang="en"] { display: none; }
+  h1 { font: 400 clamp(28px, 7vw, 38px)/1.1 var(--display); color: #ffcf3f; -webkit-text-stroke: 7px #3a1d24; paint-order: stroke fill; margin: 14px 0 4px; letter-spacing: .3px; }
+  h2 { font: 700 20px/1.25 var(--font); margin: 26px 0 6px; }
+  .date { color: var(--ink-2); margin: 0 0 14px; font-size: 14px; }
+  .short { background: #fff8e6; border: 2px solid #f6dfa6; border-radius: 16px; padding: 12px 16px 12px 34px; margin: 14px 0 6px; }
+  .short li { margin: 3px 0; }
+  ul { padding-left: 22px; margin: 6px 0; } li { margin: 4px 0; }
+  p { margin: 6px 0; }
+  a { color: var(--link); }
+  code { font: 600 14px ui-monospace, Menlo, Consolas, monospace; background: var(--cream-2); padding: 1px 5px; border-radius: 6px; }
+  b { font-weight: 600; }
+  footer { max-width: 720px; margin: 16px auto 0; text-align: center; font-size: 14px; }
+  footer a { color: #ffe2b0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><a href="../">← Food Delivery Simulator</a><span class="langs"><a href="#en" hreflang="en">English</a> <a href="#tr" hreflang="tr">Türkçe</a></span></div>
+
+  <section lang="en" id="en">
+    <h1>Privacy Policy</h1>
+    <p class="date">Last updated: 1 November 2026</p>
+
+    <ul class="short">
+      <li>No account, no sign-in, no ads, no tracking across other apps or websites. Nothing is sold.</li>
+      <li>The game sends <b>anonymous play data</b> to our own server so we can fix bugs and balance the game.</li>
+      <li>You can turn it off at any time: <b>Settings → Share play data</b>.</li>
+      <li>IP addresses are deleted after 30 days.</li>
+    </ul>
+
+    <h2>Who is responsible</h2>
+    <p>Food Delivery Simulator (the website <a href="https://mithatck.com/food-delivery-sim/">mithatck.com/food-delivery-sim</a> and the Android
+      and iOS apps) is made by Mithat Can Turan, who is responsible for the data described here (the data controller).
+      Contact: <a href="mailto:mithatcturan@gmail.com">mithatcturan@gmail.com</a>.</p>
+
+    <h2>What stays on your device</h2>
+    <p>Your career (the save), your settings and a random player ID are kept in the browser's storage for this site, or
+      in the app's own storage, where the apps also keep a backup copy of the save. The game sets no cookies. The save
+      itself only leaves the device if you copy a save code yourself; what is sent instead is a short summary of it (below).</p>
+
+    <h2>What the game sends</h2>
+    <p>While <b>Share play data</b> is on, the game sends the following to our server:</p>
+    <ul>
+      <li><b>Random IDs:</b> a player ID made on your device (it looks like <code>p3f9…</code>) and a new ID for each visit.
+        They are not tied to your name, account, phone number or advertising ID.</li>
+      <li><b>Gameplay:</b> orders, rides and how they went, purchases with in-game money, levels, tutorial steps, settings
+        you change, time played and the screen you were on.</li>
+      <li><b>A summary of your career:</b> level, cash, deliveries, districts, rating, and the courier name you typed in the
+        game. The name is optional; leave it empty or use a nickname if you'd rather not send it.</li>
+      <li><b>Errors and crashes,</b> with the technical details of where they happened.</li>
+      <li><b>Device details:</b> device type and model, operating system and browser (with versions), screen size, graphics
+        chip, memory and processor class, language, time zone, frame rate, whether the game runs as an installed app, and
+        the website that linked you to the game (only its domain).</li>
+      <li><b>Your IP address,</b> which comes with every connection to a server.</li>
+    </ul>
+
+    <h2>Why</h2>
+    <ul>
+      <li>To find and fix bugs and crashes.</li>
+      <li>To see where the game is too hard, too slow or confusing, and to balance it.</li>
+      <li>To tell real players apart from bots and link previews, and to stop abuse.</li>
+    </ul>
+    <p>The legal basis is our legitimate interest in running and improving the game (GDPR Art. 6(1)(f); KVKK Art. 5(2)(f)).
+      We don't use this data for advertising or profiling, we don't try to identify you, and we don't combine it with any
+      other data.</p>
+
+    <h2>Who can see it</h2>
+    <p>Only the developer, through a password-protected panel. The data is stored on the server that runs mithatck.com;
+      the hosting company operates that machine but doesn't use the data. It is not sold or shared, and the game contains
+      no third-party analytics or advertising code.</p>
+    <p>Google Play and the App Store handle downloads and may collect their own data (for example crash reports) under
+      their own privacy policies.</p>
+
+    <h2>How long it is kept</h2>
+    <ul>
+      <li><b>IP addresses:</b> 30 days, then deleted.</li>
+      <li><b>Everything else:</b> until 2 years after your last visit, then deleted automatically.</li>
+    </ul>
+
+    <h2>Your choices and rights</h2>
+    <ul>
+      <li><b>Stop sending:</b> turn off <b>Settings → Share play data</b>. Nothing more is sent from that device until you turn
+        it back on.</li>
+      <li><b>Delete:</b> email us the <b>Player ID</b> shown in Settings and we will delete everything stored under it within
+        30 days. <i>Reset progress</i> only clears your device; it doesn't delete what was already sent.</li>
+      <li>You can also ask what we hold under your Player ID, have it corrected, or object to its use. Because the data
+        isn't tied to your identity, the Player ID is how we find it.</li>
+      <li>You can complain to a data protection authority: in Türkiye the Personal Data Protection Authority (KVKK), in the
+        EU the authority of your country.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>The game never asks for anyone's name, age or contact details and collects the same anonymous data from every
+      player. If you are a parent and want your child's data deleted, send us the Player ID from their Settings.</p>
+
+    <h2>Security</h2>
+    <p>Data is sent over encrypted HTTPS. The database is kept outside the public website, and the panel needs a password.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the date at the top changes too. Important changes will also be announced in the game.</p>
+  </section>
+
+  <section lang="tr" id="tr">
+    <h1>Gizlilik Politikası</h1>
+    <p class="date">Son güncelleme: 1 Kasım 2026</p>
+
+    <ul class="short">
+      <li>Hesap yok, giriş yok, reklam yok, başka uygulama ve sitelerde takip yok. Hiçbir veri satılmaz.</li>
+      <li>Oyun, hataları düzeltmek ve dengeyi ayarlamak için kendi sunucumuza <b>anonim oyun verisi</b> gönderir.</li>
+      <li>Bunu istediğin zaman kapatabilirsin: <b>Settings → Share play data</b>.</li>
+      <li>IP adresleri 30 gün sonra silinir.</li>
+    </ul>
+
+    <h2>Veri sorumlusu</h2>
+    <p>Food Delivery Simulator'ı (<a href="https://mithatck.com/food-delivery-sim/">mithatck.com/food-delivery-sim</a> sitesi ile Android
+      ve iOS uygulamaları) Mithat Can Turan geliştirir. Burada anlatılan verilerin veri sorumlusu odur.
+      İletişim: <a href="mailto:mithatcturan@gmail.com">mithatcturan@gmail.com</a>.</p>
+
+    <h2>Cihazında kalanlar</h2>
+    <p>Kariyerin (kayıt), ayarların ve rastgele bir oyuncu kimliği tarayıcının bu siteye ayırdığı depoda ya da uygulamanın
+      kendi deposunda tutulur. Uygulamalar ayrıca kaydın yedek bir kopyasını saklar. Oyun çerez kullanmaz. Kaydın kendisi,
+      sen bir kayıt kodunu kopyalamadıkça cihazdan çıkmaz; onun yerine kısa bir özeti gönderilir (aşağıda).</p>
+
+    <h2>Oyunun gönderdikleri</h2>
+    <p><b>Share play data</b> açıkken oyun sunucumuza şunları gönderir:</p>
+    <ul>
+      <li><b>Rastgele kimlikler:</b> cihazında üretilen bir oyuncu kimliği (<code>p3f9…</code> gibi) ve her ziyaret için yeni bir
+        kimlik. Bunlar adına, hesabına, telefon numarana ya da reklam kimliğine bağlı değildir.</li>
+      <li><b>Oyun içi olaylar:</b> siparişler, sürüşler ve nasıl geçtikleri, oyun parasıyla yapılan alışverişler, seviyeler,
+        tanıtım adımları, değiştirdiğin ayarlar, oynama süresi ve o an bulunduğun ekran.</li>
+      <li><b>Kariyerinin özeti:</b> seviye, para, teslimat sayısı, bölgeler, puan ve oyunda yazdığın kurye adı. Ad zorunlu
+        değildir; göndermek istemiyorsan boş bırakabilir ya da bir takma ad kullanabilirsin.</li>
+      <li><b>Hatalar ve çökmeler,</b> nerede olduklarına dair teknik ayrıntılarla.</li>
+      <li><b>Cihaz bilgileri:</b> cihaz türü ve modeli, işletim sistemi ve tarayıcı (sürümleriyle), ekran boyutu, grafik
+        işlemcisi, bellek ve işlemci sınıfı, dil, saat dilimi, kare hızı, oyunun yüklü bir uygulama olarak çalışıp çalışmadığı
+        ve seni oyuna yönlendiren sitenin yalnızca alan adı.</li>
+      <li><b>IP adresin:</b> bir sunucuya yapılan her bağlantıyla birlikte gelir.</li>
+    </ul>
+
+    <h2>Neden</h2>
+    <ul>
+      <li>Hataları ve çökmeleri bulup düzeltmek için.</li>
+      <li>Oyunun nerede fazla zor, yavaş ya da kafa karıştırıcı olduğunu görüp dengelemek için.</li>
+      <li>Gerçek oyuncuları botlardan ve bağlantı önizlemelerinden ayırmak ve kötüye kullanımı önlemek için.</li>
+    </ul>
+    <p>Hukuki sebep, oyunu çalıştırma ve geliştirmedeki meşru menfaatimizdir (KVKK m. 5/2-f; GDPR m. 6/1-f). Veriler
+      otomatik yollarla, oyun açıkken toplanır. Bu verileri reklam ya da profilleme için kullanmayız, seni tanımaya
+      çalışmayız ve başka verilerle birleştirmeyiz.</p>
+
+    <h2>Kimler görebilir</h2>
+    <p>Yalnızca geliştirici, şifreli bir panel üzerinden. Veriler mithatck.com'u çalıştıran sunucuda saklanır; barındırma
+      şirketi bu makineyi işletir ama verileri kullanmaz. Veriler satılmaz, kimseyle paylaşılmaz; oyunda üçüncü taraf bir
+      analitik ya da reklam kodu yoktur.</p>
+    <p>Google Play ve App Store indirmeleri yönetir ve kendi gizlilik politikalarına göre kendi verilerini (ör. çökme
+      raporları) toplayabilir.</p>
+
+    <h2>Ne kadar saklanır</h2>
+    <ul>
+      <li><b>IP adresleri:</b> 30 gün, sonra silinir.</li>
+      <li><b>Diğer her şey:</b> son ziyaretinden 2 yıl sonrasına kadar, sonra kendiliğinden silinir.</li>
+    </ul>
+
+    <h2>Seçeneklerin ve hakların</h2>
+    <ul>
+      <li><b>Göndermeyi durdurmak:</b> <b>Settings → Share play data</b>'yı kapat. Yeniden açana kadar o cihazdan başka bir şey
+        gönderilmez.</li>
+      <li><b>Silmek:</b> Ayarlar'da görünen <b>Player ID</b>'yi bize e-postayla gönder; o kimlikle saklanan her şeyi 30 gün içinde
+        sileriz. <i>Reset progress</i> yalnızca cihazındaki kaydı siler, daha önce gönderilmiş verileri silmez.</li>
+      <li>KVKK m. 11 kapsamında oyuncu kimliğine bağlı hangi verileri tuttuğumuzu öğrenebilir, düzeltilmesini isteyebilir ya da
+        işlenmesine itiraz edebilirsin. Veriler kimliğine bağlı olmadığı için onları oyuncu kimliğiyle buluruz.</li>
+      <li>Kişisel Verileri Koruma Kurumu'na (AB'deysen ülkendeki veri koruma otoritesine) şikâyette bulunabilirsin.</li>
+    </ul>
+
+    <h2>Çocuklar</h2>
+    <p>Oyun kimseden ad, yaş ya da iletişim bilgisi istemez ve her oyuncudan aynı anonim verileri toplar. Bir ebeveyn olarak
+      çocuğunun verilerinin silinmesini istiyorsan, onun Ayarlar'ındaki Player ID'yi bize gönder.</p>
+
+    <h2>Güvenlik</h2>
+    <p>Veriler şifreli HTTPS ile gönderilir. Veritabanı herkese açık sitenin dışında tutulur, panel şifre ister.</p>
+
+    <h2>Değişiklikler</h2>
+    <p>Bu politika değişirse en üstteki tarih de değişir. Önemli değişiklikler oyunda da duyurulur.</p>
+  </section>
+</main>
+<footer><a href="../">Play Food Delivery Simulator</a></footer>
+</body>
+</html>

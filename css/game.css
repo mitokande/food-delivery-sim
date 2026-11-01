@@ -535,6 +535,10 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .settings .set { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 10px 0; font-weight: 600; }
 .settings input[type=range] { flex: 1; max-width: 190px; } .settings select { font: 600 14px var(--font); padding: 4px 8px; border-radius: 8px; }
 .settings .actions { flex-direction: row; justify-content: space-between; }
+.settings .set-priv { margin-top: -4px; line-height: 1.45; }
+.settings .pid { font: 600 12px ui-monospace, Menlo, Consolas, monospace; word-break: break-all; user-select: all; -webkit-user-select: all; padding: 1px 5px; border-radius: 6px; background: rgba(60, 40, 20, .08); }
+.settings a, .modal.privacy a, .i-legal a { color: #2f6fd6; text-decoration: underline; }
+.modal.privacy a.btn { display: flex; margin-top: 6px; color: var(--ink-2); text-decoration: none; }
 .modal.tip { background: transparent; }
 .modal.tip .card { background: var(--panel); color: #fff; } .modal.tip p { color: #fff; font-size: 15.5px; }
 .modal.tip.at-top { --tip-top: 130px; place-items: start center; padding-top: calc(var(--tip-top) + var(--safe-t)); }
@@ -666,7 +670,7 @@ body[data-mode="ride"] #markers { display: none; }
 /* ===== top bar name ===== */
 
 /* ===== settings + reset ===== */
-.settings .set input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--green); }
+.settings .set input[type=checkbox] { flex: none; width: 22px; height: 22px; accent-color: var(--green); }
 .set-more { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0 4px; }
 .btn.danger { color: #c8321f; background: rgba(200, 50, 31, .08); border-bottom-color: rgba(200, 50, 31, .35); }
 .settings .btn.ghost { color: var(--ink-2); background: rgba(0,0,0,.06); }
@@ -695,6 +699,7 @@ body[data-mode="ride"] #markers { display: none; }
 .i-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0 12px; }
 .i-dots i { width: 9px; height: 9px; border-radius: 50%; background: #e4d6bb; } .i-dots i.on { background: var(--green); width: 22px; border-radius: 5px; }
 .i-btns { display: flex; gap: 8px; align-items: center; } .i-btns .btn.ghost { color: var(--ink-2); background: transparent; flex: none; } .i-btns .btn.big { flex: 1; }
+.i-card p.i-legal { font-size: 12px; line-height: 1.35; margin: 12px 4px 0; color: var(--ink-2); opacity: .85; }
 .i-card.pick h2 { margin-top: 0; }
 .i-preview { position: relative; width: 104px; height: 104px; margin: 0 auto 8px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffe6b8, #e8a75a); border: 4px solid #fff; overflow: hidden; box-shadow: 0 0 0 3px #ffd56b, 0 5px 0 3px rgba(0,0,0,.14); }
 .i-preview .ip { width: 116px; height: 116px; margin-top: 8px; margin-left: -6px; }

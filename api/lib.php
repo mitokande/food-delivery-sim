@@ -214,6 +214,37 @@ function client_ip(): ?string {
   return filter_var($v, FILTER_VALIDATE_IP) ? $v : null;
 }
 
+// ---------------------------------------------------------------- retention
+// What privacy/ promises: an IP address is kept 30 days (bot checks, abuse), then cleared; a player who hasn't come
+// back for 2 years is deleted with all their sessions and events. The collector runs this at most once a day.
+const IP_DAYS = 30, KEEP_DAYS = 730;
+function housekeep(bool $force = false): array {
+  $stamp = rtrim((string) cfg('data_dir'), '/') . '/housekeep.stamp';
+  if (!$force && (int) @filemtime($stamp) > time() - 86400) return [];
+  @touch($stamp);
+  $pdo = db();
+  $ipCut = now_ms() - IP_DAYS * 86400000;
+  $ips = $pdo->exec("UPDATE sessions SET ip = NULL WHERE ip IS NOT NULL AND last_seen < $ipCut");
+  $pdo->exec("UPDATE players SET ip = NULL WHERE ip IS NOT NULL AND last_seen < $ipCut");
+  $gone = $pdo->query('SELECT id FROM players WHERE last_seen < ' . (now_ms() - KEEP_DAYS * 86400000))->fetchAll(PDO::FETCH_COLUMN);
+  return ['ips' => $ips, 'players' => forget($gone)];
+}
+// everything stored under these player ids (a deletion request names the id Settings shows); returns players deleted
+function forget(array $pids): int {
+  if (!$pids) return 0;
+  $pdo = db(); $n = 0;
+  $pdo->exec('BEGIN IMMEDIATE');
+  try {
+    foreach ($pids as $pid) {
+      foreach (['events', 'sessions'] as $t) $pdo->prepare("DELETE FROM $t WHERE player_id = ?")->execute([$pid]);
+      $q = $pdo->prepare('DELETE FROM players WHERE id = ?'); $q->execute([$pid]);
+      $n += $q->rowCount();
+    }
+    $pdo->exec('COMMIT');
+  } catch (Throwable $e) { $pdo->exec('ROLLBACK'); throw $e; }
+  return $n;
+}
+
 // ---------------------------------------------------------------- ingest
 const ID_RE = '/^[A-Za-z0-9_-]{8,64}$/';
 const NAME_RE = '/^[a-z][a-z0-9_]{0,31}$/';
