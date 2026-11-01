@@ -76,6 +76,7 @@ function whereName(w) {
   const [a, b] = w.split(':');
   return a === 'hub' ? TAB_TR[b] || b : w;
 }
+const PAUSE_TR = { button: 'buton', key: 'klavye (Esc / P)', back: 'Android geri tuşu', hidden: 'sayfa gizlendi' };
 const STEP_TR = { 0: 'Başlangıç', 1: 'Sipariş seç', 2: 'Start', 3: 'Yemeği al', 4: 'Teslim et', 5: 'Fiş', 6: 'Garaja git', 7: 'Motor yükselt', 8: 'Şehre dön', 99: 'Bitti' };
 const BUY_TR = { vehicle: 'Araç', part: 'Parça', paint: 'Boya', skill: 'Beceri', district: 'Bölge başvurusu', premium: 'Premium boya', office: 'Ofis', office_up: 'Ofis yükseltme',
   hire: 'Kurye işe alma', train: 'Kurye eğitimi', reroll: 'Aday yenileme', fleet_crash: 'Kurye kaza tamiri', fleet_star: 'Yıldız kurye kursu',
@@ -111,7 +112,7 @@ function itemName(k, id) {
 function fmtEvent(e) {
   const p = e.props || {};
   switch (e.name) {
-    case 'session_start': return { c: 'sys', t: p.why === 'resume' ? `Oturum başladı <small>arka plandan ${num(p.away)} dk sonra döndü</small>` : `Oturum başladı <small>${p.saved ? 'kayıtlı oyunu var' : 'ilk açılış (kayıt yok)'}</small>` };
+    case 'session_start': return { c: 'sys', t: p.why === 'resume' ? `Oturum başladı <small>arka plandan ${num(p.away)} dk sonra döndü</small>` : p.why === 'optin' ? 'Oturum başladı <small>veri paylaşımını yeniden açtı</small>' : `Oturum başladı <small>${p.saved ? 'kayıtlı oyunu var' : 'ilk açılış (kayıt yok)'}</small>` };
     case 'boot': return { c: 'sys', t: `Oyun yüklendi <small>${num1(p.ms / 1000)} sn · seviye ${num(p.lvl)} · ${num(p.del)} teslimat</small>` };
     case 'boot_fail': return { c: 'bad', t: `Oyun açılamadı: ${esc(p.msg)}` };
     case 'error': return { c: 'bad', t: `Hata: ${esc(p.msg)} <small>${esc(p.src || '')}${p.line ? ':' + esc(p.line) : ''} · ${esc(whereName(p.where))}</small>` };
@@ -137,6 +138,8 @@ function fmtEvent(e) {
     case 'buy': { const w = buyWhat(p); return { c: 'money', t: `Satın aldı: ${esc(BUY_TR[p.k] || p.k)}${w ? ` · ${esc(w)}` : ''} <small>${money(p.cost)} · kalan ${money(p.cash)}</small>` }; }
     case 'claim': return { c: 'money', t: `Ödül aldı: ${esc(CLAIM_TR[p.k] || p.k)} <small>${money(p.reward)}</small>` };
     case 'next_offer': return { c: p.take ? 'ride' : '', t: `Fişte yakın sipariş: ${p.take ? '<b>sürmeye devam</b>' : 'hub\'a döndü'} <small>alış ${num(p.pick)} m · ${money(p.pay)} · kalan enerji ${num(p.energy)}</small>` };
+    case 'pause': return { c: 'sys', t: `Duraklattı <small>${esc(PAUSE_TR[p.why] || p.why)} · sürüşün ${num(p.secs)}. sn'si · ayak ${num(p.leg + 1)}/${num(p.legs)}</small>` };
+    case 'ride_cancel': return { c: 'bad', t: `<b>Siparişi iptal etti</b> <small>${num(p.n)} sipariş${p.done ? ` · ${num(p.done)} tanesi teslim edilmişti` : ''}${p.picked ? ` · ${num(p.picked)} tanesi alınmıştı` : ''} · ${num(p.secs)} sn · ${num(p.m)} m · ${num(p.energy)} enerji geri</small>` };
     case 'energy_out': return { c: 'bad', t: `Enerji yetmedi <small>${num(p.need)} gerekli · ${num(p.have)} vardı · ${money(p.cash)} nakit · ${num(p.coffee)} kahve hakkı</small>` };
     case 'equip': return { c: 'money', t: `Araç değiştirdi: ${esc(vehName(p.id))}` };
     case 'fleet': {
@@ -494,13 +497,13 @@ const VIEWS = {
     const d = await api('session', { id: r.id });
     const s = d.session, p = d.player, ev = d.events, now = d.now;
     const t0 = +s.started_at;
-    // rides (job_start … job_end) are grouped; one that never ended is flagged
+    // rides (job_start … job_end, or a ride_cancel with nothing delivered) are grouped; one that never ended is flagged
     let html = '', open = false;
     for (const e of ev) {
       const f = fmtEvent(e);
       if (e.name === 'job_start') { if (open) html += '</div>'; html += '<div class="ride">'; open = true; }
       html += `<div class="ev c-${f.c}${f.dim ? ' dim' : ''}" data-raw><span class="tm">${clock(e.ts)}</span><span class="off">+${mmss(e.ts - t0)}</span><span class="c"></span><div class="tx">${f.t}</div><pre class="raw mono">${esc(e.name)} ${esc(JSON.stringify(e.props, null, 1))}</pre></div>`;
-      if (e.name === 'job_end' && open) { html += '</div>'; open = false; }
+      if ((e.name === 'job_end' || (e.name === 'ride_cancel' && !e.props?.done)) && open) { html += '</div>'; open = false; }
     }
     if (open) html += '<div class="ev c-bad"><span class="tm"></span><span class="off"></span><span class="c"></span><div class="tx">Sürüş yarım kaldı — oturum bitmeden teslimat tamamlanmadı</div></div></div>';
     const total = +s.last_seen - t0;
@@ -511,7 +514,7 @@ const VIEWS = {
       ['Model', s.model ? (s.model.startsWith('≈') ? `${s.model} (ekran boyutundan tahmin)` : s.model) : 'bilinmiyor (tarayıcı söylemedi)'], ['Ekran', `${s.screen || '?'} · pencere ${s.viewport || '?'} · DPR ${s.dpr ?? '?'}`], ['GPU', s.gpu],
       ['Donanım', s.mem || s.cores ? `${s.mem ? s.mem + ' GB bellek' : ''}${s.mem && s.cores ? ' · ' : ''}${s.cores ? s.cores + ' çekirdek' : ''}` : null],
       ['Dil / saat dilimi', `${s.lang || '?'} · ${s.tz || '?'}`], ['Geldiği yer', s.ref || 'doğrudan'], ['Ana ekrandan (PWA)', +s.pwa ? 'evet' : 'hayır'],
-      ['Başlangıç', `${s.why === 'resume' ? 'arka plandan döndü' : 'sayfa açıldı'}${+s.fresh ? ' · cihazda kayıt yoktu' : ''}`], ['Son ekran', whereName(s.last_where)], ['User agent', s.ua],
+      ['Başlangıç', `${s.why === 'resume' ? 'arka plandan döndü' : s.why === 'optin' ? 'veri paylaşımını yeniden açtı' : 'sayfa açıldı'}${+s.fresh ? ' · cihazda kayıt yoktu' : ''}`], ['Son ekran', whereName(s.last_where)], ['User agent', s.ua],
     ].filter(([, v]) => v);
     return {
       html: `<div class="pagehead"><h1>${who(p.name, p.id)} · ${num(d.nth)}. oturum</h1>${+s.is_new ? '<span class="badge new">ilk oturum</span>' : ''}${+s.dev ? '<span class="badge">dev</span>' : ''}${botBadge(s)}${status}

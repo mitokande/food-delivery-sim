@@ -28,7 +28,7 @@ import { makeOrder, refreshOrder, etaFor, pathMeters, setTimerRide } from './ord
 import * as St from './state.js';
 import { restore } from './native.js';
 import { S } from './state.js';
-import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES, ENERGY } from './data.js';
+import { TILE, DISTRICTS, DISTRICT, RESTAURANT, FOODS, GAME_MIN_PER_SEC, DAY_END, FLEET, ORDER_TYPES, ENERGY, CANCEL_STARS } from './data.js';
 import { mulberry32 } from './rng.js';
 
 window.__started = true;
@@ -360,6 +360,25 @@ const LEVEL_UNLOCKS = {
   5: ['Fleet: rent a dispatch office and hire couriers'], 6: ['Harbor job application', 'Skills up to level 3'], 8: ['Skills up to level 4', 'EXPRESS orders: double pay, very tight timers'], 10: ['Green Hills job application', 'Skills up to level 5'],
 };
 async function finishJob(sum) {
+  pauseWant = null;
+  // cancelled from the pause menu: what wasn't delivered goes back with its ⚡ and counts as a poor rating
+  const dropped = sum.cancelled ? sum.orders.filter((x) => !x.result) : [];
+  if (dropped.length) {
+    const back = game.energyFor(dropped.length);
+    if (back) St.addEnergy(back);
+    for (const x of dropped) St.addRating(CANCEL_STARS);
+    An.track('ride_cancel', { n: dropped.length, done: sum.orders.length - dropped.length, picked: dropped.filter((x) => x.picked).length, secs: Math.round(sum.time),
+      m: Math.round(sum.meters), energy: back, veh: S.active, lvl: S.lvl, ctl: ride.R.scheme });
+    ui.toast(`${dropped.length > 1 ? `${dropped.length} orders` : 'Order'} cancelled${back ? ` · ${ICON('ui-bolt')}${back} back` : ''}`, '');
+    ob.event('cancel');
+    // nothing delivered: no receipt, nothing paid or charged; the time ridden still passes
+    if (dropped.length === sum.orders.length) {
+      if (St.advanceClock(sum.time * GAME_MIN_PER_SEC)) await endDay();
+      St.save(true);
+      backToHub();
+      return;
+    }
+  }
   const lines = [];
   let total = 0, starsSum = 0, xp = 0, tipsT = 0;
   const goalsHit = [], levels = [], empNews = [];
@@ -406,15 +425,20 @@ async function finishJob(sum) {
       ratio: Math.round(r.ratio * 100) / 100, pay: r.pay, tip: r.tip, bonus: r.bonus, cond: Math.round(r.cond) })) });
   await new Promise((r) => setTimeout(r, 350));
   // keep riding: once the guide is done (and the day isn't over), the receipt offers an order near this door
-  const next = !ob.active && !dayOver ? nextOffer() : null;
+  const next = !ob.active && !dayOver && !sum.cancelled ? nextOffer() : null;
   const how = await ui.receipt({ lines, total, xp, avgStars: starsSum / n, goals: goalsHit.length ? `${goalsHit.length} goal${goalsHit.length > 1 ? 's' : ''} done!` : '', next });
   if (next) An.track('next_offer', { take: how === 'next' ? 1 : 0, pick: Math.round(next.o.pickM), pay: next.o.base, energy: S.energy.n });
   for (const l of levels) await ui.levelUp(l, LEVEL_UNLOCKS[l] || []);
   for (const n of empNews) ui.employerNews(n);
   for (const a of checkAchievements()) ui.achievement(a);
-  if (dayOver) { const rep = St.newDay(); An.track('day_end', { ...rep, earned: Math.round(rep.earned), fuel: Math.round(rep.fuel), tips: Math.round(rep.tips), fleet: Math.round(rep.fleet) }); await ui.dayReport(rep); }
+  if (dayOver) await endDay();
   St.save(true);
   if (how === 'next') rideOn(next.o); else backToHub();
+}
+async function endDay() {
+  const rep = St.newDay();
+  An.track('day_end', { ...rep, earned: Math.round(rep.earned), fuel: Math.round(rep.fuel), tips: Math.round(rep.tips), fleet: Math.round(rep.fleet) });
+  await ui.dayReport(rep);
 }
 // the next order offered at a customer's door: of a few from around here, the one whose restaurant is nearest
 function nextOffer() {
@@ -578,6 +602,13 @@ const HELD = new Set(['gas', 'brake', 'boost', 'left', 'right']);
 const keyMap = () => (ride.R.scheme === 'run' ? KEYS_RUN : ride.R.scheme ? KEYS_LB : ride.R.manual ? KEYS_RIDE : KEYS);
 addEventListener('keydown', (e) => {
   if (game.mode !== 'ride') return;
+  if (e.code === 'Escape' || e.code === 'KeyP') {
+    e.preventDefault();
+    if (!game.paused) game.pause('key');
+    else if ([...document.querySelectorAll('#modals .modal:not(.out)')].pop()?.classList.contains('pause')) game.resume(); // (not from under Settings)
+    return;
+  }
+  if (game.paused) return;
   const k = keyMap()[e.code];
   // pedals and steering keep working under an event card (the ride goes on in slow motion); everything else waits for it
   if (document.querySelector('.modal:not(.rated), .evdock') && !(k === 'gas' || k === 'brake' || k === 'left' || k === 'right')) return;
@@ -588,7 +619,30 @@ addEventListener('keydown', (e) => {
   ride.input(k, true);
 });
 addEventListener('keyup', (e) => { const k = keyMap()[e.code]; if (HELD.has(k)) ride.input(k, false); });
-addEventListener('blur', () => { lbPtrs.clear(); for (const k of HELD) ride.input(k, false); });
+const releaseInputs = () => { lbPtrs.clear(); for (const k of HELD) ride.input(k, false); };
+addEventListener('blur', releaseInputs);
+
+// ---------------------------------------------------------------- pause (the HUD's button, Esc / P, Android's back, a hidden page)
+// The ride stops where it is: no ride, traffic or people update under the menu. Asked for at a door or under an event
+// card it waits for that to end, since their beats and timers run on the clock. A hidden page pauses itself, so the
+// rider comes back to the menu instead of a ride that has gone on.
+let pauseMenu = null, pauseWant = null;
+game.paused = false;
+const pauseOk = () => ride.R.phase === 'ride' && !document.getElementById('ridehud').classList.contains('evmode') && !document.querySelector('.modal.event:not(.out), .evdock');
+game.pause = (why = 'button') => {
+  if (game.paused || game.mode !== 'ride' || !ride.R.active) return;
+  if (!pauseOk()) { pauseWant = why; return; }
+  pauseWant = null; game.paused = true;
+  releaseInputs(); audio.engine(false);
+  const left = ride.R.orders.filter((x) => !x.done).length;
+  An.track('pause', { why, secs: Math.round(ride.R.rideTime), leg: ride.R.leg, legs: ride.R.job.legs.length, ctl: ride.R.scheme });
+  pauseMenu = ui.pauseMenu({ left, back: game.energyFor(left), resume: game.resume, cancel: game.cancelRide });
+};
+const closePause = () => { pauseMenu?.close(); pauseMenu = null; game.paused = false; };
+game.resume = () => { if (!game.paused) return; closePause(); audio.engine(true, S.active); };
+game.cancelRide = () => { if (!ride.R.active) return; closePause(); ride.cancel(); };
+// js/native.js asks before the back button sends the app to the background
+addEventListener('appback', (e) => { if (game.mode === 'ride' && ride.R.active) { e.preventDefault(); game.pause('back'); } });
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); game.amb = undefined; } }, { capture: true });
 
 // ---------------------------------------------------------------- boot finish
@@ -654,9 +708,10 @@ let boardT = 0, fleetT = 0, lastNight = -1, lifeT = 0, topT = 0;
 function frame() {
   timer.update();
   const dt = Math.min(0.05, timer.getDelta());
-  waterTime.value += dt; toyUni.uTime.value += dt; backdrop.update(dt); train.update(dt * (game.mode === 'ride' ? ride.R.timeScale : 1));
+  if (pauseWant && game.mode === 'ride' && ride.R.active && pauseOk()) game.pause(pauseWant);
+  const ts = game.mode !== 'ride' ? 1 : game.paused ? 0 : ride.R.timeScale;
+  waterTime.value += dt; toyUni.uTime.value += dt; backdrop.update(dt); train.update(dt * ts);
   ribbonTime.value += dt;
-  const ts = game.mode === 'ride' ? ride.R.timeScale : 1;
   traffic.update(dt * ts);
   if (tween) {
     tween.t += dt / tween.dur;
@@ -668,7 +723,7 @@ function frame() {
   }
   updateViewOffset(dt);
   if (game.mode === 'ride' || (game.mode === 'tween' && ride.R.active)) {
-    ride.update(dt);
+    if (!game.paused) ride.update(dt);
     const b = ride.R.bike.root.position;
     peds.update(dt * ts, b.x, b.z, 110);
     cullChunks(view, b.x, b.z, QV === 'low' ? 220 : 380);
@@ -680,7 +735,7 @@ function frame() {
     scene.fog.near = (QV === 'low' ? 45 : 60) * (1 - 0.45 * wr); scene.fog.far = (QV === 'low' ? 230 : 420) * (1 - 0.45 * wr);
     sky.state.rain = wr;
     sky.set(clk);
-    audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost, ride.R.load, ride.R.v, ride.R.slip);
+    if (!game.paused) audio.engineSpeed(ride.R.v / Math.max(1, ride.R.vs?.top || 10), ride.R.boost, ride.R.load, ride.R.v, ride.R.slip);
   } else if (game.mode === 'peek') {
     // test camera: a fixed rider's-eye view of one street (tools/look.mjs)
     const b = ride.R.bike?.root.position || camera.position;
@@ -724,7 +779,7 @@ function frame() {
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(frame);
-document.addEventListener('visibilitychange', () => { if (document.hidden) St.save(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { St.save(true); game.pause('hidden'); } });
 // headless test hook: advance the simulation without rendering
 game.skipTween = () => { if (tween) tween.t = 1; };
 game.refill = () => fillBoard(true);

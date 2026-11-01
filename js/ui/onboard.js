@@ -148,6 +148,8 @@ export function createOnboarding(game, ui) {
   function event(name) {
     if (name === 'pickup' || name === 'drop' || name === 'receipt') { waiting = name; if (cur && cur.waitFor === name) show(cur.n); return; }
     if (name === 'hidden') { waiting = null; hide(); return; }
+    // the guided first ride was cancelled from the pause menu: back to "tap an order"
+    if (name === 'cancel') { if (step() >= 2 && step() <= 5) { waiting = null; setStep(1); show(1); } return; }
     if (step() >= 99) { milestone(name); return; }
     if (cur && name === cur.on) { waiting = null; advance(); }
     else if (step() >= 1 && step() < 99 && STEPS[step()] && !cur) show(step());

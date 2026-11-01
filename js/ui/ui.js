@@ -79,7 +79,7 @@ export function createUI(game) {
       <div class="r-timer"><span class="tw"><span><b>0:00</b><small>left</small></span></span></div>
     </div>
     <div class="r-sub">
-      <div class="r-cond" hidden><span class="m heat">${ICON('ui-thermo')}<i><u></u></i></span><span class="m integ">${ICON('ui-package')}<i><u></u></i></span></div>
+      <div class="r-left"><button class="r-pause" aria-label="Pause"><i></i><i></i></button><div class="r-cond" hidden><span class="m heat">${ICON('ui-thermo')}<i><u></u></i></span><span class="m integ">${ICON('ui-package')}<i><u></u></i></span></div></div>
       <canvas class="r-map" width="240" height="240"></canvas>
     </div>
     <div class="r-ctx"></div>
@@ -603,6 +603,28 @@ export function createUI(game) {
       <button class="btn green big" data-x="close">OK</button><a class="btn ghost" href="${PRIVACY}" target="_blank" rel="noopener">Privacy policy</a>`, { dismiss: true, cls: 'privacy' });
     m.card.querySelector('[data-x="close"]').onclick = () => { tap(); m.close(); };
   }
+  // the ride's pause menu (main.js game.pause): Resume / Settings / Cancel order, the cancel asked twice. `left` orders
+  // not yet delivered, `back` the ⚡ they'd return. main.js closes it (resume and cancel both go through there).
+  function pauseMenu({ left, back, resume, cancel }) {
+    const m = modal(`<h2>Paused</h2>
+      <button class="btn green big" data-x="close">Resume</button>
+      <button class="btn ghost" data-x="settings">Settings</button>
+      <button class="btn ghost danger" data-x="drop">Cancel ${left > 1 ? `${left} orders` : 'order'}</button>`, { cls: 'pause' });
+    m.card.addEventListener('click', (e) => {
+      const x = e.target.closest('[data-x]')?.dataset.x; if (!x) return;
+      tap();
+      if (x === 'close') resume();
+      if (x === 'settings') settings();
+      if (x === 'drop') {
+        m.card.innerHTML = `<h2>Cancel ${left > 1 ? 'the orders' : 'the order'}?</h2>
+          <p>${left > 1 ? 'They go' : 'It goes'} back to the restaurant${back ? ` and you get ${ICON('ui-bolt')}<b>${back}</b> back` : ''}, but the customer won't be happy: a small hit to your rating.</p>
+          <button class="btn red big" data-x="really">Cancel ${left > 1 ? 'orders' : 'order'}</button>
+          <button class="btn ghost" data-x="close">Keep riding</button>`;
+      }
+      if (x === 'really') cancel();
+    });
+    return m;
+  }
   function saveCode() {
     St.save(true);
     const code = St.exportCode();
@@ -707,6 +729,7 @@ export function createUI(game) {
   });
   const rideUp = (e) => { const b = e.target.closest('[data-ride]'); if (!b) return; b.classList.remove('down'); if (b.dataset.ride === 'boost' || b.dataset.ride === 'brake') game.rideInput(b.dataset.ride, false); };
   hud.addEventListener('pointerup', rideUp); hud.addEventListener('pointercancel', rideUp); hud.addEventListener('lostpointercapture', rideUp);
+  hud.querySelector('.r-pause').addEventListener('click', () => { tap(); game.pause?.('button'); });
   // swipe left anywhere on the road = overtake (no swipe-up hop: an upward drag moves the camera; HOP is the button).
   // With lanes & brake the swipes are main.js's.
   let sw = null;
@@ -725,11 +748,11 @@ export function createUI(game) {
     rh.food.innerHTML = leg.kind === 'pickup' ? ICON(FOODS[o.food].icon) : ICON('char-' + o.char);
     rh.cond.hidden = !R.orders.some((x) => x.picked && !x.done);
     vTop = St.vehStats().top || 9;
-    rh.keys.textContent = R.scheme === 'run' ? '← / → change lane · ↓ / S / Space brake (hold) · ↑ / W hop — it rides itself, the traffic is yours'
+    rh.keys.textContent = (R.scheme === 'run' ? '← / → change lane · ↓ / S / Space brake (hold) · ↑ / W hop — it rides itself, the traffic is yours'
       : R.scheme === 'b' ? '↓ / S / Space brake (hold) · ← / ↑ / → another street at a junction — the gas is always on'
       : R.scheme ? '← / → change lane, or the turn at a junction (↑ straight on) · ↓ / S / Space brake — the gas is always on'
       : R.manual ? 'W/↑ gas · S/↓ brake & reverse · A/D steer · Space hop · Shift turbo · E action · H horn · drag to look'
-        : 'Space turbo · W hop · S stop · A overtake · D shortcut · E action · H horn · drag to look';
+        : 'Space turbo · W hop · S stop · A overtake · D shortcut · E action · H horn · drag to look') + ' · Esc pause';
     hud.classList.toggle('lb', !!R.scheme);
     hud.classList.toggle('run', R.scheme === 'run');
     hud.classList.toggle('auto', !!R.auto);
@@ -1213,7 +1236,7 @@ export function createUI(game) {
   });
 
   return {
-    setMode, setTab, render, refreshTop, toast, modal, privacyNote, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
+    setMode, setTab, render, refreshTop, toast, modal, privacyNote, pauseMenu, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
     rideLeg, rideFrame, routeChanged, flash, coach, flowPop, pop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };

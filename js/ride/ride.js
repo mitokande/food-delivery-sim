@@ -810,7 +810,15 @@ export function createRide(ctx) {
     R.sceneCam = { pos: new THREE.Vector3(mx - sx / sl * 7.5 - hx * 3.5, 3.4, mz - sz / sl * 7.5 - hz * 3.5), look: new THREE.Vector3(mx, 1.3, mz) };
   }
 
-  function finish() {
+  // the pause menu's "Cancel order": the ride ends where the bike is (main.js gives back what wasn't delivered)
+  function cancel() {
+    if (!R.active || R.phase !== 'ride') return;
+    const rt = R.manual ? world.routeTile(F.x, F.z, true) : -1, st = stepAt();
+    if (rt >= 0) { R.curTile = rt; R.curDir = cardinal(F.h); } else if (st) { R.curTile = st.tile; R.curDir = st.din; }
+    ringMk.visible = false; R.junc = null; R.offer = null; R.timeScale = 1; ctx.ui.coach(null); coachOn = null;
+    finish(true);
+  }
+  function finish(cancelled = false) {
     R.phase = 'done'; R.active = false;
     leaveFree(); cdown.sp.visible = false;
     pfx.clear(); pfx.clearSkids(); clearActors(); R.dodge = null; R.dodgeLat = 0; R.stall = false; R.wobble = 0;
@@ -820,7 +828,7 @@ export function createRide(ctx) {
     traffic.removeAgent(agent); calmTraffic();
     St.S.pos = R.curTile; St.S.posDir = R.curDir;
     const fuel = Math.round(R.meters / 1000 * R.vs.fuel * 100) / 100;
-    ctx.onFinish({ orders: R.orders, stats: R.stats, fuel, fines: R.fines, meters: R.meters, time: R.rideTime, xpBonus: R.xpBonus || 0 });
+    ctx.onFinish({ orders: R.orders, stats: R.stats, fuel, fines: R.fines, meters: R.meters, time: R.rideTime, xpBonus: R.xpBonus || 0, cancelled });
     R.xpBonus = 0;
   }
   function abort() {
@@ -2523,6 +2531,6 @@ export function createRide(ctx) {
     input('left', err > 0.04); input('right', err < -0.04);
     return { target, err, rd };
   }
-  return { R, F, fx: pfx, start, update, input, abort, stage, chasePose, canOvertake, bot, schemeBot, autoBot, offerSide, countdown: cdown.sp, ensureBike, setNight, testEvent, testPed, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; }, get npc() { return npc; } };
+  return { R, F, fx: pfx, start, update, input, abort, cancel, stage, chasePose, canOvertake, bot, schemeBot, autoBot, offerSide, countdown: cdown.sp, ensureBike, setNight, testEvent, testPed, camDrag, camZoom, camHold, camSnap, camRestore, camReset, free, get offer() { return R.offer; }, get npc() { return npc; } };
 }
 const smooth = (t) => t * t * (3 - 2 * t);
