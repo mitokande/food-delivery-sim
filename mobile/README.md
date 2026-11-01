@@ -87,14 +87,22 @@ questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (th
   Turkish). Both stores require one, because the game sends analytics (`js/analytics.js`, `api/`). The page, the forms
   below and `PrivacyInfo.xcprivacy` must say the same thing: change them together.
 - **Play Data safety / App Store privacy**, all of it *not linked to the player's identity*, no tracking, no ads SDK,
-  nothing shared with third parties, encrypted in transit:
+  no advertising ID, encrypted in transit. Adapty is a service provider (processor), so nothing counts as *shared*:
   - personal info: name (the optional courier name typed in the intro)
-  - device or other IDs: the random per-install player id
-  - app activity: gameplay interactions
+  - device or other IDs: the random per-install player id, and Adapty's per-install id (+ IDFV on iOS)
+    — purposes analytics and app functionality
+  - financial info (Play) / purchases (App Store): purchase history, through Adapty — app functionality, analytics
+  - app activity: gameplay interactions (and Adapty's app opens / purchase screens)
   - app info and performance: crash logs, diagnostics, performance (load time, frame rate)
-  - collected by default; the player can turn it off in Settings → Share play data. Deletion: by email with the Player
-    ID that Settings shows (`php api/cli.php forget <id>`); IPs go after 30 days, the rest 2 years after the last visit.
-- **Content rating**: cartoon scooter crashes, no blood, no purchases with real money (yet), no chat.
+  - the game's own analytics is collected by default and the player can turn it off in Settings → Share play data;
+    Adapty's is required (purchases need it). Deletion: by email with the Player ID that Settings shows
+    (`php api/cli.php forget <id>`), or for Adapty the store order number (delete the profile in Adapty's dashboard);
+    IPs go after 30 days, the rest 2 years after the last visit.
+  - Play also asks whether the app uses an advertising ID: **no**. The manifest removes the `AD_ID` permission
+    Adapty's SDK asks for, and `js/native.js` turns IDFA / Advertising ID collection off. Keep both if that changes.
+- **Content rating**: cartoon scooter crashes, no blood, no chat. No purchases with real money *yet*: Adapty is in,
+  but switch the answers (Play: in-app purchases; IARC: digital purchases; App Store: in-app purchases) once the first
+  product is on sale.
 - **Screenshots**: Play needs 2–8 phone screenshots and a 1024×500 feature graphic. The App Store needs 6.9" iPhone
   screenshots (1320×2868). The headless tools in `../tools/` (`shot.mjs`, `play.mjs`) can make them at any size.
 - **Name / description**: the store name can be the full "Food Delivery Simulator"; the home-screen label stays short.
@@ -109,10 +117,9 @@ like every other package here; raise it with `npm i -E @adapty/capacitor@x.y.z`,
   '@adapty/capacitor'`), from `../js/native.js` or behind its `app` check, never on the web.
 - `../js/native.js` activates it once at launch and exports `adapty`, a promise of the ready SDK (null on the web, on
   failure, or with no key). Wait for it before any other Adapty call.
-- `ADAPTY_KEY` there is empty: until the app's **Public SDK key** goes in (Adapty dashboard → App settings → General →
-  API keys), the SDK ships but never starts and nothing reaches Adapty. Setting it sends purchase and device data to
-  Adapty, so the same release must update the privacy page, both stores' privacy forms and the content rating
-  ("no purchases with real money") in the checklist above.
+- `ADAPTY_KEY` there is the app's **Public SDK key** (Adapty dashboard → App settings → General → API keys; it is not a
+  secret). With it the apps send purchase and device data to Adapty: the privacy page has a section on it and the
+  store forms above list it. Emptied, the SDK ships but never starts.
 - Android: `MainActivity` is `singleTop`, not Capacitor's default `singleTask`, which would close Google Play's purchase
   sheet when the player leaves mid-purchase and comes back from the icon.
 - iOS: Adapty supports Swift Package Manager only, which `ios/` already uses (`CapApp-SPM`). After an SDK change, run
