@@ -42,12 +42,14 @@ plugins?.then(({ App }) => App.addListener('backButton', () => {
 
 // In-app purchases go through Adapty, activated once at launch; `adapty` resolves to the ready SDK, or null. The key is
 // the app's Public SDK key (Adapty dashboard → App settings → General → API keys), which ships inside the app anyway.
-// While it is empty the SDK is in the apps but never starts, so nothing reaches Adapty.
-const ADAPTY_KEY = '';
+// Emptied, the SDK stays in the apps but never starts, so nothing reaches Adapty.
+const ADAPTY_KEY = 'public_live_E7wjUVcL.eLd0terUotkYycyN61yC';
 export const adapty = app && ADAPTY_KEY ? import('@adapty/capacitor').then(async ({ adapty }) => {
   // verbose (Xcode / Logcat only) is what Adapty asks for until the first release is out. The SDK stays activated
   // natively when the game reloads its page (a career import or wipe, the tutorial replay); the __ flag skips that
-  // second activate instead of failing it
-  await adapty.activate({ apiKey: ADAPTY_KEY, params: { logLevel: 'verbose', __ignoreActivationOnFastRefresh: true } });
+  // second activate instead of failing it. No advertising IDs (IDFA, Google's Advertising ID): the game has no ads or
+  // attribution, and the privacy page and store forms say so (the Android manifest also drops Adapty's AD_ID permission)
+  await adapty.activate({ apiKey: ADAPTY_KEY, params: { logLevel: 'verbose', __ignoreActivationOnFastRefresh: true,
+    ios: { idfaCollectionDisabled: true }, android: { adIdCollectionDisabled: true } } });
   return adapty;
 }).catch((e) => { console.warn('adapty:', e); return null; }) : null;

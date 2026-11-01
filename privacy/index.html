@@ -10,8 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Lilita+One&display=swap">
 <!-- What this page says must match what the game does: js/analytics.js (what is sent, the Settings switch),
-     api/lib.php (what is stored, housekeep(): 30-day IPs, 2-year players), mobile/ios/App/App/PrivacyInfo.xcprivacy
-     and the store forms (mobile/README.md). Change them together, and the date. -->
+     api/lib.php (what is stored, housekeep(): 30-day IPs, 2-year players), js/native.js (what Adapty is allowed to
+     collect in the apps), mobile/ios/App/App/PrivacyInfo.xcprivacy and the store forms (mobile/README.md). Change
+     them together, and the date. -->
 <script>
   // one language at a time: #en / #tr, else the browser's language
   (function () {
@@ -62,6 +63,8 @@
       <li>The game sends <b>anonymous play data</b> to our own server so we can fix bugs and balance the game.</li>
       <li>You can turn it off at any time: <b>Settings → Share play data</b>.</li>
       <li>IP addresses are deleted after 30 days.</li>
+      <li>In the Android and iOS apps, in-app purchases go through <b>Adapty</b>, which also gets a random installation ID
+        and basic device details (below).</li>
     </ul>
 
     <h2>Who is responsible</h2>
@@ -102,15 +105,35 @@
 
     <h2>Who can see it</h2>
     <p>Only the developer, through a password-protected panel. The data is stored on the server that runs mithatck.com;
-      the hosting company operates that machine but doesn't use the data. It is not sold or shared, and the game contains
-      no third-party analytics or advertising code.</p>
+      the hosting company operates that machine but doesn't use the data. It is not sold or shared. The game contains no
+      third-party analytics or advertising code; the apps contain only Adapty's purchase code, described next.</p>
     <p>Google Play and the App Store handle downloads and may collect their own data (for example crash reports) under
       their own privacy policies.</p>
+
+    <h2>In the apps: purchases (Adapty)</h2>
+    <p>The Android and iOS apps use <a href="https://adapty.io/">Adapty</a> (Adapty Tech Inc.) to sell, check and restore
+      in-app purchases; the website doesn't. Each time an app starts, Adapty's code in it connects to Adapty's servers and
+      sends:</p>
+    <ul>
+      <li><b>A random ID</b> made for this installation, and on iPhone the app's vendor ID (IDFV). The advertising ID (IDFA,
+        Google's Advertising ID) is turned off and never sent.</li>
+      <li><b>Purchases:</b> what you bought, when, at what price and in what currency, and the store's proof of purchase.</li>
+      <li><b>Use of the app:</b> when it is opened, and which purchase screens you see.</li>
+      <li><b>Device details:</b> device model, operating system version, language, time zone and store country.</li>
+      <li><b>Your IP address,</b> which Adapty uses to tell your country.</li>
+    </ul>
+    <p>Adapty does this on our behalf (a data processor): it checks that purchases are real, gives you what you bought,
+      brings it back on a new phone and counts sales for us. This data isn't tied to your name, your store account or the
+      game's Player ID, and it isn't used for advertising or tracking. Purchases need it, so <b>Share play data</b> doesn't
+      turn it off. The legal basis is the purchase itself (GDPR Art. 6(1)(b); KVKK Art. 5(2)(c)) and our legitimate interest
+      in offering purchases (GDPR Art. 6(1)(f); KVKK Art. 5(2)(f)). Adapty keeps it on its own servers, which may be outside
+      your country; see <a href="https://adapty.io/privacy/">Adapty's privacy policy</a>.</p>
 
     <h2>How long it is kept</h2>
     <ul>
       <li><b>IP addresses:</b> 30 days, then deleted.</li>
       <li><b>Everything else:</b> until 2 years after your last visit, then deleted automatically.</li>
+      <li><b>Purchase data at Adapty:</b> as long as the apps use Adapty, or until you ask us to delete it.</li>
     </ul>
 
     <h2>Your choices and rights</h2>
@@ -119,6 +142,9 @@
         it back on.</li>
       <li><b>Delete:</b> email us the <b>Player ID</b> shown in Settings and we will delete everything stored under it within
         30 days. <i>Reset progress</i> only clears your device; it doesn't delete what was already sent.</li>
+      <li><b>Delete purchase data (apps):</b> email us the order number from your Google Play or App Store receipt and we
+        will have Adapty delete what it holds for it. If you never bought anything, Adapty only has the random installation
+        ID and device details above, which we have no way to match to you.</li>
       <li>You can also ask what we hold under your Player ID, have it corrected, or object to its use. Because the data
         isn't tied to your identity, the Player ID is how we find it.</li>
       <li>You can complain to a data protection authority: in Türkiye the Personal Data Protection Authority (KVKK), in the
@@ -145,6 +171,8 @@
       <li>Oyun, hataları düzeltmek ve dengeyi ayarlamak için kendi sunucumuza <b>anonim oyun verisi</b> gönderir.</li>
       <li>Bunu istediğin zaman kapatabilirsin: <b>Settings → Share play data</b>.</li>
       <li>IP adresleri 30 gün sonra silinir.</li>
+      <li>Android ve iOS uygulamalarında uygulama içi satın almalar <b>Adapty</b> üzerinden yapılır; Adapty ayrıca rastgele
+        bir kurulum kimliği ve temel cihaz bilgilerini alır (aşağıda).</li>
     </ul>
 
     <h2>Veri sorumlusu</h2>
@@ -185,15 +213,35 @@
 
     <h2>Kimler görebilir</h2>
     <p>Yalnızca geliştirici, şifreli bir panel üzerinden. Veriler mithatck.com'u çalıştıran sunucuda saklanır; barındırma
-      şirketi bu makineyi işletir ama verileri kullanmaz. Veriler satılmaz, kimseyle paylaşılmaz; oyunda üçüncü taraf bir
-      analitik ya da reklam kodu yoktur.</p>
+      şirketi bu makineyi işletir ama verileri kullanmaz. Veriler satılmaz, kimseyle paylaşılmaz. Oyunda üçüncü taraf bir
+      analitik ya da reklam kodu yoktur; uygulamalarda yalnızca aşağıda anlatılan Adapty satın alma kodu vardır.</p>
     <p>Google Play ve App Store indirmeleri yönetir ve kendi gizlilik politikalarına göre kendi verilerini (ör. çökme
       raporları) toplayabilir.</p>
+
+    <h2>Uygulamalarda: satın almalar (Adapty)</h2>
+    <p>Android ve iOS uygulamaları, uygulama içi satın almaları satmak, doğrulamak ve geri yüklemek için
+      <a href="https://adapty.io/">Adapty</a>'yi (Adapty Tech Inc.) kullanır; web sitesi kullanmaz. Uygulama her açıldığında
+      içindeki Adapty kodu Adapty'nin sunucularına bağlanır ve şunları gönderir:</p>
+    <ul>
+      <li><b>Rastgele bir kimlik:</b> bu kurulum için üretilir; iPhone'da ayrıca uygulamanın satıcı kimliği (IDFV). Reklam
+        kimliği (IDFA, Google'ın Reklam Kimliği) kapalıdır ve hiç gönderilmez.</li>
+      <li><b>Satın almalar:</b> ne aldığın, ne zaman, hangi fiyat ve para biriminde, ve mağazanın satın alma kanıtı.</li>
+      <li><b>Uygulama kullanımı:</b> uygulamanın ne zaman açıldığı ve hangi satın alma ekranlarını gördüğün.</li>
+      <li><b>Cihaz bilgileri:</b> cihaz modeli, işletim sistemi sürümü, dil, saat dilimi ve mağaza ülkesi.</li>
+      <li><b>IP adresin:</b> Adapty bunu ülkeni anlamak için kullanır.</li>
+    </ul>
+    <p>Adapty bu işi bizim adımıza yapar (veri işleyen): satın almaların gerçek olduğunu doğrular, aldığını sana verir, yeni
+      bir telefonda geri getirir ve satışları bizim için sayar. Bu veriler adına, mağaza hesabına ya da oyunun Player ID'sine
+      bağlı değildir; reklam ya da takip için kullanılmaz. Satın almalar için gerektiğinden <b>Share play data</b> bunu
+      kapatmaz. Hukuki sebep satın almanın kendisi (KVKK m. 5/2-c; GDPR m. 6/1-b) ve satın alma sunmadaki meşru
+      menfaatimizdir (KVKK m. 5/2-f; GDPR m. 6/1-f). Adapty verileri kendi sunucularında saklar; bu sunucular yurt dışında
+      olabilir. Ayrıntılar: <a href="https://adapty.io/privacy/">Adapty'nin gizlilik politikası</a>.</p>
 
     <h2>Ne kadar saklanır</h2>
     <ul>
       <li><b>IP adresleri:</b> 30 gün, sonra silinir.</li>
       <li><b>Diğer her şey:</b> son ziyaretinden 2 yıl sonrasına kadar, sonra kendiliğinden silinir.</li>
+      <li><b>Adapty'deki satın alma verileri:</b> uygulamalar Adapty'yi kullandığı sürece ya da silinmesini isteyene kadar.</li>
     </ul>
 
     <h2>Seçeneklerin ve hakların</h2>
@@ -202,6 +250,9 @@
         gönderilmez.</li>
       <li><b>Silmek:</b> Ayarlar'da görünen <b>Player ID</b>'yi bize e-postayla gönder; o kimlikle saklanan her şeyi 30 gün içinde
         sileriz. <i>Reset progress</i> yalnızca cihazındaki kaydı siler, daha önce gönderilmiş verileri silmez.</li>
+      <li><b>Satın alma verilerini silmek (uygulamalar):</b> Google Play ya da App Store makbuzundaki sipariş numarasını bize
+        e-postayla gönder, Adapty'nin o satın almaya ait tuttuklarını sildiririz. Hiç satın alma yapmadıysan Adapty'de yalnızca
+        yukarıdaki rastgele kurulum kimliği ve cihaz bilgileri vardır; bunları seninle eşleştirmenin bir yolu yok.</li>
       <li>KVKK m. 11 kapsamında oyuncu kimliğine bağlı hangi verileri tuttuğumuzu öğrenebilir, düzeltilmesini isteyebilir ya da
         işlenmesine itiraz edebilirsin. Veriler kimliğine bağlı olmadığı için onları oyuncu kimliğiyle buluruz.</li>
       <li>Kişisel Verileri Koruma Kurumu'na (AB'deysen ülkendeki veri koruma otoritesine) şikâyette bulunabilirsin.</li>

@@ -21,6 +21,7 @@
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<!-- js/analytics.js: anonymous gameplay events, errors and device details, under a random id; never tracking.
+		     Adapty (js/native.js) adds app opens and purchase screens to ProductInteraction, and the entries below.
 		     The same list as the privacy page (privacy/index.html) and the store forms (mobile/README.md). -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
@@ -71,7 +72,8 @@
 				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
-		<!-- the random player id made on the phone (fds_pid), never the advertising id -->
+		<!-- the random player id made on the phone (fds_pid), and Adapty's per-install id and IDFV (it keeps purchases on
+		     the right profile); never the advertising id, which js/native.js turns off -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeDeviceID</string>
@@ -81,6 +83,22 @@
 			<false/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Adapty (in-app purchases): what was bought, to validate it, unlock it and count sales. Its SDK carries its own
+		     manifest too; Xcode's privacy report merges them -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
