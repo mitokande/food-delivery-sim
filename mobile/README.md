@@ -9,8 +9,8 @@ The web game wrapped as native apps with [Capacitor 8](https://capacitorjs.com).
   three.js version this folder doesn't have.
 - `../js/native.js` is the game's only app-specific code: haptics through the phone (iOS has no `navigator.vibrate`),
   the Android back button (closes the top card, else sends the game to the background), a second copy of the save in
-  the app's own preferences (put back if the web view's storage is ever emptied), and the site's address for analytics.
-  On the web it does nothing.
+  the app's own preferences (put back if the web view's storage is ever emptied), the site's address for analytics, and
+  the in-app purchase SDK ([below](#in-app-purchases-adapty)). On the web it does nothing.
 - `android/`, `ios/` are the native projects (in git). The app id is `com.mithatcanturan.fooddeliverysim`; the home-screen
   name is "Delivery Sim" (`android/app/src/main/res/values/strings.xml`, `CFBundleDisplayName` in `ios/App/App/Info.plist`).
 - This folder is in the web root, so `.htaccess` keeps it off the site.
@@ -20,7 +20,8 @@ Settings: portrait only, full screen (the status / navigation bars only show on 
 
 ## Day to day
 
-Needs Node 22. Android also needs JDK 21 and the Android SDK (platform 36); iOS needs a Mac with a current Xcode.
+Needs Node 22. Android also needs JDK 21 and the Android SDK (platform 36); iOS needs a Mac with Xcode 26 or later
+(Adapty's iOS SDK is built with Swift 6.2).
 
 ```sh
 cd mobile
@@ -97,6 +98,25 @@ questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (th
 - **Screenshots**: Play needs 2–8 phone screenshots and a 1024×500 feature graphic. The App Store needs 6.9" iPhone
   screenshots (1320×2868). The headless tools in `../tools/` (`shot.mjs`, `play.mjs`) can make them at any size.
 - **Name / description**: the store name can be the full "Food Delivery Simulator"; the home-screen label stays short.
+
+## In-app purchases (Adapty)
+
+The apps carry [Adapty's Capacitor SDK](https://adapty.io/docs/sdk-installation-capacitor) (`@adapty/capacitor`, pinned
+like every other package here; raise it with `npm i -E @adapty/capacitor@x.y.z`, then `npm run sync`).
+
+- The game has no bundler, so `build-web.mjs` turns the SDK's one-file build into `www/vendor/adapty-capacitor.js` and
+  maps `@adapty/capacitor` to it. Game code imports it the way Adapty's docs show (`import { adapty } from
+  '@adapty/capacitor'`), from `../js/native.js` or behind its `app` check, never on the web.
+- `../js/native.js` activates it once at launch and exports `adapty`, a promise of the ready SDK (null on the web, on
+  failure, or with no key). Wait for it before any other Adapty call.
+- `ADAPTY_KEY` there is empty: until the app's **Public SDK key** goes in (Adapty dashboard → App settings → General →
+  API keys), the SDK ships but never starts and nothing reaches Adapty. Setting it sends purchase and device data to
+  Adapty, so the same release must update the privacy page, both stores' privacy forms and the content rating
+  ("no purchases with real money") in the checklist above.
+- Android: `MainActivity` is `singleTop`, not Capacitor's default `singleTask`, which would close Google Play's purchase
+  sheet when the player leaves mid-purchase and comes back from the icon.
+- iOS: Adapty supports Swift Package Manager only, which `ios/` already uses (`CapApp-SPM`). After an SDK change, run
+  `npm run ios` on the Mac and let Xcode resolve packages, then commit the updated `Package.resolved`.
 
 ## Icon and splash
 

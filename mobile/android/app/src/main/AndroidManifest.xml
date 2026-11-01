@@ -7,12 +7,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!-- singleTop, not Capacitor's singleTask: singleTask closes Google Play's purchase sheet when the player leaves
+             mid-purchase (a bank app) and comes back from the icon. Adapty asks for standard or singleTop -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
