@@ -37,11 +37,23 @@ yükselt / işe gir / kurye kirala  ←  fiş (ücret + bahşiş − yakıt) ←
   Test: `tools/keepriding.mjs`. Analitik: `next_offer` (`take`), `job_start.chain`.
 - **Gün** 08:00'de başlar, 24:00'te biter. Saat sadece sürerken ilerler (1 gerçek sn ≈ 20 oyun sn). Öğle (11:30–13:30)
   ve akşam (18:30–21:00) yoğunluğu: daha çok sipariş, ücret çarpanı. Işık sabah → öğle → gün batımı → gece (sokak
-  lambaları, neon). Gün sonu: rapor (kazanç, gider, filo geliri, günlük hedefler).
+  lambaları, neon). Gün sonu: rapor (kazanç, gider, filo geliri). Oyun günü yoğun saatlerin ritmidir; hedefler, hediye
+  ve kontratlar gerçek takvimde.
+- **Gerçek takvim** (cihazın yerel tarihi): **3 günlük hedef** her gece yarısı yenilenir (oyun günü bitince değil);
+  **haftalık kontrat** pazartesi 00:00'da. Her gerçek günün ilk ziyaretinde **günlük hediye** kartı kendiliğinden açılır
+  (hub'da, rehber bittikten sonra, ekranda başka kart yokken; uygulama gece boyu açık kalıp geri gelince de). Arka arkaya
+  günler `data.js` `GIFTS`'i tırmanır: 1× tipik teslimat, 3 ⚡, 2×, 5 ⚡, 3×, 2× + 5 ⚡, 7. gün 6× + 10 ⚡; sonra başa
+  döner, seri saymaya devam eder. Bir gün atlanınca 1. güne döner ("You missed a day"). City sekmesinde "Today"
+  başlığında yeni hedeflere kalan süre; hedeflerin üstünde hediye satırı (bekliyorsa "Open", alındıysa "N days in a row ·
+  Tomorrow's gift"). Saat koruması: takvim geri gitmez — saat ileri alınıp hediye alındıktan sonra geri alınırsa en son
+  görülen günde bekler (ikinci hediye yok, hedefler yenilenmez); 7 günden fazla geri alınması yanlış saatin
+  düzeltilmesi sayılır (bugünden devam, bugünün hediyesi alınmış sayılır). Sunucu kaydı (MIT-12) gelince sunucu saati.
+  Ödüllü reklamlar (MIT-14) gelince hediyeye ×2: `claimGift(2)`. Kod: `state.js` `calDay` / `giftToday` / `claimGift`,
+  `ui.js` `gift`, `main.js` `offerGift`. Test: `tools/daily.mjs`.
 - **Enerji ⚡** (iş almanın bedeli; sayılar `data.js` `ENERGY`'de): her sipariş **1 ⚡**, START'a basınca düşer. Depo 10
   (Dayanıklılık becerisi seviye başına +2, en çok 20). Gerçek zamanla dolar: **6 dakikada 1**, oyun kapalıyken de (zaman
   damgasından hesaplanır; saat geri alınırsa sayaç sıfırdan başlar), ama zamanla depodan fazlası dolmaz. Seviye atlamak
-  depoyu doldurur; alınan her günlük hedef +2 ⚡; kahve +5 ⚡ (nakitle: günün ilk fincanı tipik bir teslimatın 2 katı,
+  depoyu doldurur; alınan her günlük hedef +2 ⚡; günlük hediye 3–10 ⚡; kahve +5 ⚡ (nakitle: günün ilk fincanı tipik bir teslimatın 2 katı,
   sonra 4×, 8×, gerçek günde 3 fincan; hedef ve kahve depoyu aşabilir). Filo enerji harcamaz: oyuncu dinlenirken filo
   kazanır. Ekonomi: bir teslimat ~2 dk sürer, zaman harcananın ~üçte birini geri verir; hiç durmayan oyuncu ~15–20
   teslimattan sonra boş depoya çarpar, yeni oyuncu çok daha geç (ilk seviyeler birkaç teslimatta bir gelir, her biri
@@ -421,7 +433,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 |---|---|
 | `js/main.js` | açılış, ana döngü, hub ⇄ sürüş geçişi (kamera tween), sipariş panosu, harita işaretçileri, garaj vitrini, iş sonu fiş/XP/gün |
 | `js/data.js` | tüm içerik tabloları: bölgeler, araçlar, parçalar, beceriler, yemekler, restoranlar, sipariş tipleri, filo, hedefler |
-| `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, enerji (`tickEnergy`, `useEnergy`, `buyCoffee`), gün saati |
+| `js/state.js` | kayıt (`fds_save_v1`), türetilmiş istatistikler, satın alma/yükseltme/işe girme/filo aksiyonları, enerji (`tickEnergy`, `useEnergy`, `buyCoffee`), gün saati, gerçek takvim (`calDay`, günlük hedef, haftalık kontrat, günlük hediye ve seri: `S.cal`) |
 | `js/career.js` | başarımlar (istatistikten okunur, ödülü hemen verir) |
 | `js/orders.js` | sipariş üretimi (bölge profiline göre mesafe ve tip karışımı, pano bölge filtresi), ücret, süre (`etaFor`: ölçülmüş otomatik pilot hızı × seviye payı), yıldız/bahşiş hesabı |
 | `js/city/gen.js` | 45×45 karo şehir (4 bölge, yol segmenti silme, park/ara sokak kestirmeleri, parseller, restoran yerleşimi) |
@@ -443,7 +455,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 
 Test araçları (headless Chrome, swiftshader yavaş — `game.sim(sn)` render'sız ileri sarar, `game.skipTween()` kamera geçişini atlar):
 `node tools/play.mjs` (bir teslimatı baştan sona oynar; `SIM=1.2 CTX=1 PRESS=boost`), `node tools/stop.mjs` (`?ctl=stop` otopilotunun STOP'u telefonda: ilk sürüş kartı, buton ve etiketleri, "Run it!" yok, kırmızıda basınca çizgide durup yeşilde devam, hiç dokunmadan kırmızı geçme + her birine kamera cezası, yaya ürkütme, kapıyı geçip geri dönme, dikkatli sürücü `game.ride.autoBot()` ile aynı siparişlerde kıyas; `JOBS=n`), `node tools/ctl.mjs [a|b|run|both|all]` (telefonun freni — `?ctl` olmadan varsayılan —, şerit koşusu ve Kurye Koşusu — basılı tutmak frenlemez, ↑ zıplar —: butonsuz HUD, basılı tut → fren, A'da kaydır → şerit, B'de kayan başparmak freni bırakmaz, B'de aynı siparişlerde dikkatli ve hiç dokunmayan sürücü kıyası (`PAIRS=n`), A'da draft → sapan ve kaldırım, kavşakta kaydırarak dönüş + GPS'in yeniden rotası, ışık geri sayımının döngüyle tutması, dikkatli sürücü botu `game.ride.schemeBot()` ile ve hiç dokunmadan tam teslimat), `node tools/tabs.mjs W H` (sekme görüntüleri),
-`node tools/pause.mjs` (duraklatma: buton, Settings üstte, Resume, sayfa gizlenince, Esc / P, Android geri, kapıda bekleyen istek, iptal: ⚡ geri, 2★, fiş yok; analitik olayları), `node tools/keepriding.mjs` (sürmeye devam: kapı sahneleri butonsuz ve dokunuşsuz, puan kartı dokunuşları yola geçirir, fişte yakın sipariş, "ride on" hub'a dönmeden kapıdan başlar ve 1 ⚡ harcar, enerji yokken panel, kahveyle yeniden yanar), `node tools/energy.mjs` (enerji: START bedeli, yetmeyince sipariş/START yerine panel, zamanla ve kapalıyken dolma, kahve fiyatları ve günlük sınır, seviye/hedef/Dayanıklılık), `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (bir sürüşün gerçek ortalama hızı — süre kalibrasyonu için; telefonda fren, `CTL=stop|a` başka sürüş, `BOT=1` dikkatli sürücü, yoksa hiç dokunmadan; `BOOST=1` turbo ile). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok, `?energy=off` enerji harcanmaz (çok iş süren testler).
+`node tools/pause.mjs` (duraklatma: buton, Settings üstte, Resume, sayfa gizlenince, Esc / P, Android geri, kapıda bekleyen istek, iptal: ⚡ geri, 2★, fiş yok; analitik olayları), `node tools/keepriding.mjs` (sürmeye devam: kapı sahneleri butonsuz ve dokunuşsuz, puan kartı dokunuşları yola geçirir, fişte yakın sipariş, "ride on" hub'a dönmeden kapıdan başlar ve 1 ⚡ harcar, enerji yokken panel, kahveyle yeniden yanar), `node tools/energy.mjs` (enerji: START bedeli, yetmeyince sipariş/START yerine panel, zamanla ve kapalıyken dolma, kahve fiyatları ve günlük sınır, seviye/hedef/Dayanıklılık), `node tools/daily.mjs` (gerçek takvim, saat oynatılarak: gece yarısı yeni hedefler, hediye kartı açılışta ve geri gelince, seri artar, atlanan gün sıfırlar, pazartesi yeni kontrat, oyun günü bitince hiçbiri değişmez, geri alınan saat iki kez vermez, eski kayıt hedeflerini korur), `node tools/sweep.mjs` (9 ekran boyutunda taşma/çakışma), `node tools/shot.mjs <yol> <png>`, `node tools/look.mjs <önek> <görünümler>` (sokak seviyesi görüntüler: `oldtown`, `harbor2`, `x:z:yön`, `rest-bean`, `cam_x_y_z_tx_ty_tz`, `ride5`; `CLOCK=900`, `EVAL=…`), `node tools/speed.mjs <bölge> <araç,araç> [n]` (bir sürüşün gerçek ortalama hızı — süre kalibrasyonu için; telefonda fren, `CTL=stop|a` başka sürüş, `BOT=1` dikkatli sürücü, yoksa hiç dokunmadan; `BOOST=1` turbo ile). URL: `?fps` FPS sayacı, `?clock=1260` gökyüzü saati, `?noti` hoş geldin yok, `?energy=off` enerji harcanmaz (çok iş süren testler).
 Reklam klibi: `node tools/fleetclip.mjs [oyun-kökü] [çıktı.mp4]` — 9:16, iki bölüm. Önce kurye sensin: 1. gün kaydında külüstürle
 sürüş, gerçek "Engine stalled!" olayı + KICK, kapıda 5 yıldızlı teslim (aradaki yol `game.sim` ile kesilir; acelesi olan oyuncu gibi
 turbo + kırmızıda geçiş, sipariş geç kalmasın). Sonra filo: tek kuryeden dört bölgede 10 kuryeye, gün batımı, oyunun kendi
@@ -741,6 +753,13 @@ klasör web kökünün dışında (`/var/www/vhosts/mithatck.com/fds-trailer`): 
   Sürüşte duraklatma ve siparişi iptal etme (§5). Android'in geri tuşu sürüşte artık oyunu arka plana atmıyor, menüyü
   açıyor: `native.js` önce `appback` olayını yollar, oyun onu alırsa uygulama küçülmez. Analitik: `pause`, `ride_cancel`.
   Test: `tools/pause.mjs`.
+- 2026-11-01: **Gerçek takvim** (Linear MIT-10; denetim yol haritasının 5. maddesi). Günlük hedefler yerel gece
+  yarısında, haftalık kontrat pazartesi yenilenir (`CONTRACT_DAYS` kalktı); 7 günlük giriş serisi ve günlük hediye; saat
+  geri alınınca takvim bekler (§2 *Gerçek takvim*). Eski kayıtlar güncellemede hedeflerini ve kontratlarını bugünün / bu
+  haftanın olarak korur. Bulunan bir şey: kontrat ilerlemesi haftayı yenilemiyordu (sürüş pazartesiye geçerse eski haftaya
+  yazılırdı) → `weekProgress` artık `ensureWeek`'ten geçiyor. Analitik: `streak`, `daily_gift` (admin oturum akışında
+  "Günlük hediye" / "Seri koptu"). Enerji panelinde "Daily gift · up to +10 ⚡" satırı. Test: `tools/daily.mjs`;
+  `tools/sweep.mjs` hediye kartını da ölçüyor.
 - Bilinen eksikler / sonraki adımlar: gerçek telefonda FPS ölçümü (otomatik kalite düşürme var), olay kartlarındaki
   karakterlerin dünyada görünmesi (büyükanne, köpek), müzik seçimi, Harbor iskeleleri, denge ayarı (ilk 30 dakika).
 
@@ -768,6 +787,7 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
   zıplama, kestirme, kaza, turbo ve durma süresi, kıl payı, flow; elle sürüşte virajda kayma ve kavşakta rota değişikliği; prototipte fren süresi `brakeT`, şerit değişimi `lanes`, sapan `slings`, kusursuz viraj `corners`, dışa kayma `wide`, kusursuz duruş `stops`, kapıyı geçme `overshoots`, en yüksek vites `gearMax`, kaldırımda metre `walkM`, kırmızıda geçiş `reds`, kavşakta dönüş `turns`, yeşil dalga `waves`, frende ayrıca kamera cezası `tickets`, ürkütülen yaya `pedHits`, çukura yumuşak geçiş `smooth`; otopilotta STOP ile duruş `halts` (kapıyı geçip geri gelmek sayılmaz), kusursuz duruş `stops`, kırmızıda geçiş `reds`, kapıyı geçme `overshoots`, ürkütülen yaya `pedHits`, kamera cezası `tickets` (27 Ekim öncesi kayıtlarda yerine `crossCalls`: frene basan çapraz trafik)), `ride_event` (olay, seçenek, başarı, süre doldu mu), `crash`,
   `level_up` (o ana kadarki oynama dakikası), `buy` / `claim` / `equip` / `fleet` (`state.js` her ekonomi aksiyonunda `emit('act', …)`),
   `goal_done`, `contract_done`, `achievement`, `day_end`, `offline_earn`, `setting`, `quality_step`, `app_hide` / `app_show`,
+  `streak` (hediye alınınca serinin gün sayısı `n`; seri koptuysa kopan seri `lost`), `daily_gift` (`day` 1–7, `streak`, `cash`, `energy`, `mult`),
   `energy_out` (enerji yetmedi), `next_offer` (fişteki yakın sipariş: `take` 1 = "ride on", 0 = hub'a döndü; `pick` m, `pay`, `energy`),
   `save_export` / `save_import` / `save_reset`, `pause` (`why`: `button` / `key` / `back` / `hidden`, sürüşün kaçıncı
   saniyesi, ayak), `ride_cancel` (teslim edilmeyen sipariş sayısı `n`, teslim edilmiş `done`, alınmış `picked`, geri

@@ -9,8 +9,9 @@ get hired in better districts, and grow your own courier fleet.
 - **Courier run** — on phones the road rides itself (pace, corners, the door) and the busy traffic is yours: hold the BRAKE pedal for the car in front, people crossing and red lights, swipe left / right to slip between the cars (the oncoming lane or the sidewalk), swipe up to hop potholes; grab the coins, keep the food in one piece, and react to random events.
 - **Keep riding** — pickups and hand-overs play out at the bike by themselves, and the receipt offers an order near the customer's door: "Collect & ride on" (1 ⚡) starts it right there, no trip back to the hub.
 - **Free riding on desktop** — steer anywhere in the city with the keyboard (W/S gas, brake and reverse, A/D steer); walls, poles, cars and people are solid, the GPS re-plans when you take another street, and you stop in the ring at the door.
-- **Progression** — 6 vehicles with 4 upgradeable parts and paint, 5 courier skills, 4 districts to unlock, daily goals, day/night cycle with rush hours.
-- **Energy** — every order costs 1 ⚡ at Start; it refills one every 6 minutes (even while the game is closed), a level-up fills the tank, daily goals and coffee top it up.
+- **Progression** — 6 vehicles with 4 upgradeable parts and paint, 5 courier skills, 4 districts to unlock, day/night cycle with rush hours.
+- **Coming back** — on the real calendar: three daily goals that renew at local midnight, a daily gift that grows over a 7-day streak, weekly contracts that renew on Monday.
+- **Energy** — every order costs 1 ⚡ at Start; it refills one every 6 minutes (even while the game is closed), a level-up fills the tank, daily goals, the daily gift and coffee top it up.
 - **Fleet** — rent a dispatch office, hire freelance couriers who ride around the city and earn money even while you're away.
 
 ## Run locally

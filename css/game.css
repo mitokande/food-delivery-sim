@@ -191,6 +191,8 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .goal.done { background: linear-gradient(180deg, #3b7a45, #2b5a3a); border-bottom-color: #1a3a22; } .goal em { font-style: normal; color: var(--cash); font-size: 18px; }
 .goal > .ic { width: 30px; height: 30px; }
 .goal small { color: #9fb0d6; }
+.goal.gift { background: linear-gradient(180deg, #b07a1c, #8a5a12); border-bottom-color: #5a3a0a; } .goal.gift small { color: #ffe3a3; }
+.goal small .ic.eb, .gd .ic.eb { width: 1.2em; height: 1.2em; margin-left: -1px; }
 
 /* rows (upgrades, skills) */
 .rows, .crows { display: flex; flex-direction: column; gap: 7px; }
@@ -539,6 +541,17 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .lvshield .shield { width: 96px; height: 108px; }
 .lvshield .shield::before { width: calc(100% - 12px); height: calc(100% - 12px); }
 .lvshield .shield b { font-size: 54px; -webkit-text-stroke: 7px #121b2e; }
+/* daily gift: days 1–4 on top, 5–7 below with the big day 7 twice as wide; today's glows, the ones taken this run are ticked */
+.gdays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 8px 0 10px; }
+.gd { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px 6px; border-radius: 12px; background: #fff; border-bottom: 3px solid #e4d6bb; color: #4a3d4d; }
+.gd small { font-size: 11px; font-weight: 700; color: #8a7a66; letter-spacing: .02em; }
+.gd > .ic { width: 30px; height: 30px; }
+.gv { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px; } .gd b { font: 400 15px/1.15 var(--display); white-space: nowrap; }
+.gd:last-child { grid-column: span 2; background: linear-gradient(180deg, #fff8e0, #ffe39a); } .gd:last-child > .ic { width: 38px; height: 38px; margin: -4px 0; }
+.gd.now { background: linear-gradient(180deg, #ffe08a, var(--gold)); border-bottom-color: var(--gold-d); box-shadow: 0 0 0 3px #fff, 0 0 16px 4px rgba(255, 197, 61, .85); animation: gdpulse 1.3s ease-in-out infinite; z-index: 2 !important; }
+.gd.now small { color: #6b4310; }
+.gd.got { opacity: .5; } .gd.got::after { content: '✓'; position: absolute; top: 1px; right: 6px; font: 700 17px var(--font); color: var(--green-d); }
+@keyframes gdpulse { 50% { transform: scale(1.07); } }
 .unl { text-align: left; font-weight: 600; color: #4a3d4d; margin: 4px 0 8px; padding-left: 20px; }
 .settings .set { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 10px 0; font-weight: 600; }
 .settings input[type=range] { flex: 1; max-width: 190px; } .settings select { font: 600 14px var(--font); padding: 4px 8px; border-radius: 8px; }

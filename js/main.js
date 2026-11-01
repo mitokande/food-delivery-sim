@@ -472,6 +472,7 @@ async function backToHub() {
   fillBoard(true);
   updateMarkers(); updatePreview();
   ob.event('hub');
+  offerGift(); // (a new day may have begun on the road)
   // the first ride back: say where the energy went (once)
   if (!S.seen.energyTip && !freeEnergy) { S.seen.energyTip = 1; St.save(); setTimeout(() => ui.toast(`${ICON('ui-bolt')} Each order uses ${ENERGY.order} energy. It refills by itself — tap ${ICON('ui-bolt')} to see`, ''), 2500); }
 }
@@ -645,6 +646,16 @@ game.cancelRide = () => { if (!ride.R.active) return; closePause(); ride.cancel(
 addEventListener('appback', (e) => { if (game.mode === 'ride' && ride.R.active) { e.preventDefault(); game.pause('back'); } });
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); audio.loop('music', game.mode === 'ride' ? 'music-ride' : 'music-hub'); game.amb = undefined; } }, { capture: true });
 
+// the daily gift opens by itself on a real day's first visit: in the hub, once the guide is done and nothing else is on
+// screen (tests pass ?noti, and get it only from the City tab's row)
+let giftT = 0;
+function offerGift() {
+  clearTimeout(giftT);
+  if (q.has('noti') || ob.active || !St.giftReady() || game.mode !== 'hub') return;
+  if (document.querySelector('#modals .modal')) { giftT = setTimeout(offerGift, 1500); return; }
+  ui.gift();
+}
+
 // ---------------------------------------------------------------- boot finish
 St.ensureGoals(); St.ensureWeek();
 fillBoard(true);
@@ -665,6 +676,7 @@ if (off && off.gain >= 1) { ui.offline(off); An.track('offline_earn', { gain: Ma
 // first launch: intro + guided first delivery (tests pass ?noti to skip it)
 if (q.has('noti')) { if (S.onboard.step < 99) S.onboard.step = 99; }
 else { ob.start(); if (S.onboard.step >= 99) ui.privacyNote(); } // (mid-tutorial careers see it on a later launch)
+offerGift();
 // careers from before achievements existed get theirs at once, in one note
 { const got = checkAchievements(); if (got.length && !fresh) setTimeout(() => ui.toast(`🏆 ${got.length} achievement${got.length > 1 ? 's' : ''} unlocked from your career so far — see Courier`, 'good'), 1800); }
 
@@ -779,7 +791,7 @@ function frame() {
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(frame);
-document.addEventListener('visibilitychange', () => { if (document.hidden) { St.save(true); game.pause('hidden'); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { St.save(true); game.pause('hidden'); } else offerGift(); }); // (back: a phone that kept the game open overnight)
 // headless test hook: advance the simulation without rendering
 game.skipTween = () => { if (tween) tween.t = 1; };
 game.refill = () => fillBoard(true);
