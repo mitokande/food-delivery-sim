@@ -142,6 +142,8 @@ export const fleetRate = (district, veh, skill, cut = FLEET.commission) => DISTR
 // Riding ~2 min a delivery, time gives back about a third of what a rider spends, so a player who never stops meets an
 // empty tank after ~15–20 deliveries (a new one much later: early levels come every few deliveries).
 export const ENERGY = { max: 10, regenMin: 6, order: 1, goal: 2, stamina: 2, coffee: { n: 5, price: [2, 4, 8] } };
+// an order cancelled from the pause menu: its ⚡ comes back, and it counts as this many stars among the last 30 ratings
+export const CANCEL_STARS = 2;
 
 export const xpToNext = (lvl) => Math.round(90 * Math.pow(lvl, 1.35) / 10) * 10;
 

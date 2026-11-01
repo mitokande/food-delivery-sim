@@ -287,6 +287,14 @@ h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacin
 .r-timer.late { --tc: #e8432f; background: linear-gradient(#ff8a7a, #e8432f 55%, #a8261a); } .r-timer.late b { color: #fff; animation: pulse 0.8s infinite; } .r-timer.late small { color: #ffc2bb; }
 @keyframes pulse { 50% { transform: scale(1.1); } }
 .r-sub { position: absolute; top: calc(104px + var(--safe-t)); left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: flex-start; }
+.r-left { display: flex; gap: 10px; align-items: flex-start; }
+.r-pause { flex: none; display: flex; align-items: center; justify-content: center; gap: 5px; width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(180deg, #34507e, #1d2a44); border-bottom: 3px solid #121b2e; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 4px 10px rgba(0,0,0,.3); }
+.r-pause i { width: 6px; height: 18px; border-radius: 2px; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.r-pause:active { transform: translateY(2px); border-bottom-width: 1px; }
+.modal.pause .card { display: flex; flex-direction: column; gap: 8px; }
+.modal.pause .btn:not(.big) { min-height: 46px; font-size: 16px; }
+.modal.pause .btn.ghost:not(.danger) { color: #6b5a44; background: rgba(60, 40, 20, .08); }
 .r-cond { display: flex; gap: 8px; }
 .r-cond .m { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; }
 .r-cond .ic { width: 26px; height: 26px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.4)); }

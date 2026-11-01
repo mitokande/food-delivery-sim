@@ -29,12 +29,13 @@ export async function restore(key) {
   } catch { /* nothing kept */ }
 }
 
-// Android's back: closes the card on top the way its own close / cancel would; with none, the game goes to the
-// background (it saves when hidden) instead of quitting
+// Android's back: closes the card on top the way its own close / cancel would; with none, the game may take it (an
+// 'appback' event it cancels: in a ride, the pause menu), else it goes to the background (it saves when hidden)
+// instead of quitting
 plugins?.then(({ App }) => App.addListener('backButton', () => {
   const m = [...document.querySelectorAll('#modals .modal:not(.out)')].pop();
   if (m?.dataset.dismiss != null) return m.click();
   const b = m?.querySelector('[data-x="close"], [data-x="cancel"]');
   if (b) return b.click();
-  if (!m) App.minimizeApp();
+  if (!m && dispatchEvent(new Event('appback', { cancelable: true }))) App.minimizeApp();
 })).catch(() => { /* no App plugin */ });
