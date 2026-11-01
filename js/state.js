@@ -1,6 +1,6 @@
 // Save game + derived stats + economy actions. No three.js, no DOM.
 import { VEHICLE, VEHICLES, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICT, DISTRICTS, FLEET, fleetRate,
-  xpToNext, DAY_START, DAY_END, GOALS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, CONTRACT_DAYS, ENERGY } from './data.js';
+  xpToNext, DAY_START, DAY_END, GOALS, GIFTS, PAINT_COST, CHAR_IDS, FIRST_NAMES, RANKS, PREMIUM, CONTRACTS, ENERGY } from './data.js';
 import { keep } from './native.js';
 
 export const KEY = 'fds_save_v1'; // (the store apps keep a copy: native.js)
@@ -28,13 +28,14 @@ const fresh = () => ({
     express: 0, vip: 0, rainy: 0, night: 0, maxFlow: 1, contracts: 0 },
   today: { earned: 0, deliveries: 0, fuel: 0, tips: 0, fleet: 0 },
   goals: null,
+  cal: { day: 0, gift: 0, streak: 0 }, // the real calendar: latest local day seen, the day the daily gift was last taken, days in a row
   look: { char: 'male-a', helmet: '#e8432f' },
   settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true, autodrive: null }, // autodrive null: by device (phones auto, keyboards ride)
   seen: {}, // one-time tips
   onboard: { step: 0 }, // first-time guide; 99 = finished
   focus: null, // order board: work one district only (id) or all (null)
   emp: {}, // per district: { del, r: last 20 star ratings there, sus: suspended through this day }
-  week: null, // weekly contracts
+  week: null, // weekly contracts (this real week's)
   ach: {}, // achievement id → time unlocked
   unlocked: { paints: [] }, // premium finishes
   name: '',
@@ -50,8 +51,10 @@ export function load() {
       const f = fresh();
       S = { ...f, ...d, fleet: { ...f.fleet, ...d.fleet }, stats: { ...f.stats, ...d.stats }, skills: { ...f.skills, ...d.skills },
         settings: { ...f.settings, ...d.settings }, look: { ...f.look, ...d.look }, energy: { ...f.energy, ...d.energy }, today: { ...f.today, ...d.today }, seen: { ...d.seen },
-        emp: { ...d.emp }, ach: { ...d.ach }, unlocked: { ...f.unlocked, ...d.unlocked },
+        emp: { ...d.emp }, ach: { ...d.ach }, unlocked: { ...f.unlocked, ...d.unlocked }, cal: { ...f.cal, ...d.cal },
         onboard: d.onboard ? { ...d.onboard } : { step: 99 } }; // saves from before onboarding existed skip it
+      // saves from before the real calendar keep the goals and contract they have, as today's and this week's
+      if (!d.cal) { const t = calDay(); if (S.goals) S.goals.day = t; if (S.week) S.week.wk = weekOf(t); }
       return true;
     }
   } catch (e) { console.warn('save load failed', e); }
@@ -236,14 +239,32 @@ export function newDay() {
   }
   S.day++; S.clock = DAY_START;
   S.today = { earned: 0, deliveries: 0, fuel: 0, tips: 0, fleet: 0 };
-  S.goals = null; ensureGoals(); ensureWeek();
   emit('clock'); save(true);
   return report;
 }
 
+// ---------- the real calendar: daily goals, the daily gift and weekly contracts follow the device's local date ----------
+// (the in-game day stays the rhythm of the rushes). Days are numbered from 1970-01-01, local time. The calendar never
+// runs backwards: with the clock set back (after a trip forward for an early gift) it holds on the latest day seen until
+// real time catches up; set back more than ROLLBACK days, it was a wrong clock that's now fixed. The server save will
+// bring a server clock.
+const ROLLBACK = 7;
+export const dayNum = (t = Date.now()) => Math.floor((t - new Date(t).getTimezoneOffset() * 60000) / 864e5);
+export const weekOf = (day) => Math.floor((day + 3) / 7); // weeks start on Monday (day 0 was a Thursday)
+const dayStart = (day) => { const u = new Date(day * 864e5); return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()).getTime(); };
+export function calDay(now = Date.now()) {
+  const c = S.cal, d = dayNum(now);
+  if (d < c.day && c.day - d <= ROLLBACK) return c.day;
+  if (c.gift > d) c.gift = d; // (back from a clock days ahead: today's gift counts as taken)
+  c.day = d; return d;
+}
+export const msToNewDay = (now = Date.now()) => dayStart(calDay(now) + 1) - now; // new goals and the next gift
+export const weekDaysLeft = () => { const d = calDay(); return (weekOf(d) + 1) * 7 - 3 - d; }; // 7 on Monday, 1 on Sunday
+
 // ---------- daily goals ----------
 export function ensureGoals(rng = Math.random) {
-  if (S.goals && S.goals.day === S.day) return S.goals;
+  const day = calDay();
+  if (S.goals && S.goals.day === day) return S.goals;
   const pool = GOALS.filter((g) => !g.needs || skill(g.needs) > 0);
   const list = [];
   while (list.length < 3 && pool.length) {
@@ -251,7 +272,7 @@ export function ensureGoals(rng = Math.random) {
     const n = g.n[Math.min(g.n.length - 1, Math.floor(rng() * g.n.length + (S.lvl > 6 ? 1 : 0)))];
     list.push({ id: g.id, n, p: 0, reward: Math.round(typicalPay() * 2 * g.reward * Math.sqrt(n / g.n[0]) / 5) * 5, claimed: false });
   }
-  S.goals = { day: S.day, list };
+  S.goals = { day, list };
   save(); return S.goals;
 }
 export function goalProgress(id, by = 1, ctx = {}) {
@@ -261,9 +282,10 @@ export function goalProgress(id, by = 1, ctx = {}) {
   save();
 }
 
-// ---------- weekly contracts (a set of three bigger goals every CONTRACT_DAYS in-game days) ----------
+// ---------- weekly contracts (a set of three bigger goals every real week) ----------
 export function ensureWeek(rng = Math.random) {
-  if (S.week && S.day < S.week.from + CONTRACT_DAYS) return S.week;
+  const wk = weekOf(calDay());
+  if (S.week && S.week.wk === wk) return S.week;
   const pool = CONTRACTS.filter((c) => !c.minLvl || S.lvl >= c.minLvl);
   const open = DISTRICTS.filter((d) => S.districts[d.id]);
   const list = [];
@@ -277,12 +299,11 @@ export function ensureWeek(rng = Math.random) {
   // finishing all three wins a premium finish (or a fat cheque once you own them all)
   const paints = PREMIUM.filter((x) => !x.award && !S.unlocked.paints.includes(x.id));
   const bonus = paints.length ? { paint: paints[Math.floor(rng() * paints.length)].id } : { cash: Math.round(typicalPay() * 20 / 10) * 10 };
-  S.week = { from: S.day, list, bonus, bonusClaimed: false };
+  S.week = { wk, list, bonus, bonusClaimed: false };
   save(); return S.week;
 }
 export function weekProgress(id, by = 1, ctx = {}) {
-  if (!S.week) return;
-  for (const c of S.week.list) {
+  for (const c of ensureWeek().list) { // (a ride may cross Monday midnight)
     if (c.p >= c.n) continue;
     const match = c.id === id && (!c.d || c.d === ctx.d) || (c.id === 'dist' && id === 'deliver' && c.d === ctx.d);
     if (!match) continue;
@@ -364,6 +385,30 @@ export function claimGoal(i) {
   const g = S.goals.list[i];
   if (!g || g.p < g.n || g.claimed) return false;
   g.claimed = true; did('claim', { k: 'goal', id: g.id, reward: g.reward }); earn(g.reward, 'goal'); addEnergy(ENERGY.goal); addXP(30); return true;
+}
+
+// ---------- daily gift: one a real day; days in a row climb GIFTS (data.js), a missed day starts again at day 1 ----------
+export function giftValue(i) { const g = GIFTS[i % GIFTS.length]; return { cash: g.cash ? Math.round(typicalPay() * g.cash / 5) * 5 : 0, energy: g.energy || 0 }; }
+export const giftReady = () => calDay() > S.cal.gift;
+// today's gift: the day of the run it is (i: 0..6, streak: days in a row with it) and what it holds; taken = already collected
+export function giftToday() {
+  const day = calDay(), c = S.cal, taken = day <= c.gift;
+  const streak = taken ? c.streak : day - c.gift === 1 ? c.streak + 1 : 1;
+  return { i: (streak - 1) % GIFTS.length, streak, taken, ...giftValue(streak - 1) };
+}
+// mult: ×2 for watching a rewarded ad, once those exist
+export function claimGift(mult = 1) {
+  const g = giftToday();
+  if (g.taken) return null;
+  const c = S.cal, lost = g.streak === 1 && c.streak ? c.streak : 0;
+  c.gift = calDay(); c.streak = g.streak;
+  const cash = g.cash * mult, energy = g.energy * mult;
+  did('streak', { n: g.streak, ...(lost && { lost }) });
+  did('daily_gift', { day: g.i + 1, streak: g.streak, cash, energy, mult });
+  if (cash) earn(cash, 'gift');
+  if (energy) addEnergy(energy);
+  save(true);
+  return { ...g, cash, energy };
 }
 
 // ---------- fleet ----------

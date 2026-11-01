@@ -147,7 +147,7 @@ export const CANCEL_STARS = 2;
 
 export const xpToNext = (lvl) => Math.round(90 * Math.pow(lvl, 1.35) / 10) * 10;
 
-// Daily goal templates
+// Daily goal templates: three of them, a fresh set at local midnight (the real calendar, not the in-game day)
 export const GOALS = [
   { id: 'deliver', text: (n) => `Deliver ${n} orders`, n: [4, 6, 8], reward: 1 },
   { id: 'five', text: (n) => `Get ${n} five-star ratings`, n: [2, 3, 4], reward: 1.3 },
@@ -157,6 +157,10 @@ export const GOALS = [
   { id: 'early', text: (n) => `Deliver ${n} orders early`, n: [2, 3, 4], reward: 1.1 },
   { id: 'nodamage', text: (n) => `${n} deliveries with no food damage`, n: [1, 2, 3], reward: 1.2 },
 ];
+
+// Daily gift: one a real day, waiting on the first visit of the day. Days in a row climb this table (cash is × a typical
+// delivery's pay; energy may go over the tank), after day 7 it goes round again, and a missed day starts it at day 1.
+export const GIFTS = [{ cash: 1 }, { energy: 3 }, { cash: 2 }, { energy: 5 }, { cash: 3 }, { cash: 2, energy: 5 }, { cash: 6, energy: 10 }];
 
 // Employer ranks per district (deliveries there + rating there). Perks apply to that district's orders.
 export const RANKS = [
@@ -204,8 +208,7 @@ export const ACHIEVEMENTS = [
   { id: 'contract10', name: 'Contractor', desc: 'Complete 10 weekly contracts', stat: 'contracts', n: 10, cash: 4000 },
 ];
 
-// Weekly contracts: a fresh set every CONTRACT_DAYS in-game days. Scaled by level in state.js.
-export const CONTRACT_DAYS = 5;
+// Weekly contracts: a fresh set every real week (Monday, local time). Scaled by level in state.js.
 export const CONTRACTS = [
   { id: 'deliver', text: (n) => `Deliver ${n} orders`, n: 30 },
   { id: 'dist', text: (n, d) => `Deliver ${n} orders in ${d}`, n: 15, district: true },

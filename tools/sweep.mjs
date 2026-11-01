@@ -21,6 +21,7 @@ const screens = {
   courier: () => game.ui.setTab('courier'),
   jobs: () => game.ui.setTab('jobs'),
   fleet: () => game.ui.setTab('fleet'),
+  gift: () => game.ui.gift(),
   ride: () => { game.ui.setTab('city'); document.querySelector('.ocard')?.click(); game.startJob(); return 1; },
   // the autopilot's STOP and the context buttons all up at once (the ride held still so its frame doesn't redraw them)
   stop: () => {
@@ -59,7 +60,7 @@ for (const [w, h] of sizes) {
         const r = el.getBoundingClientRect();
         if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.push(`${nm(el)} off screen [${r.left | 0},${r.top | 0},${r.right | 0},${r.bottom | 0}]`);
       }
-      for (const el of document.querySelectorAll('button, .oinfo b, .r-what b, .res b')) {
+      for (const el of document.querySelectorAll('button, .oinfo b, .r-what b, .res b, .gd')) {
         if (!vis(el) || el.closest('.vcards, .marker, .r-btn')) continue;
         if (el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).textOverflow !== 'ellipsis') out.push(`text clipped in ${nm(el)}: "${el.textContent.trim().slice(0, 24)}"`);
       }
@@ -74,7 +75,7 @@ for (const [w, h] of sizes) {
     if (issues.length) bad++;
     console.log(`${String(w + 'x' + h).padEnd(9)} ${name.padEnd(8)} ${issues.length ? issues.join('; ') : 'ok'}`);
     if (process.env.SHOTS) await page.screenshot({ path: `tools/shots/sw-${w}x${h}-${name}.png` });
-    if (name === 'event' || name === 'receipt') await page.evaluate(() => document.querySelectorAll('.modal').forEach((m) => m.remove()));
+    if (name === 'event' || name === 'receipt' || name === 'gift') await page.evaluate(() => document.querySelectorAll('.modal').forEach((m) => m.remove()));
   }
   await page.close();
 }

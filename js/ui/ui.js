@@ -1,7 +1,7 @@
 // DOM UI: hub (top bar, tabs, sheets), ride HUD, modals, toasts.
 import * as St from '../state.js';
 import { S } from '../state.js';
-import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT, RANKS, PREMIUM, ACHIEVEMENTS, CONTRACTS, CONTRACT_DAYS,
+import { VEHICLES, VEHICLE, PARTS, PART_MAX, partCost, SKILLS, SKILL_MAX, skillCost, DISTRICTS, DISTRICT, DPROFILE, FOODS, ORDER_TYPES, RESTAURANT, RANKS, PREMIUM, ACHIEVEMENTS, CONTRACTS, GIFTS,
   FLEET, fleetRate, PAINTS, PAINT_COST, CHAR_IDS, DAY_END, ENERGY } from '../data.js';
 import { HZ } from '../ride/hazards.js';
 import { W as WEATHER, RAIN_PAY } from '../weather.js';
@@ -266,6 +266,11 @@ export function createUI(game) {
       : `<div class="hint">${list.length ? `Tap an order to take it. Your ${VEHICLE[S.active].name} carries <b>${cap}</b>.` : 'No orders right now — new ones pop up every few seconds.'}</div>`;
     const goals = St.ensureGoals().list.map((g, i) => `<div class="goal ${g.p >= g.n ? 'done' : ''}">${ICON(g.p >= g.n ? 'ui-gift' : 'ui-trophy')}<span>${goalText(g)}<i><u style="width:${g.p / g.n * 100}%"></u></i></span>
       ${g.claimed ? '<em>✓</em>' : g.p >= g.n ? `<button class="btn gold sm" data-act="claim" data-i="${i}">${money(g.reward)}<small class="gen">+${ENERGY.goal}${ICON('ui-bolt')}</small></button>` : `<small>${g.p}/${g.n}</small>`}</div>`).join('');
+    // the daily gift waiting (it also opens by itself: main.js offerGift), or the run of days so far and tomorrow's gift
+    const gf = St.giftToday();
+    const gift = gf.taken
+      ? `<div class="goal streak">${ICON('ui-calendar')}<span>${gf.streak} day${gf.streak > 1 ? 's' : ''} in a row<small>Tomorrow's gift: ${giftText(St.giftValue(gf.streak))}</small></span></div>`
+      : `<div class="goal gift">${ICON('ui-gift')}<span>Daily gift<small>Day ${gf.i + 1} of ${GIFTS.length}</small></span><button class="btn gold sm" data-act="gift">Open</button></div>`;
     // work one district only, or all of them
     const open = DISTRICTS.filter((d) => S.districts[d.id]);
     const focus = S.focus && S.districts[S.focus] ? S.focus : '';
@@ -274,12 +279,12 @@ export function createUI(game) {
       ${filter}
       <div class="orders">${list.map((o) => orderCard(o, game.taken.includes(o))).join('')}</div>
       ${start}
-      <div class="sec-head"><h2>Today</h2><span class="sub">Day ${S.day} goals</span></div><div class="goals">${goals}</div>
+      <div class="sec-head"><h2>Today</h2><span class="sub">New goals in ${hmm(St.msToNewDay() / 1000)}</span></div><div class="goals">${gift}${goals}</div>
       ${renderWeek()}`;
   }
   function renderWeek() {
     const w = St.ensureWeek(); if (!w) return '';
-    const left = w.from + CONTRACT_DAYS - S.day;
+    const left = St.weekDaysLeft();
     const rows = w.list.map((c, i) => {
       const T = CONTRACTS.find((x) => x.id === c.id);
       const text = T ? T.text(c.n, c.d ? DISTRICT[c.d].name : '') : c.id;
@@ -292,6 +297,7 @@ export function createUI(game) {
       ${w.bonusClaimed ? '<em>✓</em>' : all ? `<button class="btn gold sm" data-act="weekbonus">Claim</button>` : ''}</div>`;
     return `<div class="sec-head"><h2>Contract</h2><span class="sub">${left > 1 ? `${left} days left` : 'last day'}</span></div><div class="goals">${rows}${bonus}</div>`;
   }
+  function giftText(v) { return [v.cash && money(v.cash), v.energy && `${v.energy}${ICON('ui-bolt', 'eb')}`].filter(Boolean).join(' + '); }
   function goalText(g) {
     const t = { deliver: `Deliver ${g.n} orders`, five: `Get ${g.n} five-star ratings`, shortcut: `Take ${g.n} shortcuts`, overtake: `Overtake ${g.n} cars`, perfect: `Land ${g.n} perfect hops`, early: `Deliver ${g.n} orders early`, nodamage: `${g.n} deliveries with no damage` };
     return t[g.id] || g.id;
@@ -463,6 +469,7 @@ export function createUI(game) {
       case 'order': game.toggleOrder(+id); render(); break;
       case 'start': game.startJob(); break;
       case 'claim': if (St.claimGoal(+b.dataset.i)) { game.audio?.play('ui-coins'); coinsTo(b, 6); render(); } break;
+      case 'gift': gift(); break;
       case 'focus': S.focus = b.dataset.d || null; St.save(); game.refocus?.(); render(); break;
       case 'contract': if (St.claimContract(+b.dataset.i)) { game.audio?.play('ui-coins'); coinsTo(b, 8); render(); } break;
       case 'weekbonus': { const bn = St.claimWeekBonus(); if (bn) { game.audio?.play('ui-unlock'); toast(bn.paint ? `New finish: ${PREMIUM.find((p) => p.id === bn.paint).name}! Try it in the Garage.` : `+${money(bn.cash)} contract bonus`, 'good'); render(); } break; }
@@ -1187,6 +1194,7 @@ export function createUI(game) {
           <div class="rl"><span>${ICON('ui-clock')} Rest</span><b>+1 every ${ENERGY.regenMin} min</b></div>
           <div class="rl"><span>${ICON('ui-xp')} Level up</span><b>full tank</b></div>
           <div class="rl"><span>${ICON('ui-trophy')} Daily goal</span><b>+${ENERGY.goal} ${bolt}</b></div>
+          <div class="rl"><span>${ICON('ui-gift')} Daily gift</span><b>up to +${Math.max(...GIFTS.map((g) => g.energy || 0))} ${bolt}</b></div>
           <div class="rl"><span>${ICON('ui-bolt')} Stamina skill</span><b>+${ENERGY.stamina} tank / level</b></div>
           ${S.fleet.office ? `<div class="rl"><span>${ICON('ui-people')} Your fleet</span><b>earns while you rest</b></div>` : ''}
         </div>
@@ -1214,6 +1222,27 @@ export function createUI(game) {
     });
     draw();
   }
+  // the daily gift: seven days in a row climb the table, a missed day starts it again (main.js opens it on a day's first visit)
+  function gift() {
+    if ($('.modal.gift', modals)) return;
+    const g = St.giftToday(); if (g.taken) return;
+    const days = GIFTS.map((_, i) => {
+      const v = St.giftValue(i);
+      const val = [v.cash && money(v.cash), v.energy && `${v.cash ? '+' : ''}${v.energy}${ICON('ui-bolt', 'eb')}`].filter(Boolean).map((x) => `<b>${x}</b>`).join(''); // (wraps on narrow phones)
+      return `<div class="gd ${i < g.i ? 'got' : i === g.i ? 'now' : ''}"><small>Day ${i + 1}</small>${ICON(i === GIFTS.length - 1 ? 'ui-gift' : v.cash ? 'ui-cash' : 'ui-bolt')}<span class="gv">${val}</span></div>`;
+    }).join('');
+    const say = g.streak > 1 ? `<b>${g.streak} days in a row!</b> ${g.i === GIFTS.length - 1 ? 'The big one. Tomorrow it goes round again.' : 'Come back tomorrow for a bigger one.'}`
+      : S.cal.streak ? 'You missed a day, so the gifts start again from day 1.' : 'A gift every day you play. Days in a row bring bigger ones; miss a day and they start again.';
+    const m = modal(`<div class="burst"></div><div class="ribwrap"><span class="ribbon">Daily gift</span></div>
+      <p class="small">${say}</p><div class="gdays">${days}</div>
+      <button class="btn green big" data-x="ok">Collect</button>`, { cls: 'pop gift' });
+    game.audio?.play('ui-unlock', { vol: 0.6 });
+    m.card.querySelector('[data-x]').onclick = (e) => {
+      const r = St.claimGift();
+      if (r) { game.audio?.play('ui-coins'); if (r.cash) coinsTo(e.currentTarget, 8); toast(`${ICON('ui-gift')} ${giftText(r)}${r.streak > 1 ? ` · ${r.streak} days in a row` : ''}`, 'good'); }
+      m.close(); render();
+    };
+  }
   function tutorial(text, { at = 'center', btn = 'Got it' } = {}) {
     return new Promise((resolve) => {
       const m = modal(`<p>${text}</p><button class="btn green" data-x="ok">${btn}</button>`, { cls: 'tip at-' + at });
@@ -1236,7 +1265,7 @@ export function createUI(game) {
   });
 
   return {
-    setMode, setTab, render, refreshTop, toast, modal, privacyNote, pauseMenu, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy,
+    setMode, setTab, render, refreshTop, toast, modal, privacyNote, pauseMenu, event, pickup, drop, rated, receipt, levelUp, offline, dayReport, tutorial, employerNews, achievement, energy, gift,
     rideLeg, rideFrame, routeChanged, flash, coach, flowPop, pop, get tab() { return tab; },
     sheetState: () => sheetState, setSheet: (s) => { sheetState = s; sheet.dataset.state = s; },
   };

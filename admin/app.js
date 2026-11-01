@@ -141,6 +141,8 @@ function fmtEvent(e) {
     case 'pause': return { c: 'sys', t: `Duraklattı <small>${esc(PAUSE_TR[p.why] || p.why)} · sürüşün ${num(p.secs)}. sn'si · ayak ${num(p.leg + 1)}/${num(p.legs)}</small>` };
     case 'ride_cancel': return { c: 'bad', t: `<b>Siparişi iptal etti</b> <small>${num(p.n)} sipariş${p.done ? ` · ${num(p.done)} tanesi teslim edilmişti` : ''}${p.picked ? ` · ${num(p.picked)} tanesi alınmıştı` : ''} · ${num(p.secs)} sn · ${num(p.m)} m · ${num(p.energy)} enerji geri</small>` };
     case 'energy_out': return { c: 'bad', t: `Enerji yetmedi <small>${num(p.need)} gerekli · ${num(p.have)} vardı · ${money(p.cash)} nakit · ${num(p.coffee)} kahve hakkı</small>` };
+    case 'daily_gift': return { c: 'money', t: `Günlük hediye: ${num(p.day)}. gün <small>${[p.cash && money(p.cash), p.energy && `${num(p.energy)} enerji`].filter(Boolean).join(' + ')}${p.mult > 1 ? ` · ×${num(p.mult)}` : ''} · seri ${num(p.streak)} gün</small>` };
+    case 'streak': return p.lost ? { c: 'bad', t: `Seri koptu <small>${num(p.lost)} günlük seri bitti, yeniden 1. gün</small>` } : { c: 'prog', dim: 1, t: `Giriş serisi: ${num(p.n)} gün` };
     case 'equip': return { c: 'money', t: `Araç değiştirdi: ${esc(vehName(p.id))}` };
     case 'fleet': {
       const what = p.k === 'decision' ? `${FLEET_EV_TR[p.kind] || p.kind} → ${p.choice === 'a' ? 'kabul' : 'ret'}` : p.k === 'fire' ? 'kurye ayrıldı' : p.k === 'assign' ? `atama: ${p.district ? distName(p.district) : vehName(p.veh)}` : p.k;
