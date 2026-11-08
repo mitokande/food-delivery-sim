@@ -63,12 +63,18 @@ export function createIdleUI(game) {
   const sfx = (n, o) => game.audio?.play(n, o);
 
   // ---------- tabs ----------
+  // a tab opens the sheet on it; the open tab's own icon closes it (the whole map), and opens it again
+  const isClosed = () => sheet.dataset.state === 'closed';
   function setTab(t) {
     tab = t;
     for (const b of hub.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === t);
     sheet.dataset.tab = t;
-    if (sheet.dataset.state === 'min') sheet.dataset.state = 'mid';
+    if (sheet.dataset.state === 'min' || isClosed()) sheet.dataset.state = 'mid';
     render();
+  }
+  function closeSheet() {
+    sheet.dataset.state = 'closed';
+    for (const b of hub.querySelectorAll('.tabs button')) b.classList.remove('on');
   }
   function selectDistrict(d, fly = true) {
     if (!G.dist[d]) return;
@@ -257,8 +263,8 @@ export function createIdleUI(game) {
   root.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
     const a = el.dataset.act, id = el.dataset.id;
-    if (a === 'tab') { sfx('ui-tap'); setTab(el.dataset.tab); return; }
-    if (a === 'grab') { const s = sheet.dataset.state; sheet.dataset.state = s === 'min' ? 'mid' : s === 'mid' ? 'big' : 'min'; return; }
+    if (a === 'tab') { sfx('ui-tap'); if (el.closest('.tabs') && el.dataset.tab === tab && !isClosed()) closeSheet(); else setTab(el.dataset.tab); return; }
+    if (a === 'grab') { const s = sheet.dataset.state; sheet.dataset.state = s === 'mid' ? 'big' : 'mid'; return; }
     if (a === 'dist') { sfx('ui-tap'); selectDistrict(id); return; }
     if (a === 'amt') { sfx('ui-tap'); st.amt = st.amt === 1 ? 10 : st.amt === 10 ? 100 : st.amt === 100 ? 'max' : 1; render(); return; }
     if (a === 'settings') { settings(); return; }
@@ -332,5 +338,5 @@ export function createIdleUI(game) {
     });
   }
 
-  return { render, live, toast, modal, setTab, selectDistrict, offline, welcome, get tab() { return tab; }, get d() { return st.d; } };
+  return { render, live, toast, modal, setTab, closeSheet, selectDistrict, offline, welcome, get tab() { return tab; }, get d() { return st.d; }, get open() { return !isClosed(); } };
 }

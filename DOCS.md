@@ -829,6 +829,12 @@ hava ve motorlar; oyuncu kurye değil **Saffron Bay Delivery Co.**'nun patronu, 
 - **Franchise:** şubeyi sat, nakit/mutfak/kurye/manager/deal sıfırlanır; ömür boyu kazanca göre Yıldız (`√(kazanç / 1e10)`),
   her biri +%10 gelir, kalıcı.
 - **Hedefler:** üstteki hap: 11 adımlık rehber (ilk dokunuş → Downtown lisansı), sonra sıradaki kilometre taşları.
+- **Alt panel:** sekme ikonu paneli o sekmede açar; açık sekmenin kendi ikonu paneli kapatır (harita tam ekran), tekrar
+  basınca açar. Kapalıyken haritada mutfağa dokunmak yalnız pişirir, paneli açmaz.
+
+Harita kaydırma (iki oyunun hub kamerası, `js/hub.js`, 9 Kasım): parmağın altındaki zemin noktası parmağın altında kalır
+(zemine ışın, parmak basılıyken gecikme yok); fırlatma son ~100 ms'nin hızıyla kayar ve yumuşakça durur, durup kaldırılan
+parmak kaymaz. Test: `node tools/pan.mjs` (iki oyunda kaydırma, fırlatma, idle'da panelin aç/kapa).
 
 Denge `node tools/idlesim.mjs [saat] [dokunma payı]` ile: açgözlü bir bot gelir/dolar en iyi alımı yapar, manager'a kadar
 dokunur, bekleyen yıldız mevcudu ikiye katlayınca franchise yapar; zaman çizelgesi ve harcama dağılımı basar. 8 Kasım ayarıyla

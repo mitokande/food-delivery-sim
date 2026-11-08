@@ -9,43 +9,58 @@ export function createHubCamera(camera, dom, city) {
   const minD = 70, maxD = 720;
   const W = city.W * TILE, H = city.H * TILE;
   const pointers = new Map();
-  let pinch0 = 0, dist0 = 0, last = null, lastT = 0;
-  const panScale = () => st.dist * 0.0021 * (900 / Math.max(500, dom.clientHeight));
-  const toWorld = (dx, dy) => {
-    // screen drag → ground motion, rotated by the camera yaw
-    const k = panScale();
-    const c = Math.cos(st.yaw), s = Math.sin(st.yaw);
-    const rx = -dx * k, rz = -dy * k / Math.sin(PITCH);
-    return [rx * c + rz * s, -rx * s + rz * c];
-  };
+  let pinch0 = 0, dist0 = 0, anchor = null, samples = [];
+  // Drag: the spot of ground under the finger stays under it (1:1, no lag while the finger is down). A flick glides on
+  // with the speed of the last ~100 ms, easing out; a finger that stopped before lifting doesn't glide.
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3();
+  function groundAt(cx, cy) {
+    apply(camera, st.x, st.z, st.dist); camera.updateMatrixWorld();
+    const r = dom.getBoundingClientRect();
+    ndc.set((cx - r.left) / r.width * 2 - 1, -(cy - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    return ray.ray.intersectPlane(ground, hit) ? [hit.x, hit.z] : null;
+  }
+  const clampT = () => { st.tx = THREE.MathUtils.clamp(st.tx, -TILE, W); st.tz = THREE.MathUtils.clamp(st.tz, -TILE, H); };
+  // (times are the input events' own: on a slow frame the events come late and bunched, the finger's speed doesn't change)
+  function grab(p, t) { st.tx = st.x; st.tz = st.z; anchor = groundAt(p.x, p.y); samples = [[t, st.x, st.z]]; }
   dom.addEventListener('pointerdown', (e) => {
     if (!st.enabled) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
     try { dom.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
-    if (pointers.size === 1) { last = { x: e.clientX, y: e.clientY }; st.dragging = true; st.moved = 0; st.vx = st.vz = 0; lastT = performance.now(); }
-    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = st.tdist; }
+    st.vx = st.vz = 0;
+    if (pointers.size === 1) { st.dragging = true; st.moved = 0; grab(pointers.get(e.pointerId), e.timeStamp); }
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = st.tdist; anchor = null; }
   });
   dom.addEventListener('pointermove', (e) => {
     if (!st.enabled || !pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pointers.get(e.pointerId);
+    st.moved += Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y);
+    p.x = e.clientX; p.y = e.clientY;
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
       if (pinch0 > 0) st.tdist = THREE.MathUtils.clamp(dist0 * pinch0 / d, minD, maxD);
       st.moved += 10; return;
     }
-    if (!last) return;
-    const dx = e.clientX - last.x, dy = e.clientY - last.y;
-    st.moved += Math.abs(dx) + Math.abs(dy);
-    const [wx, wz] = toWorld(dx, dy);
-    st.tx += wx; st.tz += wz;
-    const now = performance.now(), dt = Math.max(1, now - lastT) / 1000; lastT = now;
-    st.vx = wx / dt; st.vz = wz / dt;
-    last = { x: e.clientX, y: e.clientY };
+    if (!anchor) return;
+    const g = groundAt(p.x, p.y); if (!g) return;
+    st.tx += anchor[0] - g[0]; st.tz += anchor[1] - g[1]; clampT();
+    st.x = st.tx; st.z = st.tz;
+    const now = e.timeStamp;
+    samples.push([now, st.x, st.z]);
+    while (samples.length > 2 && now - samples[0][0] > 100) samples.shift();
   });
   const up = (e) => {
-    pointers.delete(e.pointerId);
-    if (pointers.size === 0) { st.dragging = false; last = null; if (performance.now() - lastT > 80) st.vx = st.vz = 0; }
-    if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; pinch0 = 0; }
+    if (!pointers.delete(e.pointerId)) return;
+    if (pointers.size === 0) {
+      st.dragging = false; anchor = null;
+      const now = e.timeStamp, a = samples[0], b = samples[samples.length - 1];
+      if (a && b && b[0] > a[0] + 8 && now - b[0] < 60) {
+        const dt = (b[0] - a[0]) / 1000, cap = st.dist * 4; // (at most a few screens a second)
+        st.vx = THREE.MathUtils.clamp((b[1] - a[1]) / dt, -cap, cap); st.vz = THREE.MathUtils.clamp((b[2] - a[2]) / dt, -cap, cap);
+      }
+      samples = [];
+    }
+    if (pointers.size === 1) { pinch0 = 0; grab([...pointers.values()][0], e.timeStamp); } // (one finger left after a pinch: it drags from here)
   };
   dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
   dom.addEventListener('wheel', (e) => { if (!st.enabled) return; e.preventDefault(); st.tdist = THREE.MathUtils.clamp(st.tdist * Math.exp(e.deltaY * 0.0012), minD, maxD); }, { passive: false });
@@ -53,12 +68,14 @@ export function createHubCamera(camera, dom, city) {
   function update(dt) {
     if (!st.dragging && (st.vx || st.vz)) {
       st.tx += st.vx * dt; st.tz += st.vz * dt;
-      const k = Math.exp(-dt * 5); st.vx *= k; st.vz *= k;
-      if (Math.abs(st.vx) + Math.abs(st.vz) < 0.5) st.vx = st.vz = 0;
+      st.x += st.vx * dt; st.z += st.vz * dt; // (the glide moves the view itself, not a target it eases toward)
+      const k = Math.exp(-dt * 4); st.vx *= k; st.vz *= k;
+      if (Math.abs(st.vx) + Math.abs(st.vz) < 2) st.vx = st.vz = 0;
     }
-    st.tx = THREE.MathUtils.clamp(st.tx, -TILE, W); st.tz = THREE.MathUtils.clamp(st.tz, -TILE, H);
+    clampT();
     const k = 1 - Math.exp(-dt * 12);
-    st.x += (st.tx - st.x) * k; st.z += (st.tz - st.z) * k; st.dist += (st.tdist - st.dist) * k;
+    if (!st.dragging) { st.x += (st.tx - st.x) * k; st.z += (st.tz - st.z) * k; }
+    st.dist += (st.tdist - st.dist) * k;
     if (st.enabled) apply(camera, st.x, st.z, st.dist, st.yaw);
   }
   function apply(cam, x, z, dist, yaw = st.yaw) {
