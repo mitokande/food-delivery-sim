@@ -1,0 +1,98 @@
+/* Idle + manager mode (idle.html): what game.css doesn't already have. */
+
+/* top bar: company name + income instead of the level bar */
+.idle .lvlbox .ipsbar { display: inline-flex; align-self: flex-start; height: 22px; align-items: center; padding: 0 10px; border-radius: 11px; background: rgba(0,0,0,.5); border: 2px solid #1d2a44; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.idle .lvlbox .ips { font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--cash); text-shadow: 0 1px 0 rgba(0,0,0,.5); }
+.idle .lvlbox .nm { font-size: 15px; }
+.idle .ava .ic { margin-top: 8px; }
+.idle .who { max-width: 230px; }
+.idle .topbar .cash { margin-left: auto; }
+.idle .shield { width: 34px; }
+.idle .shield b { font-size: 14px; }
+
+/* the goal: a pill under the clock (gold and bouncing once it can be claimed) */
+.goalpill { position: absolute; top: calc(108px + var(--safe-t)); left: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 16px;
+  background: var(--panel); box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.3); font-weight: 600; font-size: 13.5px; text-align: left; }
+.goalpill .gt { flex: 1; min-width: 0; }
+.goalpill .gr { flex: none; font-style: normal; font-family: var(--display); font-size: 14px; color: var(--cash); padding: 2px 9px; border-radius: 10px; background: rgba(0,0,0,.3); }
+.goalpill.done { background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; box-shadow: 0 0 0 2.5px #fff, 0 4px 0 2px rgba(0,0,0,.3); animation: bob 1.4s ease-in-out infinite; }
+.goalpill.done .gr { color: #fff; background: var(--green-d); }
+
+/* district chips: the locked one shows its license price */
+.dchips .lockchip { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.25); color: #c8d3ee; }
+.dchips .lockchip .ic { width: 16px; height: 16px; margin-right: 2px; vertical-align: -3px; }
+.dchips .lockchip small { color: var(--cash); }
+.dchips .lockchip:disabled { opacity: 1; filter: none; } .dchips .lockchip:disabled small { color: #ff9d8a; }
+.dchips .nomgr { color: #ffb24a; }
+.dchips button.on .nomgr { color: #7a3a00; }
+.sec-head .amt { font-family: var(--display); font-size: 15px; padding: 3px 12px; border-radius: 12px; background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; border-bottom: 3px solid #c47a12; }
+
+/* the delivery card: kitchens' orders against the couriers' capacity */
+.dcard { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px 9px; margin-bottom: 8px; border-radius: 16px; background: linear-gradient(180deg, #2e4470, #24345a); border-bottom: 4px solid #16213a; box-shadow: inset 0 0 0 2px rgba(91,209,59,.45); cursor: pointer; }
+.dcard.cold { box-shadow: inset 0 0 0 2px rgba(232,67,47,.8); animation: coldglow 1.4s ease-in-out infinite; }
+@keyframes coldglow { 50% { box-shadow: inset 0 0 0 2px rgba(232,67,47,.35); } }
+.dline { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: #c8d3ee; }
+.dline span { display: inline-flex; align-items: center; gap: 4px; }
+.dline .ic { width: 22px; height: 22px; }
+.dline b { font-family: var(--display); font-weight: 400; font-size: 15px; color: #fff; }
+.dbar { display: block; height: 10px; border-radius: 6px; background: linear-gradient(90deg, #e8432f, #ff8a3d); overflow: hidden; }
+.dbar u { display: block; height: 100%; background: linear-gradient(#9ff07c, #4cc22c); transition: width .3s; }
+.dcard small { font-size: 12px; color: #b9c6e6; }
+.dcard.cold small { color: #ffb4a8; font-weight: 700; }
+.mgrline { display: flex; align-items: center; gap: 8px; margin: 0 2px 8px; font-size: 13px; font-weight: 600; color: #c8d3ee; }
+.mgrline > span { flex: 1; }
+.mgrline .ic { width: 28px; height: 28px; }
+.mgrline.nom { color: #ffd2a0; }
+.cava.sm { width: 34px; height: 34px; }
+.cookall { width: 100%; margin-bottom: 8px; }
+
+/* a kitchen row: the food is the cook button, a bar fills while a batch cooks */
+.irow { padding: 7px 8px; }
+.irow.lockd { opacity: .85; }
+.irow.lockd > .ic { width: 46px; height: 46px; padding: 5px; border-radius: 50%; background: rgba(0,0,0,.24); filter: grayscale(.6); }
+.cookb { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 50% 35%, #fffaf0, #f1e4cc); box-shadow: 0 0 0 3px #fff, 0 4px 0 3px rgba(0,0,0,.3); }
+.cookb .ic { width: 40px; height: 40px; }
+.cookb:active { transform: scale(.92); }
+.cookb .lvb { position: absolute; left: -6px; bottom: -6px; min-width: 24px; height: 20px; padding: 0 5px; border-radius: 10px; background: #2b3d63; border: 2px solid #fff; font: 400 12px/16px var(--display); font-style: normal; color: #fff; }
+.cookb .tapme { position: absolute; top: -9px; right: -10px; font: 400 11px var(--display); font-style: normal; color: #4a2a00; background: var(--gold); padding: 1px 6px; border-radius: 8px; border: 2px solid #fff; opacity: 0; transform: scale(.6); transition: .15s; }
+.cookb.idle:not(.auto) { animation: tapme 1s ease-in-out infinite; }
+.cookb.idle:not(.auto) .tapme { opacity: 1; transform: none; }
+@keyframes tapme { 50% { box-shadow: 0 0 0 3px #ffd56b, 0 0 0 7px rgba(255,213,107,.4), 0 4px 0 3px rgba(0,0,0,.3); } }
+.pbar { position: relative; display: block; height: 18px; border-radius: 9px; background: rgba(0,0,0,.4); overflow: hidden; margin: 3px 0 2px; }
+.pbar u { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#9ff07c, #4cc22c); }
+.pbar em { position: relative; display: block; font: 400 12.5px/18px var(--display); font-style: normal; text-align: center; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.8); }
+.btn.buy { min-width: 96px; flex-direction: column; gap: 0; line-height: 1.05; padding: 4px 8px; }
+.btn.buy small, .row .btn.sm small { font-size: 12px; display: block; }
+.row .btn.sm { flex-direction: column; gap: 0; line-height: 1.05; min-width: 84px; }
+.btn.bump { animation: cashpop .4s cubic-bezier(.3,1.6,.5,1); }
+.row.mgr .sg { font-size: inherit; text-shadow: none; color: #ffd56b; }
+.btn.gold.on { animation: bob .8s ease-in-out infinite; }
+
+/* franchise */
+.bank.star { background: linear-gradient(180deg, #b07a1c, #8a5a12); border-bottom-color: #5a3a0a; box-shadow: inset 0 0 0 2px rgba(255,213,107,.6); }
+.bank.star b { color: #ffe08a; -webkit-text-stroke-color: #5a3a0a; }
+.frbox { padding: 4px 2px; }
+.frbox p { margin: 2px 2px 8px; font-size: 14px; color: #c8d3ee; }
+.frbox .rlines { margin: 0 0 10px; }
+
+/* map: kitchens with a cycle ring, popups, the big-order bubble */
+.mk.ik .ring { position: absolute; inset: -8px; border-radius: 50%; background: conic-gradient(#5bd13b calc(var(--p, 0) * 1turn), rgba(20,30,50,.45) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); }
+.mk.ik .cnt { background: #2b3d63; }
+.mk.ik .cnt.buy { background: var(--green-d); font-size: 16px; }
+.mk.ik .price { margin-top: 12px; font-style: normal; font: 400 13px var(--display); color: #fff; background: var(--green-d); padding: 1px 8px; border-radius: 9px; border-bottom: 3px solid #1f5e12; }
+.marker.idle .bub { animation: tapme 1s ease-in-out infinite; }
+.mk.paypop { padding: 0; animation: payup 1.1s ease-out forwards; }
+.mk.paypop b { font: 400 18px var(--display); color: var(--cash); -webkit-text-stroke: 4px #1d4a12; paint-order: stroke fill; white-space: nowrap; }
+@keyframes payup { from { opacity: 0; margin-top: 10px; } 15% { opacity: 1; } to { opacity: 0; margin-top: -46px; } }
+.mk.bigorder .bub { width: auto; height: auto; border-radius: 16px; padding: 4px 12px 5px; display: flex; flex-direction: column; align-items: center; gap: 0; background: linear-gradient(180deg, #ffe08a, #f6b52a); color: #4a2a00;
+  box-shadow: 0 0 0 3px #fff, 0 5px 0 2px rgba(0,0,0,.3); animation: bob 1s ease-in-out infinite; }
+.mk.bigorder .bub b { font: 400 15px var(--display); } .mk.bigorder .bub small { font: 700 13px var(--font); color: #1f5e12; }
+.mk.bigorder .bub .ic { width: 32px; height: 32px; position: static; }
+.mk.bigorder .bub::after { border-top-color: #fff; }
+
+/* wide screens: the sheet is a panel on the left, so the goal goes to the top right */
+@media (min-aspect-ratio: 1/1) and (min-width: 700px) {
+  .goalpill { left: auto; right: 8px; top: calc(60px + var(--safe-t)); max-width: 420px; }
+}
+.modal .btn.ghost { color: #6b5a44; background: rgba(60, 40, 20, .08); box-shadow: none; margin-top: 6px; width: 100%; }
