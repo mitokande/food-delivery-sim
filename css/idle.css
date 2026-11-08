@@ -18,6 +18,9 @@
 .goalpill.done { background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; box-shadow: 0 0 0 2.5px #fff, 0 4px 0 2px rgba(0,0,0,.3); animation: bob 1.4s ease-in-out infinite; }
 .goalpill.done .gr { color: #fff; background: var(--green-d); }
 
+/* the sheet closed from its tab icon: out of the way, the whole map shows (beats game.css's landscape panel too) */
+.sheet[data-state="closed"] { height: 0 !important; top: auto !important; opacity: 0; visibility: hidden; pointer-events: none; transition: height .28s cubic-bezier(.3,.8,.3,1), opacity .2s, visibility 0s .28s; }
+
 /* district chips: the locked one shows its license price */
 .dchips .lockchip { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.25); color: #c8d3ee; }
 .dchips .lockchip .ic { width: 16px; height: 16px; margin-right: 2px; vertical-align: -3px; }

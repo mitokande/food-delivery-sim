@@ -136,8 +136,8 @@ function syncMap() {
       html: `<span class="bub" style="--mc:${r.color}"><i class="ring"></i>${ICON(FOODS[r.food].icon)}${L ? `<i class="cnt">${L}</i>` : `<i class="cnt buy">+</i>`}</span>${L ? '' : `<em class="price">${E.money(r.c)}</em>`}`,
       onTap: () => {
         ui.selectDistrict(r.district, false);
-        if (ui.tab !== 'kitchens') ui.setTab('kitchens');
-        if (!L) { const row = document.querySelector(`.irow[data-id="${r.id}"]`); row?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+        if (!L) { ui.setTab('kitchens'); const row = document.querySelector(`.irow[data-id="${r.id}"]`); row?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+        if (ui.open && ui.tab !== 'kitchens') ui.setTab('kitchens'); // (a closed sheet stays closed: the tap just cooks)
         if (!E.hasMgr(G, r.district)) game.act('cook', r.id);
       } });
     mk[r.id] = m;
@@ -221,7 +221,8 @@ const sheetEl = document.getElementById('sheet'), topEl = document.querySelector
 function updateViewOffset(dt) {
   const W = innerWidth, H = innerHeight, r = sheetEl.getBoundingClientRect(), top = topEl.getBoundingClientRect().bottom + 30;
   let tx = 0, ty = 0;
-  if (r.width > W * 0.8) ty = H / 2 - (top + r.top) / 2; else tx = -(r.right + 10) / 2;
+  if (r.width > W * 0.8) ty = H / 2 - (top + r.top) / 2; // (sheet at the bottom; closed, its top is the tab bar's)
+  else if (sheetEl.dataset.state !== 'closed') tx = -(r.right + 10) / 2; // (side panel)
   const k = 1 - Math.exp(-dt * 8);
   vo.x += (tx - vo.x) * k; vo.y += (ty - vo.y) * k;
   camera.setViewOffset(W, H, vo.x, vo.y, W, H);
