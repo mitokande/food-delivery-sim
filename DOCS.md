@@ -448,6 +448,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ride/world.js` | serbest sürüş için şehir: zemin (asfalt/kaldırım/çim ve yüksekliği), çarpılabilir her şey (10 m ızgarada), rota başlatılacak yol karosu |
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
+| `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -808,3 +809,31 @@ Site bir proxy/CDN arkasına girerse `api/config.local.php`'de `ip_header` ayarl
 - **Kurulum (sunucu):** veritabanı web kökünün dışında olmalı ve PHP kullanıcısı yazabilmeli:
   `php api/cli.php init /var/www/vhosts/mithatck.com/fds-analytics` → `api/config.local.php` yazar ve rastgele panel şifresini basar.
   Şifre değiştirmek: `php api/cli.php set-password`. Durum: `php api/cli.php info`. Eski ham olayları silmek: `php api/cli.php prune 180`.
+
+## 11. Idle + yönetim modu (`idle.html`, prototip, 8 Kasım 2026)
+
+Ayrı sayfa, ayrı kayıt (`fds_idle_v1`): kurye oyununun kaydına dokunmaz, analitik göndermez. Aynı şehir, trafik, gökyüzü,
+hava ve motorlar; oyuncu kurye değil **Saffron Bay Delivery Co.**'nun patronu, sürüş yok.
+
+- **Döngü:** restoranlar parti parti sipariş pişirir (her birinin döngüsü var: Sunny Burger 1 sn … Sunny Burger Hills 20 sn),
+  bölgenin kuryeleri taşır. Parti `sipariş × değer` öder, ama yalnız kuryelerin taşıyabildiği payı: mutfaklar filodan hızlıysa
+  yemeğin bir kısmı soğur (üst karttaki kırmızı çubuk). Yönetim kararı budur: mutfak mı büyütülecek, kurye mi alınacak.
+- **Restoran:** ortaklık bedeli, seviye (fiyat ×g her seviye), 10/25/50/100/200… seviyede partideki sipariş ×2. Büyük mutfaklar
+  seviye başına daha çok sipariş yollar (bölgedeki sırası: 1, 3, 9, 27), yani her ortaklık kuryelerin yükünü de artırır.
+- **Kurye:** bölge başına sayı (fiyat ×1.14), aynı kilometre taşlarında rota ×2, araç sınıfı (Rust Bucket → Viper, ×1 … ×10).
+- **Manager:** bölge başına bir tane. Yokken mutfak yalnız dokununca bir parti pişirir (Cook all hepsini başlatır); varken hepsi
+  kendi pişirir ve oyun kapalıyken de kazanır (ofisin saati kadar: 1 → 24 saat). *Surge*: o bölgede 30 sn ×3, 5 dk bekleme.
+- **Canlı çarpanlar:** öğle (11:30–14:00) ve akşam (18:30–21:00) yoğunluğu ×1.5 (şehir saati gerçek dakikada bir oyun saati),
+  yağmur ×1.25. Haritada ara sıra **BIG ORDER** balonu: dokununca ~40 sn'lik gelir.
+- **Deals:** tek seferlik çarpanlar (restoran ×3/×5, tüm gelir ×2…×10, bölge kurye kapasitesi ×2), en ucuzdan sıralı.
+- **Franchise:** şubeyi sat, nakit/mutfak/kurye/manager/deal sıfırlanır; ömür boyu kazanca göre Yıldız (`√(kazanç / 1e10)`),
+  her biri +%10 gelir, kalıcı.
+- **Hedefler:** üstteki hap: 11 adımlık rehber (ilk dokunuş → Downtown lisansı), sonra sıradaki kilometre taşları.
+
+Denge `node tools/idlesim.mjs [saat] [dokunma payı]` ile: açgözlü bir bot gelir/dolar en iyi alımı yapar, manager'a kadar
+dokunur, bekleyen yıldız mevcudu ikiye katlayınca franchise yapar; zaman çizelgesi ve harcama dağılımı basar. 8 Kasım ayarıyla
+botta Downtown ~9 dk, Harbor ~38 dk, ilk franchise ~54 dk (+10 ★); gerçek oyuncu daha yavaş. Kurye harcaması toplamın %1–23'ü
+(en çok başta): darboğaz kilometre taşlarında çıkıyor ama ucuz kapanıyor; güçlenmesi gerekirse `HIRE_G` / `IDIST.hire`.
+Tarayıcı testi `node tools/idle.mjs [klasör]` (telefon: hoş geldin, dokunuşlar, alım, kurye darboğazı, manager, Surge, deal, lisans,
+franchise, offline kazanç; görüntüler `idle-*.png`). URL: `?fresh` kaydı okumadan başlar, `?noti` hoş geldin kartı yok.
+

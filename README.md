@@ -14,6 +14,12 @@ get hired in better districts, and grow your own courier fleet.
 - **Energy** — every order costs 1 ⚡ at Start; it refills one every 6 minutes (even while the game is closed), a level-up fills the tank, daily goals, the daily gift and coffee top it up.
 - **Fleet** — rent a dispatch office, hire freelance couriers who ride around the city and earn money even while you're away.
 
+## Idle + manager prototype
+
+`idle.html` is the same city as a full idle tycoon: you run Saffron Bay Delivery Co., restaurants cook batches and your couriers
+carry them (too few couriers and the food goes cold), managers automate districts and earn offline, deals multiply, a franchise
+resets the city for Stars. Its own save (`fds_idle_v1`), no analytics. Design and balance notes: DOCS.md §11.
+
 ## Run locally
 
 Any static file server works, e.g. `npx serve .` or `python3 -m http.server`, then open `index.html`.
