@@ -449,6 +449,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ride/hazards.js` · `events.js` · `vehicle.js` · `ribbon.js` | engeller · olay kartları/QTE · motor + sürücü + kask · yol üstü ok şeridi |
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
+| `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -842,4 +843,43 @@ botta Downtown ~9 dk, Harbor ~38 dk, ilk franchise ~54 dk (+10 ★); gerçek oyu
 (en çok başta): darboğaz kilometre taşlarında çıkıyor ama ucuz kapanıyor; güçlenmesi gerekirse `HIRE_G` / `IDIST.hire`.
 Tarayıcı testi `node tools/idle.mjs [klasör]` (telefon: hoş geldin, dokunuşlar, alım, kurye darboğazı, manager, Surge, deal, lisans,
 franchise, offline kazanç; görüntüler `idle-*.png`). URL: `?fresh` kaydı okumadan başlar, `?noti` hoş geldin kartı yok.
+
+## 12. Hot Chain (`idle2.html`, yeni idle oyunun 1. aşaması, 9 Kasım 2026)
+
+Yeniden tasarım önerisinin (artifact: claude.ai/artifact/UNuAx3VjmThCg8Q5oF3zhP) sentezi seçildi: B'nin bölüm iskeleti,
+A'nın "sıcak zincir" çekirdeği, C'den kurye huyları ve olay kartları. Kararlar: bölüm 15 dakika, kartlar sandıktan şansla,
+idle ayrı bir oyun. Bu sayfa 1. aşama: tek bölge, tek bölüm, çekirdek. Ayrı kayıt (`fds_idle2_v1`), analitik yok;
+`idle.html` olduğu gibi duruyor.
+
+- **Bölüm = bir iş günü:** Old Town, 09:00–22:00, gerçek zamanda 15 dakika (oyun saati gerçek saniyede 0,87 dakika). Öğle
+  yoğunluğu 12:00–14:00 ×2, akşam 18:30–21:00 ×2,4; sabah ×0,8, 21:00 sonrası ×0,8. Kart açıkken (hoş geldin, ayarlar) ve
+  sekme gizliyken gün durur. Gün bitince yıldızlar: **sıcak teslimat** sayısı 110 / 170 / 215 → ★ / ★★ / ★★★; "Play the day
+  again" aynı bölümü baştan başlatır, en iyi gün saklanır.
+- **Zincir:** müşteri sipariş verir (mutfağın talebi: taban × günün saati × promo × puan) → mutfak sırası (75 sn bekleyen
+  vazgeçer) → aşçılar (her biri bir siparişi `cook` saniyede pişirir) → raf (dolu raf aşçıları durdurur) → en yakın boş kurye
+  gelir, aracına sığanı alır (raf boşalmak üzereyse tezgâhta 5 sn bekler) → en yakın kapıdan başlayarak dağıtır → durağa döner
+  ya da yeni işe gider. Mesafeler şehrin yol ağında A* (ara sokaklar dahil); motorlar haritada bu rotaları sürer.
+- **Sıcaklık:** pişince 100, rafta ve motorda yemeğe göre saniyede düşer (kahve en hızlı, pizza en yavaş). Kapıda ≥70 sıcak
+  (×1,5, puanı yükseltir, yıldıza sayılır), 40–70 ılık (×1), altı soğuk (×0,5, puanı düşürür). Puan talebi ×0,6–1,2 etkiler.
+- **Alımlar:** mutfak ortaklığı (Sultan $70, Bean $220, Mamma $520), aşçı (+1, ×1,55), raf (4→6→9→13→18), promo (+%35
+  sipariş), ısı lambası (rafta ısı kaybı ×0,35), kurye (Zippy 1 sipariş / Vespetta 2, hızlı / Mule 4, yavaş; her kurye
+  sonrakini ×1,22 pahalandırır), termal çanta (motorda ısı kaybı ×0,6), kurye durağını taşımak ($40: garaj ya da bir mutfağın
+  yanı; boş kuryeler orada bekler, her iş oradan başlar).
+- **Darboğaz şeridi:** `diagnose()` zincirin nerede tıkandığını söyler (aşçılar yetişmiyor / yemek rafta kurye bekliyor /
+  kuryeler boşta, sipariş lazım / yemek ılık varıyor); şerit dokununca ilgili sekmeyi açar, ne alınacağını söylemez.
+- **Harita:** mutfak işaretinde halka = meşgul aşçı oranı, kum saati = sırada bekleyen, noktalar = raf (sıcaklık rengiyle);
+  kapılarda sipariş iğneleri (gri: hazırlanıyor, renkli: yolda, sıcaklığıyla); kurye durağı boş kurye sayısıyla; Couriers
+  sekmesi açıkken diğer durak yerleri haritada ("Move $40").
+
+Denge: `node tools/idle2sim.mjs [tohum] [bot] [--log]`. Kapı şartı tasarımdan: "en ucuzunu al" botu planlı botların gerisinde
+kalmalı. 9 Kasım ayarıyla (5 tohum): cheap 161 sıcak (★), random 162 (★), eski idle alışkanlığı "kitchen" (önce hep mutfak)
+2 (0★), neck (darboğazı düzelt) 173 (★★), plan (+ yoğunluğa hazırlık, durak) 194 (★★), plan-v (Vespetta filosu) 211 (★★,
+bir tohumda ★★★), plan-m (Old Town'da Mule) 99. Fark var ama dar (neck +%7); 3★ iyi bir insan oyunu için ayarlı, elle
+doğrulanmadı. Tarayıcı testi `node tools/idle2.mjs` (telefon: hoş geldin, gün akışı, iğneler, motor, alımlar, durak taşıma,
+şerit, sekme aç/kapa, kayıt + yeniden yükleme, gün sonu ve yeniden oynama; görüntüler `idle2-*.png`). URL: `?fresh` kaydı
+okumadan başlar, `?noti` hoş geldin kartı yok, `?speed=N` günü N kat hızlı oynatır (test için).
+
+Sonraki aşamalar (önerideki sıra): 2) üç bölüm, bölüm seçimi, oyun kapalıyken ilerleme; 3) kurye ve araç kartları, sandık,
+kadro seçimi; 4) olay kartları, günlük kutu, haftalık etkinlik, ödüllü reklam, Adapty VIP. Her aşamadan önce analitik
+(bölüm başı/sonu, yıldız) eklenmeli.
 
