@@ -2,7 +2,7 @@
   "name": "food-delivery-sim-mobile",
   "private": true,
   "type": "module",
-  "description": "Food Delivery Simulator store apps: the web game bundled into Android and iOS with Capacitor",
+  "description": "Idle Restaurant Manager store apps: the web game bundled into Android and iOS with Capacitor",
   "scripts": {
     "web": "node scripts/build-web.mjs",
     "sync": "node scripts/build-web.mjs && cap sync",

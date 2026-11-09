@@ -1,4 +1,4 @@
-// Headless check of Uncle's Diner (idle3.html): the story, the restaurant from the inside (customers at the tables, a
+// Headless check of Idle Restaurant Manager (idle3.html): the story, the restaurant from the inside (customers at the tables, a
 // tap in the kitchen cooks, the map behind a button), tapping COOK, tables paying, a cook bringing a dish to the
 // menu, skills, the scooter card, a courier and deliveries on the map, motor and courier skills, expanding the
 // restaurant (the building on the map is rebuilt; at stage 4 it takes the lot next door), save + reload, and the

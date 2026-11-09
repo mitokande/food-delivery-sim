@@ -1,4 +1,4 @@
-// Plays Uncle's Diner (js/idle3/sim.js) headless, to check the pacing: when the cooks (and their dishes), the
+// Plays Idle Restaurant Manager (js/idle3/sim.js) headless, to check the pacing: when the cooks (and their dishes), the
 // couriers, the motors and the restaurant's stages come, and what the place earns along the way.
 //   node tools/idle3sim.mjs [minutes=60] [player=all] [--log]
 // Players: a tapper (cooks the next ticket whenever the button is free, ~0.4 s to react) who stops tapping after

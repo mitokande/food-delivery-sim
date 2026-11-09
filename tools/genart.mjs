@@ -1,4 +1,4 @@
-// Generates the story and UI art for Uncle's Diner (idle3.html) with OpenAI's image API, then the page uses the
+// Generates the story and UI art for Idle Restaurant Manager (idle3.html) with OpenAI's image API, then the page uses the
 // webp copies in assets/story/. The key is read from the environment and never written anywhere. The restaurant's
 // stages are edits of the picture before them (images/edits), so they stay the same building.
 //   OPENAI_API_KEY=… node tools/genart.mjs <outdir> [name …]
@@ -42,6 +42,12 @@ export const ART = {
   'cook-btn': { size: '1024x1024', background: 'transparent', prompt: 'Game UI icon, stylized 3D cartoon, chunky and glossy: a white chef hat '
     + 'leaning on a sizzling frying pan with a small flame under it, a few sizzle sparks. Centered, fills most of the frame, transparent background, '
     + 'no text, no letters, no outline frame, no shadow on the ground.' },
+  // the store apps' icon: only the subject, mobile/scripts/icon-diner.mjs puts it on the boot screen's gradient
+  'app-icon': { size: '1024x1024', background: 'transparent', prompt: 'Mobile game app icon subject, stylized 3D cartoon, chunky, rounded and glossy: '
+    + 'a big juicy smash cheeseburger with melting cheese, lettuce and a sesame bun, wearing a puffy white chef hat tilted to one side, '
+    + 'under a small red and cream striped diner awning, a few golden sparkles around it. One bold, simple shape that reads at a tiny size. '
+    + 'Centered, fills most of the frame, nothing cut off at the edges, transparent background, no text, no letters, no outline frame, '
+    + 'no shadow on the ground.' },
 };
 
 async function gen(name, outdir) {

@@ -1,18 +1,22 @@
 # Store apps (Android + iOS)
 
-The web game wrapped as native apps with [Capacitor 8](https://capacitorjs.com). The game itself stays where it is
-(`../index.html`, `../js`, `../css`, `../assets`); nothing here is a second copy to maintain.
+The web game wrapped as native apps with [Capacitor 8](https://capacitorjs.com). The apps are **Idle Restaurant Manager**, the
+idle restaurant manager (`../idle3.html`, which becomes the apps' `index.html`); the courier game (`../index.html`) and
+the earlier idle prototypes are on the site only. The game itself stays where it is (`../idle3.html`, `../js`, `../css`,
+`../assets`); nothing here is a second copy to maintain.
 
 - `scripts/build-web.mjs` builds `www/` (not in git): the game's files, with what the site loads from CDNs (three.js
   and its addons, the Draco decoder, es-module-shims, the Google fonts in `fonts/`) taken from `node_modules` instead,
-  so the apps start and play offline. It stops if anything would still come from a CDN, or if the game moved to a
-  three.js version this folder doesn't have.
+  so the apps start and play offline. It stops if anything would still come from a CDN, if the page names a file
+  that isn't in `www/`, or if the game moved to a three.js version this folder doesn't have. To ship another page,
+  change `PAGE` (and `GAME` / `NOT`) at its top.
 - `../js/native.js` is the game's only app-specific code: haptics through the phone (iOS has no `navigator.vibrate`),
-  the Android back button (closes the top card, else sends the game to the background), a second copy of the save in
-  the app's own preferences (put back if the web view's storage is ever emptied), the site's address for analytics, and
-  the in-app purchase SDK ([below](#in-app-purchases-adapty)). On the web it does nothing.
+  the Android back button (closes the top card, then the open sheet, then the city map, else sends the game to the
+  background), a second copy of the save (`fds_idle3_v2`) in the app's own preferences (put back if the web view's
+  storage is ever emptied), and the in-app purchase SDK ([below](#in-app-purchases-adapty)). On the web it does
+  nothing. In the apps the diner's Settings have a Vibration switch and no link to the courier game.
 - `android/`, `ios/` are the native projects (in git). The app id is `com.mithatcanturan.fooddeliverysim`; the home-screen
-  name is "Delivery Sim" (`android/app/src/main/res/values/strings.xml`, `CFBundleDisplayName` in `ios/App/App/Info.plist`).
+  name is "Idle Restaurant Manager" (iOS shortens a label this long on the home screen; `android/app/src/main/res/values/strings.xml`, `CFBundleDisplayName` in `ios/App/App/Info.plist`).
 - This folder is in the web root, so `.htaccess` keeps it off the site.
 
 Settings: portrait only, full screen (the status / navigation bars only show on a swipe from the edge), iPhone only
@@ -83,6 +87,10 @@ questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (th
 
 ## Store listing checklist
 
+- **Idle Restaurant Manager sends no analytics** (`js/analytics.js` is the courier game's and never loads in the apps): from
+  the list below only Adapty's part applies now. The privacy page and `PrivacyInfo.xcprivacy` still describe the
+  courier game's analytics, which overstates what the apps collect; trim them and the store forms together before a
+  release, or leave them if analytics is coming to the diner.
 - **Privacy policy URL**: `https://mithatck.com/food-delivery-sim/privacy/` (`../privacy/index.html`, English and
   Turkish). Both stores require one, because the game sends analytics (`js/analytics.js`, `api/`). The page, the forms
   below and `PrivacyInfo.xcprivacy` must say the same thing: change them together.
@@ -105,7 +113,7 @@ questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (th
   product is on sale.
 - **Screenshots**: Play needs 2–8 phone screenshots and a 1024×500 feature graphic. The App Store needs 6.9" iPhone
   screenshots (1320×2868). The headless tools in `../tools/` (`shot.mjs`, `play.mjs`) can make them at any size.
-- **Name / description**: the store name can be the full "Food Delivery Simulator"; the home-screen label stays short.
+- **Name / description**: "Idle Restaurant Manager" in the stores and on the home screen.
 
 ## In-app purchases (Adapty)
 
@@ -127,13 +135,24 @@ like every other package here; raise it with `npm i -E @adapty/capacitor@x.y.z`,
 
 ## Icon and splash
 
-The icon is the courier on the red Vespetta, rendered in Blender by the game's vehicle pipeline. It sits on the boot
-screen's sunset gradient, with the logo's ink outline. To remake it:
+The icon is Idle Restaurant Manager's (below). Before it, it was the courier on the red Vespetta, rendered in Blender by the
+game's vehicle pipeline, on the boot screen's sunset gradient with the logo's ink outline. To make that one again:
 
 ```sh
 blender -b --factory-startup -P tools/blender/vehicles_render.py -- --mode appicon --only vespetta --samples 128 --out /tmp/fds-app
 python3 mobile/scripts/icon.py /tmp/fds-app/app-vespetta.png     # writes mobile/assets/*.png
 cd mobile && npm run assets                                      # every Android / iOS size and splash
+```
+
+The Idle Restaurant Manager icon, the one in the apps now (a smash burger in a chef hat under the diner's awning), is AI-generated
+like the story art (OpenAI `gpt-image-2.6-flare`, 2026-11-09; `tools/genart.mjs`, entry `app-icon`: only the subject, on
+a transparent background) and goes on the same gradient. `npm run assets` also reflows `AndroidManifest.xml`'s first
+line; `git checkout` that file afterwards:
+
+```sh
+OPENAI_API_KEY=… node tools/genart.mjs /tmp/fds-art app-icon
+node mobile/scripts/icon-diner.mjs /tmp/fds-art/app-icon.png     # writes mobile/assets/*.png
+cd mobile && npm run assets
 ```
 
 To use your own art instead, replace the PNGs in `assets/` (icon-only 1024², icon-foreground / icon-background 1024²,
@@ -142,5 +161,5 @@ splash 2732²) and run `npm run assets`.
 ## Fonts
 
 `fonts/` holds Fredoka and Lilita One (SIL OFL 1.1, licenses alongside), exactly the files Google Fonts serves the site.
-If `index.html` ever asks Google Fonts for other families or weights, fetch that stylesheet with a modern browser's
+If `idle3.html` ever asks Google Fonts for other families or weights, fetch that stylesheet with a modern browser's
 user agent, download its `woff2` files here and point `fonts.css` at them.
