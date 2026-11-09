@@ -90,6 +90,12 @@ await page.waitForFunction('Object.keys(game.G.orders).length > 0', { timeout: 6
 check(true, 'delivery orders come in');
 await page.waitForFunction('[...game.bikes.values()].some((b) => b.bike && b.bike.root.visible)', { timeout: 30000, polling: 250 });
 check(true, 'the courier bike is on the map');
+// the order board: one chip per pair of hands on the stove, one ticket per waiting order, deliveries the couriers can't take yet dimmed
+await openTab('kitchen'); await wait(400);
+check(await ev('document.querySelectorAll(".board .pot").length === game.G.cooks.length + 1'), 'the board shows you and each cook on the stove');
+check(await ev('(() => { game.ui.live(); const q = game.S.queueView(game.G).slice(0, 12); const el = [...document.querySelectorAll(".board .tickets .t")]; return el.length === q.length && q.every((t, i) => el[i].classList.contains("held") === t.held && el[i].classList.contains(t.kind)); })()'),
+  `the board lists the waiting orders, table or delivery, held ones dimmed (${await ev('game.S.queueView(game.G).map((t) => t.dish + (t.held ? "*" : "")).join(" ")')})`);
+await closeSheet();
 for (let i = 0; i < 200 && await ev('game.G.stats.deliveries < 1'); i++) { await cookTap(); await wait(400); }
 check(await ev('game.G.stats.deliveries >= 1'), `a delivery paid (+tip ${(await ev('game.G.stats.tips')).toFixed(1)})`);
 await shot('4-delivering');

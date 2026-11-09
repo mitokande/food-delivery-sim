@@ -916,6 +916,10 @@ olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipl
   kotası kadar. Sipariş kapılardan gelir (220 m içindeki 188 kapı), menüden rastgele yemek; ücret yemek + $3 + metre başına
   $0,04 + bahşiş. Kuryelerin bir seferde taşıyabileceğinden fazla paket önceden pişirilmez (masalara öncelik). Motor merdiveni
   ve Riding / Bag / Charm becerileri önceki sürümdeki gibi.
+- **Sipariş panosu (Mutfak sekmesi):** "Ocakta" satırı herkesin elinde ne pişirdiğini (ilerleme çubuğuyla, sen boştaysan
+  "tap COOK"), "Bekleyen siparişler" en eskisi solda olmak üzere fişleri gösterir; her fişte masa ya da motor rozeti,
+  sıradaki fiş "next" ile işaretli. Kuryelerin o an alabileceğinden fazla teslimat fişi soluk durur ("kurye bekliyor"):
+  kurye dönene kadar pişirilmez, masa fişleri öne geçer (`queueView`). Kullanıcı ilk sürümdeki işaretsiz şeridi anlamamıştı.
 - **Şerit:** önce yol gösterir (COOK'a bas → aşçı al → kurye tut → genişle → yeni aşçı), sonra darboğazı söyler: masalar
   yemek bekliyor / masa yok, müşteri gidiyor / siparişler 50 sn'den uzun kurye bekliyor / aşçılar boşta. Gerekli kişi için
   yer yoksa "genişle" der ve Restoran sekmesine götürür. Harita işaretinde restoranın küçük resmi, dolu masa sayısı, kapıdaki
@@ -927,7 +931,7 @@ Grand 66:49; gelir 1. dk $32/dk → 10. dk $140 → 30. dk $504 → 60. dk $1200
 teras 20:01, yan bina 43:21, 60. dk $453/dk. "En ucuzunu al" oyuncusu genişlemeyi geç alıyor (2. aşama 15:30). Tarayıcı testi
 `node tools/idle3.mjs` (telefon: hikâye, COOK ve bekleme, masaların ödemesi, aşçı + Hot Dog menüde, beceriler, Menü sekmesi,
 motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
-bina, kayıt + yeniden yükleme; 32 kontrol, görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`.
+bina, sipariş panosu, kayıt + yeniden yükleme; 34 kontrol, görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`.
 
 Açık konular: oyun kapalıyken ilerleme yok; garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
 aşamaların konusu; "cızırtı" sesi yok (COOK şimdilik `land` sesi).

@@ -202,3 +202,36 @@
 .dish em { font-style: normal; font-size: 11px; color: #b9c6e6; }
 .dish.off { opacity: .55; } .dish.off .ic { filter: grayscale(1) brightness(.8); } .dish.off small { color: #b9c6e6; }
 .dish.next { opacity: .9; box-shadow: inset 0 0 0 2px rgba(255,197,61,.7); } .dish.next .ic { filter: grayscale(.4); } .dish.next em { color: #ffd56b; }
+
+/* Kitchen: the order board (who cooks what; what waits, oldest first; table or delivery; held deliveries dimmed) */
+.board { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; padding: 7px 8px 8px; border-radius: 14px; background: rgba(0,0,0,.25); }
+.brow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.blabel { display: inline-flex; align-items: center; gap: 4px; font-family: var(--display); font-weight: 400; font-size: 14px; }
+.blabel .ic { width: 20px; height: 20px; align-self: center; }
+.blabel .qn { font-style: normal; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: #2b3d63; font-size: 13px; line-height: 20px; text-align: center; }
+.bnote { font-size: 11.5px; color: #b9c6e6; white-space: nowrap; }
+.bnote b { color: #fff; font-family: var(--display); font-weight: 400; font-size: 13px; }
+.stove { display: flex; flex-wrap: wrap; gap: 5px; }
+.pot { position: relative; display: inline-flex; align-items: center; gap: 3px; height: 34px; padding: 2px 8px 4px 2px; border-radius: 17px; overflow: hidden; background: rgba(255,255,255,.08); }
+.pot.on { background: rgba(255,138,61,.3); box-shadow: inset 0 0 0 2px #ff8a3d; }
+.pot .pa { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: #fff; flex: none; }
+.pot .pa .ic { width: 28px; height: 28px; object-fit: cover; object-position: 50% 0; }
+.pot > .ic { width: 26px; height: 26px; }
+.pot small { font-size: 11.5px; color: #9fb0d6; padding-right: 2px; }
+.pot > u { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: #ffd56b; }
+.board .k { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.3); font-style: normal; }
+.board .k .ic { width: 13px; height: 13px; object-fit: contain; }
+.pot .k { margin-left: -9px; margin-top: 14px; }
+.board .tickets { display: flex; flex-wrap: wrap; gap: 5px; min-height: 34px; align-items: center; }
+.board .tickets .t { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.1); font-style: normal; }
+.board .tickets .t > .ic { width: 26px; height: 26px; }
+.board .tickets .t .k { position: absolute; right: -4px; bottom: -4px; }
+.board .tickets .t.held { opacity: .38; filter: grayscale(.6); }
+.board .tickets .t.next { box-shadow: inset 0 0 0 2px #ffd56b; }
+.board .tickets .t.next::before { content: 'next'; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); padding: 0 4px; border-radius: 6px; background: #ffd56b; color: #4a2a00; font: 700 9px/12px var(--font); }
+.board .tickets .more { font: 400 13px var(--display); font-style: normal; padding: 0 4px; }
+.board .tickets .none { font-size: 12px; color: #9fb0d6; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: #b9c6e6; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend .sw { width: 14px; height: 14px; border-radius: 4px; background: rgba(255,255,255,.1); opacity: .5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+.board .t.deliv .k, .pot .k.dv, .legend .k.dv { background: #5bd13b; }

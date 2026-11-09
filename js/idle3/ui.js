@@ -181,14 +181,19 @@ export function createDinerUI(game) {
       : `<div class="row hire">${dish ? DICON(dish.id) : ICON('ui-people')}<span class="rt"><b>Hire a cook</b><small>${dish ? `Brings <b>${dish.name}</b> to the menu ($${dish.price}): more dishes bring more customers` : 'Another pair of hands'}</small></span>
           <button class="btn green sm buy" data-act="cook" data-cost="${cost}"><span>Hire</span><small>${M(cost)}</small></button></div>`;
     return `<div class="sec-head"><h2>Kitchen</h2><span class="sub">${G.cooks.length} cook${G.cooks.length === 1 ? '' : 's'} and you</span></div>
-      <div class="counter"><span class="tickets" data-live="tickets"></span>
-        <span class="cq"><span>${ICON('ui-people')}<b data-live="seated">0</b><small>tables</small></span><span>${ICON('ui-clock')}<b data-live="atdoor">0</b><small>at the door</small></span></span></div>
+      <div class="board">
+        <div class="brow"><b class="blabel">${ICON('ui-clock')}On the stove</b><small class="bnote">Tables <b data-live="seated">0</b> · at the door <b data-live="atdoor">0</b></small></div>
+        <div class="stove" data-live="stove"></div>
+        <div class="brow"><b class="blabel">${ICON('ui-package')}Orders waiting <i class="qn" data-live="qn">0</i></b><small class="bnote">cooked oldest first →</small></div>
+        <div class="tickets" data-live="tickets"></div>
+        <div class="legend"><span><i class="k">${ICON('ui-people')}</i>at a table</span><span><i class="k dv">${VICON('rustbucket')}</i>delivery</span><span><i class="sw"></i>waits for a free courier</span></div>
+      </div>
       <div class="rows pcards">
         ${hire}
         ${personCard(G.you, 'you')}
         ${G.cooks.map((c) => personCard(c, 'cook')).join('')}
       </div>
-      <div class="hint">Orders go to the kitchen as tickets, oldest first. A table pays when its food arrives.</div>`;
+      <div class="hint">A table pays when its food arrives. Delivery orders are cooked only as fast as the couriers can take them, so the food never waits on the counter.</div>`;
   }
 
   // ---------- Menu ----------
@@ -282,7 +287,7 @@ export function createDinerUI(game) {
     fab.style.setProperty('--p', (j ? 1 - j.left / j.total : 0).toFixed(3));
     const n = String(G.tickets.length), nb = $('.sm-n', fab); if (nb.textContent !== n) nb.textContent = n;
     nb.hidden = !G.tickets.length;
-    const dish = j ? j.dish : G.tickets[0]?.dish || '', sd = $('.sm-dish', fab);
+    const dish = j ? j.dish : S.peekTicket(G)?.dish || '', sd = $('.sm-dish', fab);
     if (sd.dataset.d !== dish) { sd.dataset.d = dish; sd.innerHTML = dish ? DICON(dish) : ''; }
     // the banner
     const g = guide();
@@ -299,11 +304,23 @@ export function createDinerUI(game) {
     if (tab === 'kitchen') {
       const tk = $('[data-live="tickets"]', body);
       if (tk) {
-        const jobs = [G.you, ...G.cooks].filter((p) => p.job).map((p) => p.job);
-        let h = jobs.map((x) => `<i class="cooking">${DICON(x.dish)}</i>`).join('') + G.tickets.slice(0, 8).map((x) => `<i class="${x.kind}">${DICON(x.dish)}</i>`).join('');
-        if (G.tickets.length > 8) h += `<i class="more">+${G.tickets.length - 8}</i>`;
-        if (!h) h = '<small>No orders right now</small>';
+        // on the stove: who cooks what (the bars move every frame; the chips change only when someone starts or stops)
+        const st = $('[data-live="stove"]', body), people = [{ id: 'you', p: G.you, ch: YOU_CHAR, nm: 'You' }, ...G.cooks.map((c) => ({ id: c.id, p: c, ch: c.char, nm: c.name }))];
+        const key = people.map((x) => `${x.id}:${x.p.job ? x.p.job.dish + x.p.job.kind : '-'}`).join('|');
+        if (st.dataset.k !== key) {
+          st.dataset.k = key;
+          st.innerHTML = people.map((x) => { const jb = x.p.job; return `<span class="pot ${jb ? 'on' : 'off'}"><span class="pa">${ICON('char-' + x.ch)}</span>${jb
+            ? `${DICON(jb.dish)}<i class="k ${jb.kind === 'deliv' ? 'dv' : ''}">${jb.kind === 'deliv' ? VICON('rustbucket') : ICON('ui-people')}</i>` : `<small>${x.id === 'you' ? 'tap COOK' : 'free'}</small>`}<u></u></span>`; }).join('');
+        }
+        st.querySelectorAll('.pot > u').forEach((u, i) => { const jb = people[i]?.p.job; u.style.width = `${jb ? ((1 - jb.left / jb.total) * 100).toFixed(1) : 0}%`; });
+        // waiting: oldest first; the next one up is marked, held deliveries are dimmed
+        const q = S.queueView(G), nextId = q.find((t) => !t.held)?.id;
+        let h = q.slice(0, 12).map((t) => `<i class="t ${t.kind} ${t.held ? 'held' : ''} ${t.id === nextId ? 'next' : ''}">${DICON(t.dish)}<i class="k">${t.kind === 'deliv' ? VICON('rustbucket') : ICON('ui-people')}</i></i>`).join('');
+        if (q.length > 12) h += `<i class="more">+${q.length - 12}</i>`;
+        if (!h) h = '<small class="none">No orders right now</small>';
         if (tk.dataset.h !== h) { tk.dataset.h = h; tk.innerHTML = h; }
+        $('[data-live="qn"]', body).textContent = q.length;
+        $('.legend', body).hidden = !q.length;
         $('[data-live="seated"]', body).textContent = `${G.tables.length}/${S.stageOf(G).seats}`;
         $('[data-live="atdoor"]', body).textContent = G.door.length;
       }

@@ -175,14 +175,14 @@ let dinerMk = null;
 const stageArt = (i) => `assets/story/${i === 0 ? 'diner' : 'stage' + (i + 1)}.webp`;
 function syncMap() {
   if (!dinerMk) {
-    dinerMk = markers.add({ x: DX, y: 22, z: DZ, cls: 'mk diner',
+    dinerMk = markers.add({ x: DX, y: 9, z: DZ, cls: 'mk diner',
       html: `<span class="bub"><i class="ring"></i><img class="art" alt=""><i class="cnt">0</i></span><span class="dst"><i class="seats">${ICON('ui-people')}<b>0</b></i><i class="wq">${ICON('ui-clock')}<b>0</b></i></span><em class="dname">${SIGN}</em>`,
       onTap: () => ui.setTab('restaurant') });
   }
   const img = dinerMk.el.querySelector('.art'), src = stageArt(G.stage);
   if (img.getAttribute('src') !== src) img.setAttribute('src', src);
   const two = G.stage >= 3;
-  dinerMk.pos.set(two ? (DX + NX) / 2 : DX, 22 + G.stage * 2, two ? (DZ + NZ) / 2 : DZ);
+  dinerMk.pos.set(two ? (DX + NX) / 2 : DX, 9 + G.stage * 1.5, two ? (DZ + NZ) / 2 : DZ);
   dinerMk.el.querySelector('.dname').textContent = S.stageOf(G).name;
 }
 // orders: a pin at each door (grey: in the kitchen, gold: packed, waiting for a courier, green: on the way)

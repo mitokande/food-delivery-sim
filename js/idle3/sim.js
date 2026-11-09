@@ -196,6 +196,17 @@ function nextTicket(G) {
   const i = G.tickets.findIndex((t) => t.kind === 'table' || bags < packCap(G));
   return i < 0 ? null : G.tickets.splice(i, 1)[0];
 }
+// the queue as the kitchen sees it, oldest first: a delivery ticket is `held` while the couriers already have as many
+// bags coming as they can take (it waits for one to come back; table tickets go ahead of it)
+export function queueView(G) {
+  let bags = bagsAhead(G);
+  return G.tickets.map((t) => {
+    const held = t.kind === 'deliv' && bags >= packCap(G);
+    if (t.kind === 'deliv' && !held) bags++;
+    return { ...t, held };
+  });
+}
+export const peekTicket = (G) => queueView(G).find((t) => !t.held) || null; // what the next free hands cook
 export function canCook(G) {
   if (G.you.job) return 'busy';
   const bags = bagsAhead(G, true);
