@@ -16,9 +16,10 @@ export function vibrate(pattern) {
 }
 
 // iOS may empty a web view's storage when the phone runs short of space: the apps also keep the save in their own
-// preferences (keep; null drops it) and put it back before the game loads it (restore)
+// preferences (keep; null drops it) and put it back before the game loads it (restore). keep's promise is done when the
+// phone has it: a wipe waits for that before it reloads the page, or restore would bring the save back
 export function keep(key, value) {
-  plugins?.then(({ Preferences }) => (value == null ? Preferences.remove({ key }) : Preferences.set({ key, value }))).catch(() => { /* not kept */ });
+  return plugins?.then(({ Preferences }) => (value == null ? Preferences.remove({ key }) : Preferences.set({ key, value }))).catch(() => { /* not kept */ });
 }
 export async function restore(key) {
   if (!plugins) return;

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Delivery Sim</string>
-    <string name="title_activity_main">Delivery Sim</string>
+    <string name="app_name">Idle Restaurant Manager</string>
+    <string name="title_activity_main">Idle Restaurant Manager</string>
     <string name="package_name">com.mithatcanturan.fooddeliverysim</string>
     <string name="custom_url_scheme">com.mithatcanturan.fooddeliverysim</string>
 </resources>

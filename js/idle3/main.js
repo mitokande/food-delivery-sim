@@ -1,4 +1,4 @@
-// Uncle's Diner (idle3.html): boot, the two views (the restaurant from the inside, inside.js, the main one; the 3D
+// Idle Restaurant Manager (idle3.html): boot, the two views (the restaurant from the inside, inside.js, the main one; the 3D
 // city around it with the building rebuilt as it grows and the couriers riding real routes), the loop.
 // Rules: sim.js (pure); interface: ui.js. The city, traffic, sky and weather are the courier game's own modules;
 // nothing here reads or writes the courier game's save or the other idle prototypes'.
@@ -22,6 +22,8 @@ import { makeBike } from '../ride/vehicle.js';
 import { createAudio } from '../audio.js';
 import { S as courierSave } from '../state.js'; // (audio.js reads its volumes from there: set in memory, never saved)
 import { TILE, RESTAURANT } from '../data.js';
+import { app, keep, restore } from '../native.js';
+import { buzz } from '../haptics.js';
 import * as S from './sim.js';
 import { createDinerUI, ICON } from './ui.js';
 import { createInside } from './inside.js';
@@ -32,6 +34,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
 const SPEED = Math.max(0.25, Math.min(20, +(q.get('speed') || 1)));
 
 // ---------------------------------------------------------------- the save (its own key)
+await restore(S.KEY); // the store apps' copy, if the phone emptied the web view's storage
 let G = S.fresh();
 let fresh = true;
 try {
@@ -42,7 +45,8 @@ try {
   }
 } catch (e) { console.warn('idle3 save load failed', e); }
 // (G.at: the wall clock at the last save, so the next visit knows how long the place ran without you)
-const save = () => { G.at = Date.now(); try { localStorage.setItem(S.KEY, JSON.stringify(G)); } catch { /* private mode */ } };
+let wiped = false; // (erased: the page is about to reload, and leaving it must not write the save back)
+const save = () => { if (wiped) return; G.at = Date.now(); const j = JSON.stringify(G); keep(S.KEY, j); try { localStorage.setItem(S.KEY, j); } catch { /* private mode */ } };
 // how long the game was closed (?away=<s> pretends, to see the card)
 const gone = q.has('away') ? +q.get('away') || 0 : !fresh && G.at ? Math.max(0, (Date.now() - G.at) / 1000) : 0;
 
@@ -88,7 +92,7 @@ cullChunks(view, 0, 0, null);
 fill.style.width = '88%';
 
 const audio = createAudio();
-const applyVolumes = () => { courierSave.settings.music = G.settings.music; courierSave.settings.sfx = G.settings.sfx; audio.apply?.(); };
+const applyVolumes = () => { courierSave.settings.music = G.settings.music; courierSave.settings.sfx = G.settings.sfx; courierSave.settings.haptics = G.settings.haptics; audio.apply?.(); }; // (haptics.js reads it there too)
 applyVolumes();
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); applyVolumes(); audio.loop('music', 'music-hub'); } }, { capture: true });
 
@@ -104,7 +108,7 @@ const game = {
   G, W, S, audio, save, paused: false,
   cook() {
     const r = S.canCook(G);
-    if (r === 'ok') { S.act(G, 'cook-tap'); audio.play('land', { vol: 0.5, rate: 1.25 }); ui.tapped(); return true; }
+    if (r === 'ok') { S.act(G, 'cook-tap'); audio.play('land', { vol: 0.5, rate: 1.25 }); buzz(10); ui.tapped(); return true; }
     if (r === 'none') { audio.play('ui-error', { vol: 0.4 }); ui.toast(`${ICON('ui-clock')} No orders waiting`, 'warn'); }
     ui.nudge();
     return false;
@@ -112,6 +116,7 @@ const game = {
   act(a, id, sk, el) {
     const r = S.act(G, a, id, sk);
     if (!r) { audio.play('ui-error'); ui.toast('Not enough cash', 'bad'); return false; }
+    buzz(a === 'expand' ? 40 : a === 'cook' || a === 'courier' || a === 'motor' ? 25 : 12);
     if (a === 'cook') {
       const c = G.cooks[G.cooks.length - 1], d = S.DISH[c.dish]; audio.play('ui-levelup');
       ui.toast(d ? `${ICON('char-' + c.char)} ${c.name} joins and brings ${ICON(d.icon)} ${d.name}!` : `${ICON('char-' + c.char)} ${c.name} joins the kitchen!`, 'good');
@@ -129,7 +134,12 @@ const game = {
   changed() { save(); ui.render(); syncMap(); },
   focusDiner() { const two = G.stage >= 3; hubCam.lookAt(two ? (DX + NX) / 2 : DX, two ? (DZ + NZ) / 2 : DZ, Math.min(hubCam.st.dist, 340)); },
   applySettings() { applyVolumes(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } },
-  reset() { try { localStorage.removeItem(S.KEY); } catch { /* fine */ } location.reload(); },
+  async reset() {
+    wiped = true; // (pagehide and visibilitychange save: without this the reload wrote the save straight back)
+    try { localStorage.removeItem(S.KEY); } catch { /* fine */ }
+    await Promise.race([keep(S.KEY, null), new Promise((r) => setTimeout(r, 1500))]);
+    location.reload();
+  },
 };
 const ui = createDinerUI(game);
 game.ui = ui;
@@ -393,6 +403,11 @@ function frame() {
 }
 renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+// the store apps' back button (js/native.js closes a card first): the open sheet, then the map; else the app goes to the background
+addEventListener('appback', (e) => {
+  if (document.getElementById('sheet').dataset.state !== 'closed') { e.preventDefault(); ui.closeSheet(); }
+  else if (shown === 'city') { e.preventDefault(); game.setView('inside'); }
+});
 addEventListener('pagehide', save);
 window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest, catchUp, inside });
 window.ready = true;

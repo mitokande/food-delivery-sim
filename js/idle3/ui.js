@@ -1,7 +1,8 @@
-// Uncle's Diner (idle3.html): the interface. Top bar, the fame bar, the "what's holding you back" banner, the COOK
+// Idle Restaurant Manager (idle3.html): the interface. Top bar, the fame bar, the "what's holding you back" banner, the COOK
 // button in the middle of the tab bar, the bottom sheet (Restaurant, Kitchen, Menu, Couriers) and the story cards.
 // Numbers that change every frame are patched by live(); render() rebuilds a tab.
 import * as S from './sim.js';
+import { app } from '../native.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 const VICON = (id) => `<img class="ic veh" src="assets/icons/veh-${id}.png" alt="" draggable="false">`; // (vehicle icons are png only)
@@ -90,7 +91,7 @@ export function createDinerUI(game) {
     requestAnimationFrame(() => wrap.classList.add('in'));
     if (pause) game.paused = true;
     const close = () => { wrap.classList.remove('in'); wrap.classList.add('out'); setTimeout(() => wrap.remove(), 250); if (pause) game.paused = false; onClose?.(); };
-    if (dismiss) wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+    if (dismiss) { wrap.dataset.dismiss = ''; wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); }); } // (data-dismiss: the apps' back button closes it, js/native.js)
     return { el: wrap, card: wrap.firstElementChild, close };
   }
 
@@ -426,10 +427,11 @@ export function createDinerUI(game) {
       <label class="set">Music<input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></label>
       <label class="set">Sounds<input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></label>
       <label class="set">Graphics<select data-k="quality">${['auto', 'low', 'medium', 'high'].map((q) => `<option ${q === s.quality ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
-      <a class="btn blue" href="index.html">Ride as a courier (original game)</a>
+      ${app || navigator.vibrate ? `<label class="set">Vibration<input type="checkbox" ${s.haptics ? 'checked' : ''} data-k="haptics"></label>` : ''}
+      ${app ? '' : '<a class="btn blue" href="index.html">Ride as a courier (original game)</a>'}
       <button class="btn ghost danger" data-x="reset">Erase this game's save</button>
       <button class="btn green big" data-x="ok">Done</button>`, { cls: 'settings', dismiss: true, pause: true });
-    m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; s[k] = k === 'quality' ? e.target.value : +e.target.value; game.applySettings(); });
+    m.card.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; s[k] = k === 'quality' ? e.target.value : k === 'haptics' ? e.target.checked : +e.target.value; game.applySettings(); });
     m.card.addEventListener('click', (e) => {
       const x = e.target.closest('[data-x]')?.dataset.x;
       if (x === 'ok') { m.close(); game.save(); }

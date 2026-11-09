@@ -1,4 +1,4 @@
-// Uncle's Diner (idle3.html): the rules of an idle restaurant manager. Your distant uncle left you a run-down diner in
+// Idle Restaurant Manager (idle3.html): the rules of an idle restaurant manager. Your distant uncle left you a run-down diner in
 // Old Town and an old scooter; all you can cook is a smash burger. Customers take a table and order from the menu, the
 // order goes to the kitchen as a ticket, a cook (or you, one tap per dish) cooks it, they eat, pay and leave. Every cook
 // you hire brings a new dish to the menu (more dishes, more customers). Expanding the restaurant (five stages, from
@@ -136,7 +136,7 @@ export function fresh(keep = {}) {
     sold: {}, // dish → how many
     stats: { tables: 0, deliveries: 0, lostWalk: 0, lostOrders: 0, earned: 0, tips: 0, spent: 0, taps: 0 },
     ema: { kitchen: 0, seats: 0, bags: 0, quiet: 0 },
-    settings: { music: 0.5, sfx: 1, quality: 'auto' },
+    settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
     seen: {}, // story and tips already shown
     ...keep,
   };

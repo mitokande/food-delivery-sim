@@ -1,4 +1,4 @@
-/* Uncle's Diner (idle3.html): on top of game.css and idle.css. */
+/* Idle Restaurant Manager (idle3.html): on top of game.css and idle.css. */
 
 /* the second HUD row: fame, and the "what to do next" banner */
 .diner .hud2 { position: absolute; top: calc(66px + var(--safe-t)); left: 8px; right: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }

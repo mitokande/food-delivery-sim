@@ -410,7 +410,8 @@ rehber "bir sipariş seç" adımına döner.
   PHP + SQLite (`api/`), panel `admin/` (şifreli). Ayrıntı: §10.
 - Test: `tools/` altında headless Chrome ekran görüntüleri, birkaç telefon boyutunda taşma kontrolü.
 - Mağaza uygulamaları: `mobile/` (Capacitor 8; Android + iOS, `com.mithatcanturan.fooddeliverysim`, ana ekranda "Delivery Sim").
-  `mobile/scripts/build-web.mjs` oyunun dosyalarını `www/`'ye kopyalar, CDN'den gelenleri (three, Draco, es-module-shims,
+  9 Kasım 2026'dan beri uygulamalar **Idle Restaurant Manager**'dır (`idle3.html`, uygulamanın `index.html`'i olur; §13); kurye oyunu
+  ve önceki idle prototipleri sadece sitede. `mobile/scripts/build-web.mjs` oyunun dosyalarını `www/`'ye kopyalar, CDN'den gelenleri (three, Draco, es-module-shims,
   Google fontları) pakete koyar: uygulama internetsiz açılır ve oynanır. Oyunun uygulamaya özel tek kodu `js/native.js`:
   telefonun titreşimi (iOS'ta `navigator.vibrate` yok), Android geri tuşu (üstteki kartı kapatır, kart yoksa oyunu arka
   plana alır), kaydın uygulamanın kendi ayarlarında ikinci kopyası (web görünümünün deposu boşalırsa geri konur),
@@ -419,7 +420,7 @@ rehber "bir sipariş seç" adımına döner.
 
 ## 7. Varlıklar
 
-Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Uncle's Diner'ın hikâye görselleri yapay zekâ ile üretildi
+Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Idle Restaurant Manager'ın hikâye görselleri yapay zekâ ile üretildi
 (`tools/genart.mjs`, istemler dosyada; anahtar ortam değişkeninden okunur, repoda yok). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
 Mini Characters (animasyonlu: idle, walk, drive, sit, emote…). Oyuncu araçları, kask ve restoran binaları Blender'da
 script ile (`tools/blender/`). Arama: 3d.shep.bot (24 kaynak, lisans bilgisiyle).
@@ -451,8 +452,8 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
-| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
-| `assets/story/` | Uncle's Diner'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
+| `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -886,13 +887,18 @@ Sonraki aşamalar (önerideki sıra): 2) üç bölüm, bölüm seçimi, oyun kap
 kadro seçimi; 4) olay kartları, günlük kutu, haftalık etkinlik, ödüllü reklam, Adapty VIP. Her aşamadan önce analitik
 (bölüm başı/sonu, yıldız) eklenmeli.
 
-## 13. Uncle's Diner (`idle3.html`, idle restoran yöneticisi, 1. aşama, 9 Kasım 2026)
+## 13. Idle Restaurant Manager (`idle3.html`, idle restoran yöneticisi, 1. aşama, 9 Kasım 2026)
 
 Kullanıcı Hot Chain'i beğenmedi ve döngüyü kendisi verdi: uzak bir amcadan miras kalan harap bir lokanta ve eski bir motor;
 şef değiliz, öğrencilikte sadece smash burger öğrendik; tek tıkla yemek yapılır, her tık yapma süresi kadar bekler; belli bir
 paradan sonra kurye tutulur; aşçılar alınır ve geliştirilir; kuryenin motoru ve becerileri geliştirilir. İlk sürüm fazla burger
 odaklı bulundu ("bu oyun idle restaurant manager olacak"): aşçı aldıkça yemek çeşidi artmalı, restoran hem fiziksel hem içerik
 olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipler olduğu gibi duruyor.
+
+Mağaza uygulamaları bu oyunu taşır (kullanıcı: "make the mobile app based on and up to date to idle 3 version"; §6):
+`main.js` kaydı `js/native.js` ile uygulamanın ayarlarına da yazar ve açılışta oradan geri alır, COOK ve satın almalar
+titreşir (Ayarlar'da Titreşim anahtarı, `G.settings.haptics`), Android geri tuşu sırayla kartı, açık sayfayı, haritayı
+kapatır, sonra oyunu arka plana alır. Uygulamada Ayarlar'daki kurye oyunu bağlantısı yoktur.
 
 - **Hikâye:** ilk açılışta dört kart (mektup, lokanta, motor, menü); ilk aşçıdan sonra kurye alınabilir olunca bir kart daha
   (motor); her genişlemede yeni aşamanın görseliyle bir kart. Görseller yapay zekâ ile üretildi (§7). Kart açıkken oyun durur.

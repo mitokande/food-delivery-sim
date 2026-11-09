@@ -1,7 +1,8 @@
-// Builds mobile/www: the web game as the store apps ship it. The game's own files are copied unchanged; what the
+// Builds mobile/www: the web game as the store apps ship it. The apps are Idle Restaurant Manager, the idle restaurant manager
+// (idle3.html, which becomes the apps' index.html). The game's own files are copied unchanged; what the
 // site loads from CDNs (three.js and its addons, the Draco decoder, es-module-shims, the Google fonts) comes from
 // node_modules / mobile/fonts instead, so the apps start and play offline. @capacitor/core and @adapty/capacitor join
-// the import map for js/native.js. Anything that changes shape here (index.html, the three version, Adapty's build)
+// the import map for js/native.js. Anything that changes shape here (idle3.html, the three version, Adapty's build)
 // stops the build instead of shipping a half-offline app.
 //
 //   node scripts/build-web.mjs        (npm run web; npm run android / ios also sync the native projects)
@@ -13,20 +14,25 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOBILE = path.resolve(HERE, '..'), ROOT = path.resolve(MOBILE, '..'), WWW = path.join(MOBILE, 'www');
 const NM = path.join(MOBILE, 'node_modules');
 // the game's files the page loads (assets/src holds the raw kits the packed GLBs were made from: only a fallback)
-const GAME = ['index.html', 'css', 'js', 'assets/audio', 'assets/icons', 'assets/models'];
-const SITE = 'https://mithatck.com/food-delivery-sim/';
+const PAGE = 'idle3.html'; // the apps' game
+const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'assets/story'];
+// the site's other games (the courier game's page, the earlier idle prototypes): not in the apps. The courier game's
+// modules stay, the diner is built on them (the city, the sky, the audio, the bikes)
+const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md'];
 const CDN = /cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com/;
 
 const die = (msg) => { console.error('build-web: ' + msg); process.exit(1); };
 const copy = (from, to) => fs.cpSync(from, to, { recursive: true });
 const read = (f) => fs.readFileSync(f, 'utf8');
 function swap(text, from, to, what) {
-  if (!text.includes(from)) die(`${what}: expected to find ${JSON.stringify(from.slice(0, 80))} (did index.html change? update this script)`);
+  if (!text.includes(from)) die(`${what}: expected to find ${JSON.stringify(from.slice(0, 80))} (did ${PAGE} change? update this script)`);
   return text.split(from).join(to);
 }
 
 fs.rmSync(WWW, { recursive: true, force: true });
 for (const p of GAME) copy(path.join(ROOT, p), path.join(WWW, p));
+for (const p of NOT) fs.rmSync(path.join(WWW, p), { recursive: true, force: true });
+copy(path.join(ROOT, PAGE), path.join(WWW, 'index.html'));
 
 // ---- three.js: the version the site's import map names, from node_modules
 let html = read(path.join(WWW, 'index.html'));
@@ -67,13 +73,13 @@ fs.writeFileSync(path.join(V, 'adapty-capacitor.js'), `import * as CapacitorCore
 // ---- index.html
 const CDN_THREE = `https://cdn.jsdelivr.net/npm/three@${ver}/`;
 html = html.replace(/<link rel="preconnect"[^>]*>\n/g, '');
-html = html.replace(/<link rel="manifest"[^>]*>\n/, ''); // an app, not an installable page
 html = html.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/[^"]*">/, '<link rel="stylesheet" href="fonts/fonts.css">');
 html = html.replace(/<script async src="https:\/\/cdn\.jsdelivr\.net\/npm\/es-module-shims@[^"]*"><\/script>/, '<script async src="vendor/es-module-shims.js"></script>');
 html = swap(html, `"three": "${CDN_THREE}build/three.module.js",`, `"three": "./vendor/three/build/three.module.js",\n  "@capacitor/core": "./vendor/capacitor-core.js",\n  "@adapty/capacitor": "./vendor/adapty-capacitor.js",`, 'import map');
 html = swap(html, `"three/addons/": "${CDN_THREE}examples/jsm/"`, '"three/addons/": "./vendor/three/examples/jsm/"', 'import map');
-html = swap(html, "'api/collect.php'", `'${SITE}api/collect.php'`, 'boot beacon'); // a failed start still reaches the site
 fs.writeFileSync(path.join(WWW, 'index.html'), html);
+// (what the page itself names must be there: a stylesheet or the module dropped by NOT above would be a blank app)
+for (const m of html.matchAll(/(?:href|src)="([^":]+?)(?:\?[^"]*)?"/g)) if (!fs.existsSync(path.join(WWW, m[1]))) die(`${PAGE} loads ${m[1]}, which is not in www`);
 
 // ---- the game's own CDN links (the Draco decoder path)
 for (const f of jsFiles(path.join(WWW, 'js'))) {

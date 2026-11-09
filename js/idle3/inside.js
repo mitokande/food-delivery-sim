@@ -1,4 +1,4 @@
-// Uncle's Diner (idle3.html): the restaurant from the inside, the main view. A cut-away room (no front or right
+// Idle Restaurant Manager (idle3.html): the restaurant from the inside, the main view. A cut-away room (no front or right
 // wall, a knee wall with the door at the front) seen from above its front-right corner: the kitchen along the back
 // wall (a station per dish on the menu), the pass, the tables, the door at the front left, the sidewalk and the street
 // in front. Everything follows the sim's state (sim.js): customers come along the sidewalk, sit at a table with their
