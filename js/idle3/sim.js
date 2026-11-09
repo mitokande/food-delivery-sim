@@ -438,6 +438,32 @@ export function diagnose(G) {
   return { kind: c.length ? c[0][0] : 'ok' };
 }
 
+// ---------------------------------------------------------------- while the game is closed
+// The restaurant runs on without you: customers come, the cooks cook, the couriers ride. When the game opens again
+// (or the phone wakes up) the time away is played through, up to AWAY.max seconds; you don't tap while you're gone,
+// so a place without cooks just waits. Returns what happened, for the "while you were away" card.
+export const AWAY = { max: 2 * 3600, card: 60 }; // (s played at most; s away before the card shows)
+const HOLD = { kitchen: 'kitchen', seats: 'seats', bags: 'bags', quiet: 'quiet' };
+export function away(G, W, secs) {
+  const ran = Math.max(0, Math.min(AWAY.max, secs || 0));
+  const s0 = { ...G.stats }, served0 = G.served, fame0 = fameLevel(G);
+  const held = {};
+  for (let left = ran; left > 1e-6;) {
+    const d = Math.min(60, left); left -= d;
+    tick(G, W, d, d); // (the events are for the live page: dropped here)
+    const k = diagnose(G).kind; if (HOLD[k]) held[k] = (held[k] || 0) + d;
+  }
+  const top = Object.entries(held).sort((a, b) => b[1] - a[1])[0];
+  const d = (k) => G.stats[k] - s0[k];
+  return {
+    secs, ran, capped: secs > AWAY.max + 1,
+    earned: d('earned'), tips: d('tips'), tables: d('tables'), deliveries: d('deliveries'), lost: d('lostWalk') + d('lostOrders'),
+    served: G.served - served0, fameFrom: fame0, fameTo: fameLevel(G),
+    held: top && top[1] >= ran * 0.3 ? top[0] : null, // (what held the place back most of the time, if anything did)
+    cooks: G.cooks.length, couriers: G.couriers.length,
+  };
+}
+
 export const short = (n) => {
   const a = Math.abs(n);
   if (a < 1000) return (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');

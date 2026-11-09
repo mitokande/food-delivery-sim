@@ -235,3 +235,12 @@
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 .legend .sw { width: 14px; height: 14px; border-radius: 4px; background: rgba(255,255,255,.1); opacity: .5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
 .board .t.deliv .k, .pot .k.dv, .legend .k.dv { background: #5bd13b; }
+
+/* the "while you were away" card */
+.awaycash { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.awaycash .ic { width: 34px; height: 34px; }
+.awaycash b { font-family: var(--display); font-weight: 400; font-size: 34px; color: #2e9d3a; -webkit-text-stroke: 1px rgba(0,0,0,.08); }
+.awaynote { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 6px 8px; font-size: 13px; line-height: 1.35; text-align: center; color: #6b5a4c; }
+.awaynote .ic { width: 18px; height: 18px; flex: none; }
+.awaycard .rlines { margin: 4px 0; }
+.res.cash.bump { animation: cashpop .6s cubic-bezier(.3,1.6,.5,1); }

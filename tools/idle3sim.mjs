@@ -3,7 +3,7 @@
 //   node tools/idle3sim.mjs [minutes=60] [player=all] [--log]
 // Players: a tapper (cooks the next ticket whenever the button is free, ~0.4 s to react) who stops tapping after
 // `active` minutes, with a buyer: "cheap" buys the cheapest thing it can afford; "plan" fixes what diagnose() says
-// holds the restaurant back and saves up for the next stage.
+// holds the restaurant back and saves up for the next stage. Also: what closing the game for AWAY.max would bring.
 import { generateCity } from '../js/city/gen.js';
 import * as S from '../js/idle3/sim.js';
 
@@ -49,7 +49,7 @@ function run(name) {
   const G = S.fresh();
   const marks = {}, mark = (k) => { if (!(k in marks)) marks[k] = G.t; };
   let react = 0, lastE = 0;
-  const rows = [], diag = {};
+  const rows = [], diag = {}, gone = []; // (gone: what closing the game here for AWAY.max would bring)
   for (let t = 0; t < MIN * 60; t += 0.25) {
     if (G.t < active * 60) {
       if (S.canCook(G) === 'ok') { react += 0.25; if (react >= 0.4) { S.act(G, 'cook-tap'); react = 0; } } else react = 0;
@@ -66,6 +66,7 @@ function run(name) {
     const k = S.diagnose(G).kind; diag[k] = (diag[k] || 0) + 1;
     if (Math.abs(G.t % 60) < 0.01 || Math.abs((G.t % 60) - 60) < 0.01) {
       const m = Math.round(G.t / 60);
+      if ([10, 30, 60].includes(m)) gone.push(`${m}m +$${Math.round(S.away(structuredClone(G), W, S.AWAY.max).earned)}`);
       if ([1, 2, 3, 5, 10, 15, 20, 30, 40, 50, 60, 90].includes(m)) rows.push(`${m}m $${Math.round(G.stats.earned - lastE)}/min S${G.stage + 1} F${S.fameLevel(G)} c${G.cooks.length} r${G.couriers.length}`);
       lastE = G.stats.earned;
     }
@@ -74,6 +75,7 @@ function run(name) {
   console.log(`\n== ${name}: earned $${Math.round(st.earned)} · stage ${G.stage + 1} · fame ${S.fameLevel(G)} (${G.served}) · menu ${G.menu.length} · tables ${st.tables} (lost ${st.lostWalk}) · deliveries ${st.deliveries} (lost ${st.lostOrders}) · taps ${st.taps} · cash $${Math.round(G.cash)}`);
   console.log('   ' + Object.entries(marks).map(([k, v]) => `${k}@${fmt(v)}`).join('  '));
   console.log('   ' + rows.join(' | '));
+  console.log(`   closed for ${S.AWAY.max / 3600} h at: ${gone.join(' | ')}`);
   console.log('   banner: ' + Object.entries(diag).map(([k, v]) => `${k} ${Math.round(v / n * 100)}%`).join(', '));
 }
 for (const n of Object.keys(PLAYERS)) if (ONLY === 'all' || ONLY === n) run(n);

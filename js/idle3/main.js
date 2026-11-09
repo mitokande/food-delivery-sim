@@ -40,7 +40,10 @@ try {
     if (d && d.v === 2) { const f = S.fresh(); G = { ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }; fresh = false; }
   }
 } catch (e) { console.warn('idle3 save load failed', e); }
-const save = () => { try { localStorage.setItem(S.KEY, JSON.stringify(G)); } catch { /* private mode */ } };
+// (G.at: the wall clock at the last save, so the next visit knows how long the place ran without you)
+const save = () => { G.at = Date.now(); try { localStorage.setItem(S.KEY, JSON.stringify(G)); } catch { /* private mode */ } };
+// how long the game was closed (?away=<s> pretends, to see the card)
+const gone = q.has('away') ? +q.get('away') || 0 : !fresh && G.at ? Math.max(0, (Date.now() - G.at) / 1000) : 0;
 
 // ---------------------------------------------------------------- renderer + city (as the courier game's hub)
 const canvas = document.getElementById('gl');
@@ -310,6 +313,16 @@ fill.style.width = '100%';
 document.getElementById('boot').classList.add('out');
 ui.render();
 
+// ---------------------------------------------------------------- while the game was closed (or the phone asleep)
+// the time away is played through at once (S.away: the cooks and couriers work, you don't tap), then the card
+function catchUp(secs) {
+  const r = S.away(G, W, secs);
+  syncMap(); ui.render(); save();
+  if (secs >= S.AWAY.card && !document.querySelector('.modal.awaycard')) ui.away(r);
+  return r;
+}
+let lastWall = Date.now();
+
 // ---------------------------------------------------------------- loop
 const timer = new THREE.Timer();
 let lastNight = -1, liveT = 0, saveT = 0;
@@ -329,8 +342,11 @@ function frame() {
   scene.fog.near = hubCam.st.dist * 1.6 * (1 - 0.3 * weather.rain); scene.fog.far = hubCam.st.dist * 5.5 * (1 - 0.3 * weather.rain);
   if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); props.setNight(lastNight); carUni.uNight.value = lastNight; lampUni.uNight.value = lastNight; renderer.toneMappingExposure = 1.0 + lastNight * 0.25; setEnvNight(lastNight); }
 
-  // the diner runs in real time (and waits while a story card is open)
-  if (!game.paused) {
+  // the diner runs in real time (and waits while a story card is open); a long gap between frames (the tab hidden,
+  // the phone locked) is played through like a closed game
+  const wall = Date.now(), gap = (wall - lastWall) / 1000; lastWall = wall;
+  if (gap > 3) catchUp(gap);
+  else if (!game.paused) {
     const ev = S.tick(G, W, Math.min(1, raw) * SPEED, SPEED);
     coinT -= raw; bellT -= raw; popT -= raw;
     for (const e of ev) {
@@ -363,7 +379,8 @@ function frame() {
 renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('pagehide', save);
-window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest });
+window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest, catchUp });
 window.ready = true;
 // (the loop runs under the story cards; the diner waits for them)
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }
+else if (gone > 2) catchUp(gone);

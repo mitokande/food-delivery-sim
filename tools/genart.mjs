@@ -35,6 +35,10 @@ export const ART = {
   stage5: { size: '1536x1024', from: 'stage4', prompt: 'The same restaurant grown into a grand, successful two-building restaurant: three floors, '
     + 'a rooftop terrace with parasols and lights, a big illuminated blank sign, potted trees, golden warm windows, a wide terrace '
     + 'full of tables, festive bunting. Same stylized 3D cartoon look, plain white background. No text, no letters, no people.' },
+  // the card when the game opens again: the staff kept the place running
+  away: { size: '1536x1024', prompt: `${STYLE} Early morning inside a small cosy diner: behind the counter a cheerful young cook in a white chef hat `
+    + 'and apron proudly holds up a big glass jar stuffed with banknotes and coins, a courier in a red cap leans on the counter with a delivery bag '
+    + 'giving a thumbs up, a tall stack of clean plates, an order rail full of finished tickets, a round wall clock, warm sunrise light through the window.' },
   'cook-btn': { size: '1024x1024', background: 'transparent', prompt: 'Game UI icon, stylized 3D cartoon, chunky and glossy: a white chef hat '
     + 'leaning on a sizzling frying pan with a small flame under it, a few sizzle sparks. Centered, fills most of the frame, transparent background, '
     + 'no text, no letters, no outline frame, no shadow on the ground.' },

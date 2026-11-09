@@ -924,14 +924,27 @@ olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipl
   yemek bekliyor / masa yok, müşteri gidiyor / siparişler 50 sn'den uzun kurye bekliyor / aşçılar boşta. Gerekli kişi için
   yer yoksa "genişle" der ve Restoran sekmesine götürür. Harita işaretinde restoranın küçük resmi, dolu masa sayısı, kapıdaki
   sıra ve bekleyen fiş sayısı; kapılarda sipariş iğneleri yemeğin ikonuyla.
+- **Oyun kapalıyken:** restoran çalışmaya devam eder. Kayıt duvar saatini tutar (`G.at`); oyun yeniden açılınca aradaki
+  süre, en fazla 2 saat (`S.AWAY.max`), simülasyonda bir kerede oynatılır (`S.away`): müşteriler gelir, aşçılar pişirir,
+  kuryeler teslim eder, sen tıklamazsın (aşçı yoksa bir şey pişmez, kart yerine "kimse pişirmedi" uyarısı). Ayrı bir
+  kazanç formülü yok, yani kapalıyken kazanç oyun açıkken boşta beklemekle aynı. 1 dakikadan uzun kalınca "While you were
+  away" kartı: geçen süre, kazanç, servis edilen masa ve teslimat, kazanılan Şöhret, 2 saat sınırına takıldıysa bunun notu ve o
+  sürede restoranı en çok neyin tuttuğu (mutfak / masa / kurye / boş aşçılar) için bir öneri; **Collect** kartı kapatır.
+  Sekme gizlenince ya da telefon kilitlenince kareler durur; iki kare arasında 3 sn'den uzun boşluk da aynı şekilde
+  oynatılır. 8 saat sunucuda ~0,3 sn sürüyor. Kartın görseli de yapay zekâyla üretildi (`away`).
 
 Denge: `node tools/idle3sim.mjs [dakika] [oyuncu] [--log]`. 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı (Hot Dog) 0:58,
 kurye 3:16, 2. aşama 4:51, 2. aşçı (Döner) 7:41, teras 11:19, Pizza 18:53, yan bina 26:26, Noodles 38:10, Fish & Chips 60:15,
 Grand 66:49; gelir 1. dk $32/dk → 10. dk $140 → 30. dk $504 → 60. dk $1200. Hiç tıklamayan planlı oyuncu: 2. aşama 6:35,
-teras 20:01, yan bina 43:21, 60. dk $453/dk. "En ucuzunu al" oyuncusu genişlemeyi geç alıyor (2. aşama 15:30). Tarayıcı testi
+teras 20:01, yan bina 43:21, 60. dk $453/dk. "En ucuzunu al" oyuncusu genişlemeyi geç alıyor (2. aşama 15:30). Oyunu
+kapatmak (2 saat): planlı aktif oyuncu 10. dk'da kapatırsa +$12K, 30. dk'da +$42K, 60. dk'da +$114K; fiyatlar 1 saatlik
+aktif oyuna göre ayarlı olduğundan bir dönüş sonraki birkaç aşamayı birden aldırıyor (denge açık konu). Tarayıcı testi
 `node tools/idle3.mjs` (telefon: hikâye, COOK ve bekleme, masaların ödemesi, aşçı + Hot Dog menüde, beceriler, Menü sekmesi,
 motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
-bina, sipariş panosu, kayıt + yeniden yükleme; 34 kontrol, görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`.
+bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş ve kartı, 10 dk uyuyan sekme; 38 kontrol,
+görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için).
 
-Açık konular: oyun kapalıyken ilerleme yok; garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
+Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 saat sınırını büyüten bir yükseltme ya da
+reklamla ×2; mutfak yetişemeyince en eski fiş önce kuralı yüzünden 120 sn sabırlı teslimatlar 60 sn sabırlı masaları
+geçiyor (tek aşçılı Grand'da masalar hiç servis edilmiyor); garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
 aşamaların konusu; "cızırtı" sesi yok (COOK şimdilik `land` sesi).

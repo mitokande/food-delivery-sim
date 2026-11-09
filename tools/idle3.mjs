@@ -1,6 +1,7 @@
 // Headless check of Uncle's Diner (idle3.html): the story, tapping COOK, tables paying, a cook bringing a dish to the
 // menu, skills, the scooter card, a courier and deliveries on the map, motor and courier skills, expanding the
-// restaurant (the building on the map is rebuilt; at stage 4 it takes the lot next door), save + reload.
+// restaurant (the building on the map is rebuilt; at stage 4 it takes the lot next door), save + reload, and the
+// restaurant running while the game is closed (the "while you were away" card; a sleeping tab catches up too).
 //   node tools/idle3.mjs [outdir=tools/shots]   (phone viewport; screenshots idle3-*.png)
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
@@ -143,6 +144,25 @@ const sold = await ev('game.G.served');
 await boot('idle3.html?speed=4');
 check(await ev(`game.G.served >= ${sold} && game.G.stage === 4 && game.G.cooks.length === 1 && game.G.couriers.length === 1`), 'reload keeps the restaurant');
 check(await ev('!document.querySelector(".modal") && game.restaurant().parts.length === 2'), 'no story on a returning visit, the grand building is back');
+
+// the restaurant runs while the game is closed: two hours played through on the next visit, then the card
+await ev('game.save()');
+const b4 = await ev('({ cash: game.G.cash, t: game.G.t, tables: game.G.stats.tables, del: game.G.stats.deliveries })');
+await boot('idle3.html?speed=4&away=7200');
+await page.waitForSelector('.modal.awaycard.in [data-x="ok"]', { timeout: 10000 });
+check(await ev(`game.G.t - ${b4.t} >= 7199 && game.G.stats.tables + game.G.stats.deliveries > ${b4.tables + b4.del} + 50`),
+  `two hours away: the cook and the courier kept working (+${await ev(`game.G.stats.tables - ${b4.tables}`)} tables, +${await ev(`game.G.stats.deliveries - ${b4.del}`)} deliveries)`);
+check(await ev(`(() => { const m = document.querySelector('.awaycard .awaycash b').textContent; return game.G.cash > ${b4.cash} && m.startsWith('+$'); })()`),
+  `the card shows the takings (${await ev('document.querySelector(".awaycard .awaycash b").textContent')})`);
+await shot('9-away');
+await closeModal('ok');
+check(await ev('!game.paused'), 'Collect closes it and the restaurant runs on');
+// a hidden tab or a locked phone: a long gap between frames is played through the same way
+const t1 = await ev('game.G.t');
+await ev('(() => { const now = Date.now; Date.now = () => now() + 600e3; })()');
+await page.waitForSelector('.modal.awaycard.in', { timeout: 10000 });
+check(await ev(`game.G.t - ${t1} >= 595`), `a tab asleep for 10 minutes catches up (${Math.round(await ev(`game.G.t - ${t1}`))} s)`);
+await closeModal('ok');
 
 check(!errors.length, `no errors${errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''}`);
 await browser.close(); server.close();

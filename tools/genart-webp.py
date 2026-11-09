@@ -4,7 +4,7 @@ import sys, os
 from PIL import Image
 raw, out = sys.argv[1], os.path.join(os.path.dirname(__file__), '..', 'assets', 'story')
 os.makedirs(out, exist_ok=True)
-for n in ['letter', 'diner', 'scooter', 'smash', 'cook-btn', 'stage2', 'stage3', 'stage4', 'stage5']:
+for n in ['letter', 'diner', 'scooter', 'smash', 'cook-btn', 'stage2', 'stage3', 'stage4', 'stage5', 'away']:
     p = os.path.join(raw, n + '.png')
     if not os.path.exists(p): continue
     im = Image.open(p)

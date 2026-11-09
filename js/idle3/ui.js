@@ -436,7 +436,42 @@ export function createDinerUI(game) {
     });
   }
 
-  Object.assign(api, { render, live, toast, modal, setTab, closeSheet, story, tapped, nudge, cooked, fameUp, newDish, stageUp });
+  // ---------- back after a while: what the staff did without you (S.away) ----------
+  const HELD_TIP = {
+    kitchen: 'Orders piled up in the kitchen. Another cook, or faster ones, earn more while you\'re gone.',
+    seats: 'People waited for a table. A bigger restaurant seats more of them.',
+    bags: 'Delivery orders waited for a courier. More couriers or faster motors deliver more.',
+    quiet: 'The cooks often had nothing to do. More dishes, fame or a bigger restaurant bring more customers.',
+  };
+  const dur = (s) => {
+    if (s >= 86400) { const d = Math.floor(s / 86400); return `${d} day${d > 1 ? 's' : ''}`; }
+    const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+    return h ? `${h} h${m ? ` ${m} min` : ''}` : `${Math.max(1, m)} min`;
+  };
+  function away(r) {
+    if (!r.cooks) { toast(`${ICON('ui-clock')} Nobody cooked while you were away. Hire a cook and the diner runs without you.`, 'warn'); return; }
+    const names = G.cooks.map((c) => c.name);
+    const who = names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : `Your ${names.length} cooks`;
+    const m = modal(`<div class="storyimg"><img src="${ART('away')}" alt=""></div>
+      <div class="ribwrap"><span class="ribbon">While you were away</span></div>
+      <p class="storyp">You were gone for <b>${dur(r.secs)}</b>. ${who} kept the kitchen going${r.couriers ? ' and the couriers kept riding' : ''}.</p>
+      <div class="awaycash">${ICON('ui-cash')}<b>+${M(r.earned)}</b></div>
+      <div class="rlines">
+        <div class="rl"><span>${ICON('ui-people')} Tables served</span><b>${r.tables}</b></div>
+        ${r.couriers ? `<div class="rl"><span>${ICON('ui-route')} Deliveries</span><b>${r.deliveries}</b></div>` : ''}
+        ${r.fameTo > r.fameFrom ? `<div class="rl"><span>${ICON('ui-star')} Fame</span><b>${r.fameFrom} → ${r.fameTo}</b></div>` : ''}
+      </div>
+      ${r.capped ? `<p class="awaynote">${ICON('ui-clock')} The staff run the place for up to ${dur(S.AWAY.max)} without you.</p>` : ''}
+      ${r.held ? `<p class="awaynote">${HELD_TIP[r.held]}</p>` : ''}
+      <button class="btn green big" data-x="ok">Collect</button>`, { cls: 'pop story awaycard', pause: true });
+    m.card.querySelector('[data-x]').onclick = () => {
+      sfx('ui-coins', { vol: 0.7 }); m.close();
+      const c = $('.res.cash', hub); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+    };
+    return m;
+  }
+
+  Object.assign(api, { render, live, toast, modal, setTab, closeSheet, story, tapped, nudge, cooked, fameUp, newDish, stageUp, away });
   Object.defineProperties(api, { tab: { get: () => tab }, open: { get: () => !isClosed() } }); // (live getters: Object.assign would copy values)
   return api;
 }
