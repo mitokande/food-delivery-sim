@@ -24,10 +24,12 @@ resets the city for Stars. Its own save (`fds_idle_v1`), no analytics. Design an
 kitchen → shelf → courier → door and cool down on the way; hot deliveries earn the day's stars. Its own save (`fds_idle2_v1`),
 no analytics. Notes and balance: DOCS.md §12.
 
-`idle3.html` is **Uncle's Diner**: your distant uncle left you a run-down diner and an old scooter, and all you can cook is a
-smash burger. Tap SMASH to make one (each tap waits out your make time), sell to walk-ins, hire cooks and a courier for
-deliveries, level everyone's skills and the courier's motor. Its own save (`fds_idle3_v1`), no analytics. The story art in
-`assets/story/` is AI-generated (`tools/genart.mjs`). Notes and balance: DOCS.md §13.
+`idle3.html` is **Uncle's Diner**, an idle restaurant manager: your distant uncle left you a run-down diner and an old
+scooter, and all you can cook is a smash burger. Customers take a table and order; tap COOK to cook an order yourself, hire
+cooks (each brings a new dish to the menu) and couriers, level their skills and motors, and expand the place in five
+stages, from the run-down diner to a grand two-building restaurant, rebuilt on the map each time. Its own save
+(`fds_idle3_v2`), no analytics. The story and stage art in `assets/story/` is AI-generated (`tools/genart.mjs`). Notes and
+balance: DOCS.md §13.
 
 ## Run locally
 

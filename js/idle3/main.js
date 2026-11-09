@@ -1,9 +1,11 @@
-// Uncle's Diner (idle3.html): boot, the 3D city around the diner, couriers riding real routes, the loop.
+// Uncle's Diner (idle3.html): boot, the 3D city around the restaurant (rebuilt as it grows), couriers riding real
+// routes, the loop.
 // Rules: sim.js (pure); interface: ui.js. The city, traffic, sky and weather are the courier game's own modules;
 // nothing here reads or writes the courier game's save or the other idle prototypes'.
 import * as THREE from 'three';
 import { generateCity, DIRS } from '../city/gen.js';
-import { buildCityView, waterTime, cullChunks, setCityNight, lampUni, cityMaterials } from '../city/view.js';
+import { buildCityView, buildLotView, waterTime, cullChunks, setCityNight, lampUni, cityMaterials } from '../city/view.js';
+import { addSign } from '../city/arch.js';
 import { createWeather } from '../weather.js';
 import { createTraffic, createPeds } from '../city/traffic.js';
 import { createProps, toyUni } from '../city/props.js';
@@ -19,7 +21,7 @@ import { setProgress } from '../assets.js';
 import { makeBike } from '../ride/vehicle.js';
 import { createAudio } from '../audio.js';
 import { S as courierSave } from '../state.js'; // (audio.js reads its volumes from there: set in memory, never saved)
-import { TILE } from '../data.js';
+import { TILE, RESTAURANT } from '../data.js';
 import * as S from './sim.js';
 import { createDinerUI, ICON } from './ui.js';
 
@@ -35,7 +37,7 @@ try {
   const raw = q.has('fresh') ? null : localStorage.getItem(S.KEY);
   if (raw) {
     const d = JSON.parse(raw);
-    if (d && d.v === 1) { const f = S.fresh(); G = { ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }; fresh = false; }
+    if (d && d.v === 2) { const f = S.fresh(); G = { ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }; fresh = false; }
   }
 } catch (e) { console.warn('idle3 save load failed', e); }
 const save = () => { try { localStorage.setItem(S.KEY, JSON.stringify(G)); } catch { /* private mode */ } };
@@ -65,7 +67,10 @@ const sky = createSky(scene);
 sky.sun.shadow.mapSize.set(QV === 'high' ? 2048 : 1024, QV === 'high' ? 2048 : 1024);
 const city = generateCity();
 const W = S.createWorld(city);
-const view = await buildCityView(city, scene);
+// the restaurant's lot and the one next door are left empty: buildRestaurant() puts the right building there per stage
+const SIGN = 'Ferdi\'s Diner', SIGN2 = 'Ferdi\'s Kitchen', BRAND = '#c4480f';
+addSign(SIGN, BRAND, '#fff3d6'); addSign(SIGN2, '#2f6f5b', '#fff3d6');
+const view = await buildCityView(city, scene, { skip: new Set([W.lot.id, W.next?.id].filter((x) => x != null)) });
 const people = await bakePeople(peopleSpots(view.arch.props));
 const props = await createProps(scene, [...view.arch.props, ...people.list], { extra: people.extra });
 const backdrop = await createBackdrop(scene, city, sky);
@@ -85,50 +90,102 @@ addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); applyV
 const hubCam = createHubCamera(camera, canvas, city);
 const markers = createMarkers(document.getElementById('markers'), camera);
 const dl = W.lot, DX = dl.cx * TILE, DZ = dl.cz * TILE;
+const NX = W.next ? W.next.cx * TILE : DX, NZ = W.next ? W.next.cz * TILE : DZ;
 const doorPos = (tile) => [city.tiles[tile].x * TILE, city.tiles[tile].z * TILE];
 
 // ---------------------------------------------------------------- the game object (what ui.js calls)
 let coinT = 0, bellT = 0, popT = 0;
 const game = {
   G, W, S, audio, save, paused: false,
-  smash() {
-    const r = S.canSmash(G);
-    if (r === 'ok') { S.act(G, 'smash'); audio.play('land', { vol: 0.55, rate: 1.25 }); ui.smashed(); return true; }
-    if (r === 'full') { audio.play('ui-error', { vol: 0.5 }); ui.toast(`${ICON('food-burger')} The counter's full: wait for customers`, 'warn'); }
+  cook() {
+    const r = S.canCook(G);
+    if (r === 'ok') { S.act(G, 'cook-tap'); audio.play('land', { vol: 0.5, rate: 1.25 }); ui.tapped(); return true; }
+    if (r === 'none') { audio.play('ui-error', { vol: 0.4 }); ui.toast(`${ICON('ui-clock')} No orders waiting`, 'warn'); }
     ui.nudge();
     return false;
   },
   act(a, id, sk, el) {
     const r = S.act(G, a, id, sk);
     if (!r) { audio.play('ui-error'); ui.toast('Not enough cash', 'bad'); return false; }
-    if (a === 'cook') { const c = G.cooks[G.cooks.length - 1]; audio.play('ui-levelup'); ui.toast(`${ICON('char-' + c.char)} ${c.name} joins the kitchen!`, 'good'); }
-    else if (a === 'courier') {
+    if (a === 'cook') {
+      const c = G.cooks[G.cooks.length - 1], d = S.DISH[c.dish]; audio.play('ui-levelup');
+      ui.toast(d ? `${ICON('char-' + c.char)} ${c.name} joins and brings ${ICON(d.icon)} ${d.name}!` : `${ICON('char-' + c.char)} ${c.name} joins the kitchen!`, 'good');
+      if (d) ui.newDish(d.id);
+    } else if (a === 'courier') {
       const c = G.couriers[G.couriers.length - 1]; audio.play('ui-unlock');
       ui.toast(G.couriers.length === 1 ? `${ICON('char-' + c.char)} ${c.name} takes Uncle's scooter: delivery orders are on!` : `${ICON('char-' + c.char)} ${c.name} joins on a beat-up scooter`, 'good');
     } else if (a === 'motor') { const c = G.couriers.find((x) => x.id === +id); audio.play('ui-levelup'); ui.toast(`${ICON('ui-wrench')} ${c.name} rides a ${S.motorOf(c).name} now`, 'good'); }
+    else if (a === 'expand') { audio.play('ui-unlock'); setTimeout(() => audio.play('crowd-cheer', { vol: 0.6 }), 500); buildRestaurant(G.stage, true); game.focusDiner(); ui.stageUp(G.stage); }
     else audio.play('ui-purchase', { vol: 0.7 });
     if (el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
     game.changed();
     return true;
   },
   changed() { save(); ui.render(); syncMap(); },
-  focusDiner() { hubCam.lookAt(DX, DZ, Math.min(hubCam.st.dist, 340)); },
+  focusDiner() { const two = G.stage >= 3; hubCam.lookAt(two ? (DX + NX) / 2 : DX, two ? (DZ + NZ) / 2 : DZ, Math.min(hubCam.st.dist, 340)); },
   applySettings() { applyVolumes(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } },
   reset() { try { localStorage.removeItem(S.KEY); } catch { /* fine */ } location.reload(); },
 };
 const ui = createDinerUI(game);
 game.ui = ui;
 
-// ---------------------------------------------------------------- the map: the diner, orders at the doors
+// ---------------------------------------------------------------- the restaurant: a building per stage on its lot (and next door from stage 4)
+const BRANDED = { wall: '#f4e1bf', brand: BRAND, awning: '#e2382b', shop: true, special: 'restaurant' };
+const LOOKS = [
+  { main: { floors: 2, wall: '#c9bca6', brand: '#7d6f60', awning: null, sign: null, rest: null, shop: true, balMask: 0 }, next: null, props: 0 }, // run-down
+  { main: { ...BRANDED, floors: 2, sign: SIGN, rest: RESTAURANT.sunny, balMask: 0 }, next: null, props: 1 }, // fixed up
+  { main: { ...BRANDED, floors: 2, sign: SIGN, rest: RESTAURANT.sunny, balMask: 0 }, next: null, props: 2 }, // + terrace
+  { main: { ...BRANDED, floors: 3, sign: SIGN, rest: RESTAURANT.sunny, balMask: 1, balPat: 1 }, next: { ...BRANDED, floors: 3, sign: SIGN2, rest: null, balMask: 1, balPat: 1 }, props: 2 },
+  { main: { ...BRANDED, floors: 4, sign: SIGN, rest: RESTAURANT.sunny, balMask: 3, balPat: 1 }, next: { ...BRANDED, floors: 4, sign: SIGN2, rest: RESTAURANT.mamma, balMask: 3, balPat: 1 }, props: 2 },
+];
+let rest = null; // { group, parts, grow }
+function buildRestaurant(stage, grow = false) {
+  const L = LOOKS[stage];
+  if (rest) { rest.group.removeFromParent(); for (const p of rest.parts) p.dispose(); }
+  const group = new THREE.Group(); group.name = 'restaurant';
+  const parts = [buildLotView(city, W.lot, L.main)];
+  if (W.next) parts.push(buildLotView(city, W.next, L.next || {}));
+  const list = [];
+  parts.forEach((p, i) => {
+    group.add(p.group);
+    for (const pr of p.props) {
+      const cafe = /^cafe_set/.test(pr.type);
+      // the run-down diner has nothing outside; fixed up: a chalkboard; the terrace: tables (next door: its own things until it's ours)
+      if (i === 0 ? (cafe ? L.props >= 2 : L.props >= 1) : (!L.next || !cafe || L.props >= 2)) list.push(pr);
+    }
+  });
+  // (more tables on the terrace than the street furniture rule gives)
+  if (L.props >= 2) {
+    const f = DIRS[dl.front], r = DIRS[(dl.front + 1) & 3], lots = L.next ? [[DX, DZ], [NX, NZ]] : [[DX, DZ]];
+    for (const [x, z] of lots) for (const k of [-1, 1]) list.push({ type: k < 0 ? 'cafe_set_a' : 'cafe_set_b', x: x + f[0] * TILE * 0.34 + r[0] * k * 2.7, z: z + f[1] * TILE * 0.34 + r[1] * k * 2.7, rot: Math.atan2(f[0], f[1]) + k * 0.3 });
+  }
+  scene.add(group);
+  rest = { group, parts, grow: grow ? 0 : 1 };
+  createProps(group, list).then((pr) => { if (rest?.group === group) pr.update(DX, DZ, 120, null, true); });
+}
+function growRestaurant(dt) {
+  if (!rest || rest.grow >= 1) return;
+  rest.grow = Math.min(1, rest.grow + dt / 1.1);
+  const t = rest.grow, e = 1 - Math.pow(1 - t, 3) + Math.sin(t * Math.PI) * 0.08; // (ease out with a little overshoot)
+  rest.group.scale.set(1, Math.max(0.02, e), 1); // (the geometry is in world space with the ground at y 0: it rises from the ground)
+}
+
+// ---------------------------------------------------------------- the map: the restaurant, orders at the doors
 let dinerMk = null;
+const stageArt = (i) => `assets/story/${i === 0 ? 'diner' : 'stage' + (i + 1)}.webp`;
 function syncMap() {
   if (!dinerMk) {
-    dinerMk = markers.add({ x: DX, y: 20, z: DZ, cls: 'mk diner',
-      html: `<span class="bub"><i class="ring"></i>${ICON('food-burger')}<i class="cnt">0</i></span><span class="dst"><i class="wq">${ICON('ui-people')}<b>0</b></i></span><em class="dname">Ferdi's Diner</em>`,
-      onTap: () => ui.setTab('kitchen') });
+    dinerMk = markers.add({ x: DX, y: 22, z: DZ, cls: 'mk diner',
+      html: `<span class="bub"><i class="ring"></i><img class="art" alt=""><i class="cnt">0</i></span><span class="dst"><i class="seats">${ICON('ui-people')}<b>0</b></i><i class="wq">${ICON('ui-clock')}<b>0</b></i></span><em class="dname">${SIGN}</em>`,
+      onTap: () => ui.setTab('restaurant') });
   }
+  const img = dinerMk.el.querySelector('.art'), src = stageArt(G.stage);
+  if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+  const two = G.stage >= 3;
+  dinerMk.pos.set(two ? (DX + NX) / 2 : DX, 22 + G.stage * 2, two ? (DZ + NZ) / 2 : DZ);
+  dinerMk.el.querySelector('.dname').textContent = S.stageOf(G).name;
 }
-// orders: a pin at each door (grey: no burger yet, gold: packed, waiting for a courier, green: on the way)
+// orders: a pin at each door (grey: in the kitchen, gold: packed, waiting for a courier, green: on the way)
 const pins = new Map(); // order id → marker
 function dropMarker(m) { m.el.remove(); const i = markers.list.indexOf(m); if (i >= 0) markers.list.splice(i, 1); }
 function syncPins() {
@@ -138,7 +195,7 @@ function syncPins() {
     let m = pins.get(+id);
     if (!m) {
       const [x, z] = doorPos(o.door);
-      m = markers.add({ x, y: 4, z, cls: 'mk pin open', html: `<span class="pdot">${ICON('food-burger')}</span>` });
+      m = markers.add({ x, y: 4, z, cls: 'mk pin open', html: `<span class="pdot">${ICON(S.DISH[o.dish].icon)}</span>` });
       m.el.tabIndex = -1; m.el.style.pointerEvents = 'none';
       pins.set(+id, m);
     }
@@ -187,10 +244,10 @@ function drawBikes(dt) {
       const v = c.leg.t > 0 && fr < 1 ? rt.length / c.leg.d : 0;
       b.bike.update(dt, v, THREE.MathUtils.clamp(dh * 6, -0.4, 0.4));
     } else if (c.st === 'idle' || c.st === 'wait') {
-      // parked on the pavement in front of the diner
-      const side = (parked - (Math.min(G.couriers.length, 4) - 1) / 2) * 2.4;
+      // parked at the curb in front of the restaurant (the terrace is between them and the door)
+      const side = (parked - (Math.min(G.couriers.length, 4) - 1) / 2) * 2.2 - 2.5;
       root.visible = parked < 4;
-      root.position.set(DX + f[0] * TILE * 0.36 + r[0] * side, 0.1, DZ + f[1] * TILE * 0.36 + r[1] * side);
+      root.position.set(DX + f[0] * TILE * 0.5 + r[0] * side, 0.1, DZ + f[1] * TILE * 0.5 + r[1] * side);
       root.rotation.y = Math.atan2(r[0], r[1]);
       b.bike.update(dt, 0, 0);
       b.key = '';
@@ -202,14 +259,14 @@ function drawBikes(dt) {
 // ---------------------------------------------------------------- live map numbers
 function liveMap() {
   if (dinerMk) {
-    const el = dinerMk.el, y = G.you;
-    el.style.setProperty('--p', (y.left > 0 ? 1 - y.left / S.youTime(G) : 0).toFixed(3));
-    const cnt = el.querySelector('.cnt'), n = String(G.counter.length + S.packedN(G));
-    if (cnt.textContent !== n) cnt.textContent = n;
-    const wq = el.querySelector('.wq'), wn = String(G.walk.length);
-    if (wq.lastChild.textContent !== wn) wq.lastChild.textContent = wn;
-    wq.hidden = !G.walk.length;
-    wq.classList.toggle('long', G.walk.length >= S.WALK.queue - 2);
+    const el = dinerMk.el, j = G.you.job;
+    el.style.setProperty('--p', (j ? 1 - j.left / j.total : 0).toFixed(3));
+    const set = (sel, v) => { const e = el.querySelector(sel); if (e.textContent !== String(v)) e.textContent = v; };
+    set('.cnt', G.tickets.length);
+    set('.seats b', `${G.tables.length}/${S.stageOf(G).seats}`);
+    const wq = el.querySelector('.wq'); set('.wq b', G.door.length);
+    wq.hidden = !G.door.length; wq.classList.toggle('long', G.door.length >= S.WALK.door - 1);
+    el.querySelector('.seats').classList.toggle('full', S.seatsFree(G) <= 0);
   }
   syncPins();
 }
@@ -243,7 +300,8 @@ function adapt(dt) {
 }
 
 // ---------------------------------------------------------------- boot finish
-hubCam.snap(DX, DZ, innerWidth < innerHeight ? 430 : 340); // (far enough out to see most of the delivery zone)
+buildRestaurant(G.stage);
+hubCam.snap(G.stage >= 3 ? (DX + NX) / 2 : DX, G.stage >= 3 ? (DZ + NZ) / 2 : DZ, innerWidth < innerHeight ? 430 : 340); // (far enough out to see most of the delivery zone)
 document.body.dataset.mode = 'hub';
 syncMap();
 const CLOCK = 15 * 60; // (a fixed sunny afternoon: the day/night of the courier game isn't part of this one)
@@ -276,23 +334,26 @@ function frame() {
     const ev = S.tick(G, W, Math.min(1, raw) * SPEED, SPEED);
     coinT -= raw; bellT -= raw; popT -= raw;
     for (const e of ev) {
-      if (e.kind === 'sold') {
-        if (popT <= 0) { pop(DX, DZ, `+${S.money(e.amount)}`, 'cash', 3); popT = 0.35; }
-        if (coinT <= 0) { audio.play('ui-coins', { vol: 0.3 }); coinT = 0.5; }
+      if (e.kind === 'served') {
+        if (popT <= 0) { pop(DX, DZ, `+${S.money(e.amount)}`, 'cash', 3); popT = 0.3; }
+        if (coinT <= 0) { audio.play('ui-coins', { vol: 0.3 }); coinT = 0.45; }
       } else if (e.kind === 'paid') {
         popDoor(e.door, `+${S.money(e.amount)}`, e.tip >= S.DELIV.tip ? 'tip' : 'cash');
         audio.play('order-complete', { vol: 0.35 });
-      } else if (e.kind === 'walkin') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.18 }); bellT = 2.5; } }
+      } else if (e.kind === 'seat') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.18 }); bellT = 2.5; } }
       else if (e.kind === 'order') audio.play('notif-order', { vol: 0.45 });
       else if (e.kind === 'depart') audio.play('engine-start', { vol: 0.3 });
       else if (e.kind === 'stall') { audio.play('engine-stall', { vol: 0.5 }); pop(DX, DZ, 'Won\'t start!', 'stall', 3); }
-      else if (e.kind === 'lostWalk') { if (!e.full) { pop(DX, DZ, 'Left hungry', 'lost', 3); audio.play('order-late', { vol: 0.25 }); } }
-      else if (e.kind === 'lostOrder') { popDoor(e.door, 'Cancelled', 'lost'); audio.play('order-late', { vol: 0.3 }); }
-      else if (e.kind === 'made') ui.made(e.by);
+      else if (e.kind === 'lostWalk') {
+        if (popT <= 0) { pop(DX, DZ, e.full || e.door ? 'No table!' : 'Left hungry', 'lost', 3); popT = 0.6; }
+        if (!e.full) audio.play('order-late', { vol: 0.2 });
+      } else if (e.kind === 'lostOrder') { popDoor(e.door, 'Cancelled', 'lost'); audio.play('order-late', { vol: 0.3 }); }
+      else if (e.kind === 'cooked') ui.cooked(e.dish);
       else if (e.kind === 'fame') { audio.play('crowd-cheer', { vol: 0.5 }); ui.fameUp(e.level); }
     }
   }
   drawBikes(dt);
+  growRestaurant(raw);
   markers.update(innerWidth, innerHeight);
   liveT += dt; if (liveT > 0.08) { liveT = 0; ui.live(); liveMap(); }
   saveT += dt; if (saveT > 5) { saveT = 0; save(); }
@@ -302,7 +363,7 @@ function frame() {
 renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('pagehide', save);
-window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes });
+window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest });
 window.ready = true;
 // (the loop runs under the story cards; the diner waits for them)
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }

@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TILE } from '../data.js';
 import { K } from './gen.js';
 import { loadKit, pieceParts, getNode, texAsync } from '../assets.js';
-import { buildArchitecture, refreshSignFont } from './arch.js';
+import { buildArchitecture, buildLotArch, refreshSignFont } from './arch.js';
 import { archMaterial, archUni } from './archmat.js';
 
 const CHUNK = 9;
@@ -98,7 +98,8 @@ function ownMaterial(src) {
 }
 const KIT_SHARED = new Set(['roads', 'commercial', 'suburban', 'industrial']);
 
-export async function buildCityView(city, scene) {
+// opts.skip: lot ids with no building (a page builds its own there with buildLotView)
+export async function buildCityView(city, scene, opts = {}) {
   // which pieces are needed per kit
   const need = {};
   for (const p of city.placements) (need[p.kit] ||= new Set()).add(p.name);
@@ -151,7 +152,7 @@ export async function buildCityView(city, scene) {
     for (const g of b.geos) g.dispose();
   }
   // procedural buildings: shells/roofs per chunk (any distance) + dressing per chunk (culled nearer)
-  const arch = buildArchitecture(city);
+  const arch = buildArchitecture(city, { skip: opts.skip });
   const am = archMaterial(); mats.set('arch', am);
   for (const c of arch.chunks) {
     const ch = chunks[c.cz * nC + c.cx];
@@ -271,3 +272,15 @@ function buildLampPools(city, arch) {
   im.frustumCulled = false; im.renderOrder = 1;
   return im;
 }
+
+// One lot's building as its own group (after buildCityView): see buildLotArch. Returns the group (shells, dressing,
+// rooftop signs) and the street props (café sets…) for createProps.
+export function buildLotView(city, lot, over = {}) {
+  const a = buildLotArch(city, lot, over);
+  const am = mats.get('arch') || archMaterial();
+  const g = new THREE.Group(); g.name = 'lot' + lot.id;
+  for (const geo of [a.base, a.detail]) { if (!geo) continue; const m = new THREE.Mesh(geo, am); m.castShadow = m.receiveShadow = true; g.add(m); }
+  g.add(buildRoofSigns(city, { signs: a.signs }));
+  return { group: g, props: a.props, h: a.h, spec: a.spec, dispose: () => { a.base?.dispose(); a.detail?.dispose(); } };
+}
+

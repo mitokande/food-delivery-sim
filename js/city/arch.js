@@ -39,7 +39,10 @@ const SHOPS = {
   hills: [],
 };
 const SPECIAL_SIGNS = [['Moto Garage', '#2b2f3a', '#ffc53d'], ['Dispatch Co.', '#2e6db4', '#ffffff']];
+const EXTRA_SIGNS = []; // name boards a page adds before the city is built (addSign)
 let atlas = null;
+// a name board for buildLotArch's `sign` (call before buildCityView: the atlas is drawn once)
+export function addSign(name, bg, fg = '#ffffff') { if (!EXTRA_SIGNS.some((e) => e[0] === name)) { EXTRA_SIGNS.push([name, bg, fg]); atlas = null; } }
 function signAtlas() {
   if (atlas) return atlas;
   const entries = [];
@@ -47,6 +50,7 @@ function signAtlas() {
   const seen = new Set();
   for (const r of Object.values(RESTAURANT)) if (!seen.has(r.name)) { seen.add(r.name); entries.push({ name: r.name, bg: r.color, fg: light(r.color) ? '#3a2412' : '#ffffff', rest: true }); }
   for (const [name, bg, fg] of SPECIAL_SIGNS) entries.push({ name, bg, fg });
+  for (const [name, bg, fg] of EXTRA_SIGNS) entries.push({ name, bg, fg });
   const CW = 512, CH = 128, cols = 2, rows = Math.ceil(entries.length / cols);
   const c = document.createElement('canvas'); c.width = CW * cols; c.height = CH * rows;
   const g = c.getContext('2d');
@@ -712,7 +716,8 @@ function outskirts(city, put, ground, street) {
 
 // ---------------------------------------------------------------- entry point
 const CHUNK = 9;
-export function buildArchitecture(city) {
+// skip: lot ids left empty (a page builds its own building there with buildLotArch)
+export function buildArchitecture(city, { skip = null } = {}) {
   signAtlas();
   const nC = Math.ceil(city.W / CHUNK);
   const chunks = new Map();
@@ -724,6 +729,7 @@ export function buildArchitecture(city) {
     return c;
   };
   for (const lot of city.lots) {
+    if (skip?.has(lot.id)) { lot.h = 0; continue; }
     const spec = plan(city, lot);
     const c = gbs(lot);
     emit(spec, c.base, c.detail, out);
@@ -770,3 +776,18 @@ export function buildArchitecture(city) {
   for (const c of chunks.values()) geos.push({ cx: c.cx, cz: c.cz, base: c.base.build(), detail: c.detail.build() });
   return { chunks: geos, far: farGB.build(), ...out };
 }
+
+// One lot's building on its own (for a page that changes it while playing, e.g. a restaurant that grows): the lot's
+// usual plan with `over` on top (floors, wall, brand, awning, sign, rest = RESTAURANT entry for the rooftop sign or
+// null, balMask…). Returns geometry in world space plus the rooftop signs and street props it would have added.
+export function buildLotArch(city, lot, over = {}) {
+  signAtlas();
+  const spec = plan(city, lot);
+  Object.assign(spec, over);
+  spec.gh = spec.shop ? 3.8 : spec.fh;
+  spec.H = spec.gh + (spec.floors - 1) * spec.fh;
+  const base = new GB(), det = new GB(), out = { signs: [], props: [], buildings: [], pillars: [] };
+  emit(spec, base, det, out);
+  return { base: base.build(), detail: det.build(), signs: out.signs, props: out.props, h: spec.top || spec.H, spec };
+}
+

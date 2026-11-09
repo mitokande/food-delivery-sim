@@ -451,8 +451,8 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
-| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, kullanıcının verdiği idle döngüsü (§13): `sim.js` saf kurallar (SMASH, tezgâh, aşçılar, kuryeler, şöhret), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
-| `assets/story/` | Uncle's Diner'ın hikâye görselleri ve SMASH ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
+| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `main.js` açılış + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `assets/story/` | Uncle's Diner'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -886,42 +886,48 @@ Sonraki aşamalar (önerideki sıra): 2) üç bölüm, bölüm seçimi, oyun kap
 kadro seçimi; 4) olay kartları, günlük kutu, haftalık etkinlik, ödüllü reklam, Adapty VIP. Her aşamadan önce analitik
 (bölüm başı/sonu, yıldız) eklenmeli.
 
-## 13. Uncle's Diner (`idle3.html`, kullanıcının döngüsü, 1. aşama, 9 Kasım 2026)
+## 13. Uncle's Diner (`idle3.html`, idle restoran yöneticisi, 1. aşama, 9 Kasım 2026)
 
 Kullanıcı Hot Chain'i beğenmedi ve döngüyü kendisi verdi: uzak bir amcadan miras kalan harap bir lokanta ve eski bir motor;
-şef değiliz, öğrencilikte sadece smash burger öğrendik. Tek tıkla burger yapılır, her tık yapma süresi kadar bekler; belli bir
-paraya ulaşınca kurye tutulur ve dışarıya teslimat başlar; içeriye aşçı alınır ve becerileri geliştirilir; kuryenin motoru ve
-becerileri geliştirilir. Ayrı kayıt (`fds_idle3_v1`), analitik yok; diğer prototipler olduğu gibi duruyor.
+şef değiliz, öğrencilikte sadece smash burger öğrendik; tek tıkla yemek yapılır, her tık yapma süresi kadar bekler; belli bir
+paradan sonra kurye tutulur; aşçılar alınır ve geliştirilir; kuryenin motoru ve becerileri geliştirilir. İlk sürüm fazla burger
+odaklı bulundu ("bu oyun idle restaurant manager olacak"): aşçı aldıkça yemek çeşidi artmalı, restoran hem fiziksel hem içerik
+olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipler olduğu gibi duruyor.
 
-- **Hikâye:** ilk açılışta dört kart (mektup, lokanta, motor, menü), görseller yapay zekâ ile üretildi (§7). Lokanta Old Town'daki
-  burgercinin binası ("Ferdi's Diner"); kart açıkken oyun durur. Kurye ilk kez alınabilir olunca bir kart daha (motor).
-- **SMASH:** sekme çubuğunun ortasında büyük buton. Bir tık bir burger; burger pişerken (3 sn, Speed ile ×0,87/seviye) buton
-  halkayla dolar, yeni tık işlemez. Tezgâh 6 yer; dolunca tık da aşçılar da bekler.
-- **Müşteriler:** içeri gelenler (Fame 1'de dakikada 12, sıra en fazla 6, 30 sn bekler sonra aç gider) burgeri $4 × kalite
-  ile alır. Kurye varken kapılardan sipariş gelir (lokantaya 220 m yol mesafesindeki 189 kapı; dakikada 3,2; 100 sn içinde
-  alınmazsa iptal). Hazır burger en uzun bekleyene gider (içerideki müşteri ya da sipariş); sipariş burgeri paketlenir, ama
-  kuryelerin bir seferde taşıyabileceğinden fazla paket beklemez (yoksa içerideki müşteriler boşuna gider).
-- **Teslimat ücreti:** burger + $3 + metre başına $0,04 + bahşiş ($2 × (1 + 0,25 × Charm), siparişten 50 sn sonra azalmaya
-  başlar). Ortalama ~$14, içeriden satışın yaklaşık 3 katı.
-- **Kadro:** aşçı (en fazla 4: $40 / $180 / $700 / $2400; yeni aşçı 8 sn), beceriler Speed (süre ×0,87) ve Quality (fiyat +%12),
-  ikisi de 10 seviye; sen de aynı iki beceriyi geliştirirsin. Kurye (en fazla 4: $75 / $220 / $700 / $2200), her biri eski bir
-  motorla başlar. Motor merdiveni: Rust Bucket (amcanınki, 7 m/s, 1 paket, %30 ihtimalle 6 sn çalışmaz) → Zippy 50 $120
-  (9,5 m/s) → Vespetta 125 $500 (11 m/s, 2 paket) → Volt $1600 (13 m/s) → Viper 600 $5000 (16 m/s). Kurye becerileri: Riding
-  (+%7 hız), Bag (+1 paket, 2 seviye: $300 / $2000), Charm (+%25 bahşiş). Sonraki kişilerin beceri eğitimi ×1,6 pahalı.
-- **Şöhret:** satılan her burger sayılır; 20 / 50 / 100 / 180 / 300 / 480 / 750 / 1100 … satışta seviye atlar, her seviye
-  müşteriyi (içeri ve sipariş) +%30 artırır.
-- **Şerit:** önce yol gösterir (SMASH'e bas → aşçı al → kurye tut), sonra darboğazı söyler (müşteri burger bekliyor / siparişler
-  kurye bekliyor / tezgâh dolu, müşteri lazım); dokununca ilgili sekmeyi açar. Harita: lokanta işaretinde tezgâhtaki burger
-  sayısı, senin burgerinin halkası ve içerideki sıra; kapılarda sipariş iğneleri (gri: burger bekliyor, sarı: paketlendi,
-  yeşil: yolda); satışlar, bahşişler, "Won't start!" ve "Left hungry" haritada uçar.
+- **Hikâye:** ilk açılışta dört kart (mektup, lokanta, motor, menü); ilk aşçıdan sonra kurye alınabilir olunca bir kart daha
+  (motor); her genişlemede yeni aşamanın görseliyle bir kart. Görseller yapay zekâ ile üretildi (§7). Kart açıkken oyun durur.
+- **Masa → mutfak → masa:** müşteri boş masa varsa oturur (yoksa kapıda en fazla 4 kişi 25 sn bekler, sonra gider), menüden
+  rastgele bir yemek ister; sipariş mutfağa fiş olarak düşer (eskisi önce). Boştaki aşçı sıradaki fişi pişirir; **COOK**
+  butonu (sekme çubuğunun ortası) sıradaki fişi senin pişirmeni sağlar: bir tık bir yemek, yemeğin süresinin %40'ı kadar
+  bekler (Speed ile ×0,87/seviye). Yemek masaya gelince müşteri öder (fiyat × pişirenin kalitesi), 12 sn yer ve kalkar;
+  60 sn içinde yemeği gelmezse ödemeden gider.
+- **Menü (içerik büyümesi):** Smash Burger ile başlar; her aşçı bir yemek getirir: Hot Dog, Döner, Pizza, Noodles, Fish &
+  Chips, Sushi, Ice Cream ($4–19, 5–16 sn). Her yeni yemek müşteriyi +%18 artırır. Menü sekmesi gelecek yemekleri gri
+  gösterir, "sıradaki aşçı getirir" işaretiyle.
+- **Restoran aşamaları (fiziksel büyüme):** harap lokanta (6 masa, 1 aşçı, 1 kurye) → tamir edilmiş ($120, Şöhret 2: 10 masa,
+  2/2) → teras ($500, Şöhret 3: 16 masa, 3/3) → yan dükkânı alan Ferdi's Restaurant ($2500, Şöhret 5: 26 masa, 5/4) → Ferdi's
+  Grand ($9000, Şöhret 7: 40 masa, 7/6); her aşama müşteri çekimini de artırır (×1 → ×1,75). Haritada bina her aşamada yeniden
+  inşa edilir: şehrin kendi bina üreticisi (`arch.js`) aynı arsayı farklı ayarla kurar (`buildLotArch` / `buildLotView`;
+  şehir bu iki arsayı boş bırakır, `buildCityView(…, { skip })`). Harap: soluk duvar, tente/tabela/çatı süsü yok; tamir: marka
+  rengi, kırmızı tente, "Ferdi's Diner" tabelası, çatıda dev burger; teras: önde şemsiyeli kafe masaları; 4. aşamada yandaki
+  arsa da restoranın olur ("Ferdi's Kitchen", 3 kat); 5.'de iki bina 4 kat, balkonlar, ikinci çatıda pizza. Bina yerden
+  yükselerek değişir. Restoran sekmesinde aşamanın çizimi (beş aşama birbirinin düzenlemesi olarak üretildi, hep aynı bina).
+- **Kuryeler:** ilki $75 (amcanın Rust Bucket'ı: 7 m/s, %30 ihtimalle 6 sn çalışmaz), sonrakiler $220 / $700 / $2200 …, aşama
+  kotası kadar. Sipariş kapılardan gelir (220 m içindeki 188 kapı), menüden rastgele yemek; ücret yemek + $3 + metre başına
+  $0,04 + bahşiş. Kuryelerin bir seferde taşıyabileceğinden fazla paket önceden pişirilmez (masalara öncelik). Motor merdiveni
+  ve Riding / Bag / Charm becerileri önceki sürümdeki gibi.
+- **Şerit:** önce yol gösterir (COOK'a bas → aşçı al → kurye tut → genişle → yeni aşçı), sonra darboğazı söyler: masalar
+  yemek bekliyor / masa yok, müşteri gidiyor / siparişler 50 sn'den uzun kurye bekliyor / aşçılar boşta. Gerekli kişi için
+  yer yoksa "genişle" der ve Restoran sekmesine götürür. Harita işaretinde restoranın küçük resmi, dolu masa sayısı, kapıdaki
+  sıra ve bekleyen fiş sayısı; kapılarda sipariş iğneleri yemeğin ikonuyla.
 
-Denge: `node tools/idle3sim.mjs [dakika] [bot] [--log]`. 40 dakikalık 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı 0:47, kurye
-2:33, Zippy 6:44, 2. kurye 10:43, Vespetta 26:04; gelir 1. dakikada $48/dk → 10. dk $170 → 40. dk $475. Hiç tıklamayan planlı
-oyuncu 40. dakikada $317/dk (tıklamak erken oyunda belirgin, sonra aşçılar devralıyor). "En ucuzunu al" oyuncusu kuryeyi 6:56'da
-alıyor, 40. dakikada $403/dk. Tarayıcı testi `node tools/idle3.mjs` (telefon: hikâye, SMASH ve bekleme süresi, içeriden satış,
-aşçı + beceriler, motor kartı, kurye, teslimat, motor + kurye becerileri, Diner sekmesi, kayıt + yeniden yükleme; 25 kontrol,
-görüntüler `idle3-*.png`). URL: `?fresh` kaydı okumadan başlar, `?noti` hikâyeyi atlar, `?speed=N` N kat hızlı (test için).
+Denge: `node tools/idle3sim.mjs [dakika] [oyuncu] [--log]`. 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı (Hot Dog) 0:58,
+kurye 3:16, 2. aşama 4:51, 2. aşçı (Döner) 7:41, teras 11:19, Pizza 18:53, yan bina 26:26, Noodles 38:10, Fish & Chips 60:15,
+Grand 66:49; gelir 1. dk $32/dk → 10. dk $140 → 30. dk $504 → 60. dk $1200. Hiç tıklamayan planlı oyuncu: 2. aşama 6:35,
+teras 20:01, yan bina 43:21, 60. dk $453/dk. "En ucuzunu al" oyuncusu genişlemeyi geç alıyor (2. aşama 15:30). Tarayıcı testi
+`node tools/idle3.mjs` (telefon: hikâye, COOK ve bekleme, masaların ödemesi, aşçı + Hot Dog menüde, beceriler, Menü sekmesi,
+motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
+bina, kayıt + yeniden yükleme; 32 kontrol, görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`.
 
-Açık konular: oyun kapalıyken ilerleme yok; lokantayı tamir etme (tabela, cam, ikinci ızgara) ve menüye yeni yemek gibi
-sonraki adımlar kullanıcının kararını bekliyor; ses efektlerinde "cızırtı" yok (SMASH şimdilik `land` sesi).
-
+Açık konular: oyun kapalıyken ilerleme yok; garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
+aşamaların konusu; "cızırtı" sesi yok (COOK şimdilik `land` sesi).
