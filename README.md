@@ -20,6 +20,10 @@ get hired in better districts, and grow your own courier fleet.
 carry them (too few couriers and the food goes cold), managers automate districts and earn offline, deals multiply, a franchise
 resets the city for Stars. Its own save (`fds_idle_v1`), no analytics. Design and balance notes: DOCS.md §11.
 
+`idle2.html` is **Hot Chain**, phase 1 of the redesigned idle game: one 15-minute business day in Old Town where orders flow
+kitchen → shelf → courier → door and cool down on the way; hot deliveries earn the day's stars. Its own save (`fds_idle2_v1`),
+no analytics. Notes and balance: DOCS.md §12.
+
 ## Run locally
 
 Any static file server works, e.g. `npx serve .` or `python3 -m http.server`, then open `index.html`.
