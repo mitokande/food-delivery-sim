@@ -1,5 +1,5 @@
-// Uncle's Diner (idle3.html): boot, the 3D city around the restaurant (rebuilt as it grows), couriers riding real
-// routes, the loop.
+// Uncle's Diner (idle3.html): boot, the two views (the restaurant from the inside, inside.js, the main one; the 3D
+// city around it with the building rebuilt as it grows and the couriers riding real routes), the loop.
 // Rules: sim.js (pure); interface: ui.js. The city, traffic, sky and weather are the courier game's own modules;
 // nothing here reads or writes the courier game's save or the other idle prototypes'.
 import * as THREE from 'three';
@@ -24,6 +24,7 @@ import { S as courierSave } from '../state.js'; // (audio.js reads its volumes f
 import { TILE, RESTAURANT } from '../data.js';
 import * as S from './sim.js';
 import { createDinerUI, ICON } from './ui.js';
+import { createInside } from './inside.js';
 
 window.__started = true;
 const q = new URLSearchParams(location.search);
@@ -60,7 +61,8 @@ function quality() {
   return qv;
 }
 let QV = quality();
-function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+let inside = null; // (the inside view: made once the game object is there)
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); inside?.resize(innerWidth, innerHeight); }
 addEventListener('resize', resize); resize();
 
 const fill = document.getElementById('boot-fill'), bootMsg = document.getElementById('boot-msg');
@@ -131,6 +133,15 @@ const game = {
 };
 const ui = createDinerUI(game);
 game.ui = ui;
+bootMsg.textContent = 'Setting the tables…';
+inside = await createInside(game, canvas, document.getElementById('inmarkers'));
+// the two views: inside the restaurant (the main one) and the city map (the building, the couriers, the orders)
+let shown = q.get('view') === 'city' ? 'city' : 'inside';
+game.setView = (v) => {
+  shown = v; game.view = v; document.body.dataset.view = v;
+  hubCam.st.enabled = v === 'city'; inside.setActive(v === 'inside'); ui.setView(v);
+  if (v === 'city') { syncMap(); liveMap(); }
+};
 
 // ---------------------------------------------------------------- the restaurant: a building per stage on its lot (and next door from stage 4)
 const BRANDED = { wall: '#f4e1bf', brand: BRAND, awning: '#e2382b', shop: true, special: 'restaurant' };
@@ -180,7 +191,7 @@ function syncMap() {
   if (!dinerMk) {
     dinerMk = markers.add({ x: DX, y: 9, z: DZ, cls: 'mk diner',
       html: `<span class="bub"><i class="ring"></i><img class="art" alt=""><i class="cnt">0</i></span><span class="dst"><i class="seats">${ICON('ui-people')}<b>0</b></i><i class="wq">${ICON('ui-clock')}<b>0</b></i></span><em class="dname">${SIGN}</em>`,
-      onTap: () => ui.setTab('restaurant') });
+      onTap: () => game.setView('inside') });
   }
   const img = dinerMk.el.querySelector('.art'), src = stageArt(G.stage);
   if (img.getAttribute('src') !== src) img.setAttribute('src', src);
@@ -277,7 +288,7 @@ function liveMap() {
 // ---------------------------------------------------------------- hub view offset: the map sits in the space the sheet leaves
 const vo = { x: 0, y: 0 };
 const sheetEl = document.getElementById('sheet'), topEl = document.querySelector('.hud2') || document.querySelector('.topbar');
-function updateViewOffset(dt) {
+function updateViewOffset(dt, cam) {
   const Wd = innerWidth, H = innerHeight, r = sheetEl.getBoundingClientRect(), top = topEl.getBoundingClientRect().bottom + 20;
   let tx = 0, ty = 0;
   if (sheetEl.dataset.state === 'closed') ty = H / 2 - (top + H - 90) / 2;
@@ -285,7 +296,7 @@ function updateViewOffset(dt) {
   else tx = -(r.right + 10) / 2;
   const k = 1 - Math.exp(-dt * 8);
   vo.x += (tx - vo.x) * k; vo.y += (ty - vo.y) * k;
-  camera.setViewOffset(Wd, H, vo.x, vo.y, Wd, H);
+  cam.setViewOffset(Wd, H, vo.x, vo.y, Wd, H);
 }
 const perf = { acc: 0, n: 0, step: 0 };
 function adapt(dt) {
@@ -297,7 +308,7 @@ function adapt(dt) {
     perf.step++;
     if (perf.step === 1) renderer.setPixelRatio(Math.min(devicePixelRatio, 1.15));
     if (perf.step === 2) { renderer.setPixelRatio(1); sky.sun.shadow.mapSize.set(1024, 1024); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
-    if (perf.step === 3) { renderer.shadowMap.enabled = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
+    if (perf.step === 3) { renderer.shadowMap.enabled = false; for (const sc of [scene, inside.scene]) sc.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
     resize();
   }
 }
@@ -307,6 +318,7 @@ buildRestaurant(G.stage);
 hubCam.snap(G.stage >= 3 ? (DX + NX) / 2 : DX, G.stage >= 3 ? (DZ + NZ) / 2 : DZ, innerWidth < innerHeight ? 430 : 340); // (far enough out to see most of the delivery zone)
 document.body.dataset.mode = 'hub';
 syncMap();
+game.setView(shown);
 const CLOCK = 15 * 60; // (a fixed sunny afternoon: the day/night of the courier game isn't part of this one)
 sky.set(CLOCK);
 fill.style.width = '100%';
@@ -317,7 +329,7 @@ ui.render();
 // the time away is played through at once (S.away: the cooks and couriers work, you don't tap), then the card
 function catchUp(secs) {
   const r = S.away(G, W, secs);
-  syncMap(); ui.render(); save();
+  syncMap(); inside.snap(); ui.render(); save();
   if (secs >= S.AWAY.card && !document.querySelector('.modal.awaycard')) ui.away(r);
   return r;
 }
@@ -329,18 +341,21 @@ let lastNight = -1, liveT = 0, saveT = 0;
 function frame() {
   timer.update();
   const raw = timer.getDelta(), dt = Math.min(0.05, raw);
-  waterTime.value += dt; toyUni.uTime.value += dt; backdrop.update(dt); train.update(dt);
-  traffic.update(dt);
-  hubCam.update(dt);
-  updateViewOffset(dt);
-  const fx = hubCam.st.x, fz = hubCam.st.z;
-  peds.update(dt, fx, fz, 160);
-  props.update(fx, fz, Math.min(260, Math.max(120, hubCam.st.dist * 0.95)));
-  sky.focus(fx, fz, Math.min(900, hubCam.st.dist * 1.7), camera);
-  weather.update(dt, CLOCK, 1, camera);
-  sky.state.rain = weather.rain; sky.set(CLOCK);
-  scene.fog.near = hubCam.st.dist * 1.6 * (1 - 0.3 * weather.rain); scene.fog.far = hubCam.st.dist * 5.5 * (1 - 0.3 * weather.rain);
-  if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); props.setNight(lastNight); carUni.uNight.value = lastNight; lampUni.uNight.value = lastNight; renderer.toneMappingExposure = 1.0 + lastNight * 0.25; setEnvNight(lastNight); }
+  const C = shown === 'city'; // (the city is only moved and drawn while it's on screen)
+  if (C) {
+    waterTime.value += dt; toyUni.uTime.value += dt; backdrop.update(dt); train.update(dt);
+    traffic.update(dt);
+    hubCam.update(dt);
+    const fx = hubCam.st.x, fz = hubCam.st.z;
+    peds.update(dt, fx, fz, 160);
+    props.update(fx, fz, Math.min(260, Math.max(120, hubCam.st.dist * 0.95)));
+    sky.focus(fx, fz, Math.min(900, hubCam.st.dist * 1.7), camera);
+    weather.update(dt, CLOCK, 1, camera);
+    sky.state.rain = weather.rain; sky.set(CLOCK);
+    scene.fog.near = hubCam.st.dist * 1.6 * (1 - 0.3 * weather.rain); scene.fog.far = hubCam.st.dist * 5.5 * (1 - 0.3 * weather.rain);
+    if (sky.state.night !== lastNight) { lastNight = sky.state.night; setCityNight(lastNight); props.setNight(lastNight); carUni.uNight.value = lastNight; lampUni.uNight.value = lastNight; renderer.toneMappingExposure = 1.0 + lastNight * 0.25; setEnvNight(lastNight); }
+  }
+  updateViewOffset(dt, C ? camera : inside.camera);
 
   // the diner runs in real time (and waits while a story card is open); a long gap between frames (the tab hidden,
   // the phone locked) is played through like a closed game
@@ -350,36 +365,36 @@ function frame() {
     const ev = S.tick(G, W, Math.min(1, raw) * SPEED, SPEED);
     coinT -= raw; bellT -= raw; popT -= raw;
     for (const e of ev) {
+      if (!C) inside.event(e); // (inside: "+$4" over the table; the map's pops below only while the map is on)
       if (e.kind === 'served') {
-        if (popT <= 0) { pop(DX, DZ, `+${S.money(e.amount)}`, 'cash', 3); popT = 0.3; }
+        if (C && popT <= 0) { pop(DX, DZ, `+${S.money(e.amount)}`, 'cash', 3); popT = 0.3; }
         if (coinT <= 0) { audio.play('ui-coins', { vol: 0.3 }); coinT = 0.45; }
       } else if (e.kind === 'paid') {
-        popDoor(e.door, `+${S.money(e.amount)}`, e.tip >= S.DELIV.tip ? 'tip' : 'cash');
+        if (C) popDoor(e.door, `+${S.money(e.amount)}`, e.tip >= S.DELIV.tip ? 'tip' : 'cash');
         audio.play('order-complete', { vol: 0.35 });
       } else if (e.kind === 'seat') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.18 }); bellT = 2.5; } }
       else if (e.kind === 'order') audio.play('notif-order', { vol: 0.45 });
       else if (e.kind === 'depart') audio.play('engine-start', { vol: 0.3 });
-      else if (e.kind === 'stall') { audio.play('engine-stall', { vol: 0.5 }); pop(DX, DZ, 'Won\'t start!', 'stall', 3); }
+      else if (e.kind === 'stall') { audio.play('engine-stall', { vol: 0.5 }); if (C) pop(DX, DZ, 'Won\'t start!', 'stall', 3); }
       else if (e.kind === 'lostWalk') {
-        if (popT <= 0) { pop(DX, DZ, e.full || e.door ? 'No table!' : 'Left hungry', 'lost', 3); popT = 0.6; }
+        if (C && popT <= 0) { pop(DX, DZ, e.full || e.door ? 'No table!' : 'Left hungry', 'lost', 3); popT = 0.6; }
         if (!e.full) audio.play('order-late', { vol: 0.2 });
-      } else if (e.kind === 'lostOrder') { popDoor(e.door, 'Cancelled', 'lost'); audio.play('order-late', { vol: 0.3 }); }
+      } else if (e.kind === 'lostOrder') { if (C) popDoor(e.door, 'Cancelled', 'lost'); audio.play('order-late', { vol: 0.3 }); }
       else if (e.kind === 'cooked') ui.cooked(e.dish);
       else if (e.kind === 'fame') { audio.play('crowd-cheer', { vol: 0.5 }); ui.fameUp(e.level); }
     }
   }
-  drawBikes(dt);
   growRestaurant(raw);
-  markers.update(innerWidth, innerHeight);
-  liveT += dt; if (liveT > 0.08) { liveT = 0; ui.live(); liveMap(); }
+  if (C) { drawBikes(dt); markers.update(innerWidth, innerHeight); } else inside.update(Math.min(0.25, raw) * Math.min(SPEED, 3), innerWidth, innerHeight); // (people walk on through a slow frame)
+  liveT += dt; if (liveT > 0.08) { liveT = 0; ui.live(); if (C) liveMap(); }
   saveT += dt; if (saveT > 5) { saveT = 0; save(); }
   adapt(dt);
-  renderer.render(scene, camera);
+  renderer.render(C ? scene : inside.scene, C ? camera : inside.camera);
 }
 renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('pagehide', save);
-window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest, catchUp });
+window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest, catchUp, inside });
 window.ready = true;
 // (the loop runs under the story cards; the diner waits for them)
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }

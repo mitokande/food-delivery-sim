@@ -47,6 +47,7 @@ export function createDinerUI(game) {
       <button class="who" data-act="tab" data-tab="restaurant"><span class="ava">${ICON('char-' + YOU_CHAR)}</span>
         <span class="lvlbox"><small class="nm">Ferdi's Diner</small><span class="ipsbar"><b class="ips">$0/min</b></span></span></button>
       <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
+      <button class="viewbtn" data-act="view" aria-label="City map"></button>
       <button class="gear" data-act="settings" aria-label="Settings">${GEAR}</button>
     </header>
     <div class="hud2">
@@ -389,6 +390,7 @@ export function createDinerUI(game) {
     if (a === 'tab') { sfx('ui-tap'); if (el.closest('.tabs') && el.dataset.tab === tab && !isClosed()) closeSheet(); else setTab(el.dataset.tab); return; }
     if (a === 'grab') { const s = sheet.dataset.state; sheet.dataset.state = s === 'mid' ? 'big' : 'mid'; return; }
     if (a === 'settings') { settings(); return; }
+    if (a === 'view') { sfx('ui-tap'); game.setView(game.view === 'city' ? 'inside' : 'city'); return; }
     if (a === 'neck') { sfx('ui-tap'); neckGo?.(); return; }
     if (a === 'story') { story(); return; }
     game.act(a, el.dataset.id, el.dataset.sk, el);
@@ -436,6 +438,13 @@ export function createDinerUI(game) {
     });
   }
 
+  // ---------- the view button: to the city map from inside, back inside from the map ----------
+  function setView(v) {
+    const b = $('.viewbtn', hub);
+    b.innerHTML = v === 'city' ? `<img src="${ART('cook-btn')}" alt="" draggable="false"><small>Inside</small>` : `${ICON('ui-route')}<small>Map</small>`;
+    b.setAttribute('aria-label', v === 'city' ? 'Back inside the restaurant' : 'City map');
+  }
+
   // ---------- back after a while: what the staff did without you (S.away) ----------
   const HELD_TIP = {
     kitchen: 'Orders piled up in the kitchen. Another cook, or faster ones, earn more while you\'re gone.',
@@ -471,7 +480,7 @@ export function createDinerUI(game) {
     return m;
   }
 
-  Object.assign(api, { render, live, toast, modal, setTab, closeSheet, story, tapped, nudge, cooked, fameUp, newDish, stageUp, away });
+  Object.assign(api, { render, live, toast, modal, setTab, closeSheet, story, tapped, nudge, cooked, fameUp, newDish, stageUp, away, setView });
   Object.defineProperties(api, { tab: { get: () => tab }, open: { get: () => !isClosed() } }); // (live getters: Object.assign would copy values)
   return api;
 }

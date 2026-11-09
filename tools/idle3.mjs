@@ -1,4 +1,5 @@
-// Headless check of Uncle's Diner (idle3.html): the story, tapping COOK, tables paying, a cook bringing a dish to the
+// Headless check of Uncle's Diner (idle3.html): the story, the restaurant from the inside (customers at the tables, a
+// tap in the kitchen cooks, the map behind a button), tapping COOK, tables paying, a cook bringing a dish to the
 // menu, skills, the scooter card, a courier and deliveries on the map, motor and courier skills, expanding the
 // restaurant (the building on the map is rebuilt; at stage 4 it takes the lot next door), save + reload, and the
 // restaurant running while the game is closed (the "while you were away" card; a sleeping tab catches up too).
@@ -45,10 +46,13 @@ check(await ev('game.G.t') === t0, 'the restaurant waits under the story');
 for (let i = 0; i < 4; i++) await closeModal('next');
 check(await ev('game.G.seen.intro && !document.querySelector(".modal.in")'), 'the four story cards play through');
 check(await ev('document.querySelector(".neckb").textContent.includes("COOK")'), 'the banner says to tap COOK');
+check(await ev('document.body.dataset.view === "inside" && game.inside.peek().stations.join() === "burger"'), 'the game opens inside the restaurant, a grill in the kitchen');
 
 // customers sit down and order; one tap cooks one order
 await page.waitForFunction('game.G.tickets.length > 0', { timeout: 30000, polling: 100 });
 check(await ev('game.G.tables.length > 0'), 'a customer takes a table and orders');
+await page.waitForFunction('game.inside.peek().guests.some((g) => g.mode === "sit") && document.querySelector("#inmarkers .mk.order")', { timeout: 30000, polling: 200 });
+check(true, 'they walk in and sit at a table, the order in a bubble');
 await cookTap(); await wait(50);
 check(await ev('!!game.G.you.job && document.querySelector(".smash").classList.contains("busy")'), 'a tap cooks the order (the button shows its ring)');
 await cookTap();
@@ -56,6 +60,13 @@ check(await ev('game.G.stats.taps') === 1, 'a second tap while it cooks does not
 for (let i = 0; i < 30 && await ev('game.G.stats.tables < 2'); i++) { await cookTap(); await wait(300); }
 check(await ev('game.G.stats.tables >= 2 && game.G.cash > 0'), `tables pay when their food arrives ($${(await ev('game.G.cash')).toFixed(1)})`);
 check(await ev('!!document.querySelector(".mk.diner .art")'), 'the restaurant marker shows the place');
+// a tap on yourself in the kitchen cooks too
+await page.waitForFunction('game.S.canCook(game.G) === "ok" && !game.G.you.job', { timeout: 30000, polling: 100 });
+const taps0 = await ev('game.G.stats.taps');
+const [yx, yy] = await ev('(() => { const y = game.inside.peek().staff.find((s) => s.id === "you"); return game.inside.screenOf(y.x, 0.9, y.z); })()');
+await page.mouse.click(yx, yy);
+await wait(200);
+check(await ev(`game.G.stats.taps === ${taps0} + 1`), 'a tap on yourself in the kitchen cooks the next order');
 await shot('1-cooking');
 
 // the first cook brings the hot dog to the menu
@@ -63,6 +74,8 @@ await ev('game.G.cash = Math.max(game.G.cash, 35)');
 await openTab('kitchen');
 await tap('[data-act="cook"]'); await wait(300);
 check(await ev('game.G.cooks.length === 1 && game.G.menu.includes("hotdog")'), 'a cook hired, and the hot dog is on the menu');
+await wait(300);
+check(await ev('game.inside.peek().stations.join() === "burger,hotdog" && game.inside.peek().staff.length === 2'), 'inside: the cook in the kitchen, a hot dog station next to the grill');
 await page.waitForFunction('game.G.cooks[0].made >= 1', { timeout: 40000, polling: 200 });
 check(true, 'the cook cooks orders on their own');
 await ev('game.G.cash += 60');
@@ -89,6 +102,8 @@ check(await ev('game.G.couriers.length === 1 && game.G.couriers[0].motor === 0')
 await closeSheet();
 await page.waitForFunction('Object.keys(game.G.orders).length > 0', { timeout: 60000, polling: 250 });
 check(true, 'delivery orders come in');
+await page.click('.viewbtn'); await wait(300);
+check(await ev('document.body.dataset.view === "city" && getComputedStyle(document.getElementById("markers")).display !== "none" && document.getElementById("inmarkers").hidden'), 'the Map button shows the city');
 await page.waitForFunction('[...game.bikes.values()].some((b) => b.bike && b.bike.root.visible)', { timeout: 30000, polling: 250 });
 check(true, 'the courier bike is on the map');
 // the order board: one chip per pair of hands on the stove, one ticket per waiting order, deliveries the couriers can't take yet dimmed
@@ -112,6 +127,9 @@ check(await ev('game.G.couriers[0].ride === 1 && game.G.couriers[0].bag === 1 &&
 await page.waitForFunction(`(() => { const b = game.bikes.get(${rid}); return b && b.veh === 'zippy' && b.bike; })()`, { timeout: 30000, polling: 250 });
 check(true, 'the bike on the map is the new motor');
 await shot('5-couriers');
+await closeSheet();
+await ev('document.querySelector(".mk.diner").click()'); await wait(300);
+check(await ev('document.body.dataset.view === "inside"'), "the restaurant's marker on the map goes back inside");
 
 // expanding: fame first, then the money; the building on the map is rebuilt
 await ev('game.G.served = 5'); // (fame 1)
@@ -127,6 +145,8 @@ await page.waitForSelector('.modal.story.in [data-x="ok"]', { timeout: 5000 });
 await shot('7-expanded');
 await closeModal('ok');
 check(await ev('game.S.stageOf(game.G).seats') === 10 && await ev('game.S.roomFor(game.G, "cook")'), 'more tables and room for a second cook');
+await wait(500);
+check(await ev('game.inside.peek().tables') === 5, 'inside: the room has 5 tables now');
 // on to the end: the place takes over the shop next door
 await ev('game.G.served = 600; game.G.cash = 1e6; for (let i = 0; i < 2; i++) game.S.act(game.G, "expand"); game.changed()'); await wait(300);
 await openTab('restaurant');
@@ -134,9 +154,12 @@ await tap('[data-act="expand"]'); await wait(400);
 await closeModal('ok');
 check(await ev('game.G.stage') === 4, 'stage 5: the grand restaurant');
 check(await ev('game.restaurant().parts.length === 2 && game.restaurant().parts[1].spec.sign === "Ferdi\'s Kitchen"'), 'the shop next door is part of it now');
-await closeSheet();
-await ev('game.focusDiner(); game.hubCam.st.tdist = 200'); await wait(1500);
+await closeSheet(); await wait(800);
+check(await ev('game.inside.peek().tables === 20 && game.inside.layout.w === 16 && game.inside.layout.terrace === 6'), 'inside: two rooms wide, 20 tables, 6 on the terrace');
+await shot('8-grand-inside');
+await ev('game.setView("city"); game.focusDiner(); game.hubCam.st.tdist = 200'); await wait(1500);
 await shot('8-grand');
+await ev('game.setView("inside")');
 
 // save + reload keeps the restaurant, no story the second time
 await ev('game.save()');

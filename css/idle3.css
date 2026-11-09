@@ -244,3 +244,37 @@
 .awaynote .ic { width: 18px; height: 18px; flex: none; }
 .awaycard .rlines { margin: 4px 0; }
 .res.cash.bump { animation: cashpop .6s cubic-bezier(.3,1.6,.5,1); }
+
+/* the restaurant from the inside (inside.js): its own marker layer; the map's markers only on the map */
+#inmarkers { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+body[data-view="inside"] #markers { display: none; }
+.viewbtn { position: relative; width: 44px; height: 40px; padding: 0; border-radius: 14px; flex: none; display: grid; place-items: center;
+  background: linear-gradient(180deg, #34507e, #1d2a44); box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.35); }
+.viewbtn img, .viewbtn .ic { width: 28px; height: 28px; object-fit: contain; }
+.viewbtn small { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); padding: 0 5px; border-radius: 6px; background: #c4480f; color: #fff; font: 400 10.5px/14px var(--display); white-space: nowrap; }
+.mk.inmk { padding-bottom: 4px; }
+/* a customer's order: the dish in a bubble, a ring that empties as they lose patience */
+.mk.order .ob { position: relative; z-index: 0; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.order .ob .ic { width: 25px; height: 25px; }
+.mk.order .ob::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -5px; border: 5px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.mk.order .pat { position: absolute; inset: -4px; z-index: -1; border-radius: 50%; background: conic-gradient(#5bd13b calc((1 - var(--p, 0)) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.order.late .pat { background: conic-gradient(#e8432f calc((1 - var(--p, 0)) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.order.late .ob { animation: bob .6s ease-in-out infinite; }
+.mk.madmk .mad { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #e8432f; border: 2px solid #fff; animation: bob .5s ease-in-out infinite; }
+.mk.madmk .mad .ic { width: 20px; height: 20px; filter: brightness(10); }
+/* the staff: a ring over whoever cooks; TAP over you when an order waits */
+.mk.staff { pointer-events: auto; }
+.mk.staff .cb { position: relative; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.staff .cb .ring { position: absolute; inset: -4px; z-index: -1; border-radius: 50%; background: conic-gradient(#ffd56b calc(var(--p, 0) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.staff .cb { z-index: 0; }
+.mk.staff .cb .ic { width: 24px; height: 24px; }
+.mk.staff .tapme { display: block; padding: 3px 10px 4px; border-radius: 12px; background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; font: 400 15px var(--display); box-shadow: 0 0 0 2.5px #fff, 0 3px 0 2px rgba(0,0,0,.3); animation: bob .9s ease-in-out infinite; }
+/* the next cook's station (grey), the bags waiting for a courier */
+.mk.ghost { display: flex; flex-direction: column; align-items: center; }
+.mk.ghost .gh { display: flex; align-items: center; gap: 2px; padding: 3px 6px; border-radius: 14px; background: rgba(255,255,255,.85); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.mk.ghost .gh .ic { width: 20px; height: 20px; } .mk.ghost .gh .ic + .ic { width: 24px; height: 24px; filter: grayscale(.7); opacity: .8; }
+.mk.ghost em { margin-top: 3px; font: 400 11px/14px var(--display); font-style: normal; color: #fff; background: rgba(20,30,50,.7); padding: 0 6px; border-radius: 7px; }
+.mk.shelfmk .sh { display: flex; align-items: center; gap: 3px; padding: 2px 9px 2px 4px; border-radius: 14px; background: #5bd13b; border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.shelfmk .sh .ic { width: 22px; height: 22px; } .mk.shelfmk .sh b { font: 400 15px var(--display); color: #fff; -webkit-text-stroke: 3px #1f5e12; paint-order: stroke fill; }
+.mk.order .ob { width: 28px; height: 28px; } .mk.order .ob .ic { width: 21px; height: 21px; }
+.mk.order .pat { inset: -3px; }

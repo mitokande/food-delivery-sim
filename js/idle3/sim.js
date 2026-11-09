@@ -274,7 +274,8 @@ export function courierTile(G, W, c) {
 function go(c, W, a, b) { c.leg = { a, b, t: 0, d: 0.5 + W.dist(a, b) / speedOf(c) }; }
 
 // ---------------------------------------------------------------- time passes
-// returns events for the page: seat, served, order, packed, depart, stall, paid, lostWalk, lostOrder, cooked, fame
+// returns events for the page: seat, served (table: its id), order, packed, depart, stall, paid, lostWalk (table, or full / door),
+// lostOrder, cooked, fame
 export function tick(G, W, dtIn, max = 1) {
   const ev = [];
   let left = Math.min(max, dtIn);
@@ -304,7 +305,7 @@ function finish(G, job, by, ev) {
     const amount = Math.round(DISH[job.dish].price * job.q * 10) / 10;
     tb.st = 'eat'; tb.left = WALK.eat;
     earn(G, amount); G.stats.tables++; sold(G, job.dish, ev);
-    ev.push({ kind: 'served', amount, dish: job.dish, by });
+    ev.push({ kind: 'served', amount, dish: job.dish, by, table: tb.id });
   } else {
     const o = G.orders[job.ref];
     if (!o || o.st === 'bike') return;
@@ -341,7 +342,7 @@ function step(G, W, dt, ev) {
   for (let i = G.tables.length - 1; i >= 0; i--) {
     const tb = G.tables[i];
     if (tb.st === 'eat') { tb.left -= dt; if (tb.left <= 0) G.tables.splice(i, 1); continue; }
-    if (G.t - tb.t0 > WALK.patience) { G.tables.splice(i, 1); dropTicket(G, 'table', tb.id); G.stats.lostWalk++; ev.push({ kind: 'lostWalk' }); }
+    if (G.t - tb.t0 > WALK.patience) { G.tables.splice(i, 1); dropTicket(G, 'table', tb.id); G.stats.lostWalk++; ev.push({ kind: 'lostWalk', table: tb.id }); }
   }
   while (G.door.length && G.t - G.door[0].t0 > WALK.doorPatience) { G.door.shift(); G.stats.lostWalk++; turnedAway++; ev.push({ kind: 'lostWalk', door: true }); }
   while (G.door.length && G.tables.length < stg.seats) { G.door.shift(); seat(G, ev); }

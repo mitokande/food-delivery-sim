@@ -451,7 +451,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
-| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `main.js` açılış + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `assets/story/` | Uncle's Diner'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -924,6 +924,24 @@ olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipl
   yemek bekliyor / masa yok, müşteri gidiyor / siparişler 50 sn'den uzun kurye bekliyor / aşçılar boşta. Gerekli kişi için
   yer yoksa "genişle" der ve Restoran sekmesine götürür. Harita işaretinde restoranın küçük resmi, dolu masa sayısı, kapıdaki
   sıra ve bekleyen fiş sayısı; kapılarda sipariş iğneleri yemeğin ikonuyla.
+- **Restoranın içi (ana görünüm, `inside.js`):** Kullanıcı "harita değil de restoran içi mi göstersek" dedi; PM
+  değerlendirmesindeki "yönetici fantezisi görünmüyor" eksiğine karşılık. Ön duvarı ve sağ duvarı olmayan bir kesit; kamera
+  sağ önden, hafif yandan bakıyor (dikey telefonda odanın eni ekranı doldursun diye). Arka duvar boyunca mutfak (menüdeki
+  her yemeğe bir istasyon: ızgara, sosis ızgarası, döner, pizza fırını, wok, fritöz, suşi tezgâhı, dondurma dolabı; yemek
+  kitinin modelleri ve duvarda yemeğin ikonu; sıradaki aşçının getireceği yemeğin yeri gri, "Next cook"), önünde tezgâh,
+  solda kuryelerin paket rafı, salonda iki kişilik masalar, önde diz boyu duvar ve kapı, kaldırım ve sokak. Her şey
+  simülasyonun durumundan: `G.tables`'taki her müşteri sokaktan gelip kapıdan girer, bir sandalyeye oturur, siparişi
+  balonda (sabır halkası azalır, son üçte birde kırmızı), yemek tezgâhtan masaya uçar, oturarak yer (`sit` bacakları +
+  `interact-right` kolları), ödeyince "+$" ve çıkıp sağa yürür; yemeği gelmeyen kızgın balonla gider; kapıdaki sıra
+  dışarıda bekler. Sen ve aşçılar (şef şapkalı; seninki kırmızı bantlı) pişirdiğiniz yemeğin istasyonuna yürürsünüz,
+  üstünüzde ilerleme halkası; boştayken ve sipariş varken üstünde **TAP**. Mutfağa ya da kendine dokunmak COOK'la aynı;
+  bir aşçıya dokunmak Mutfak, rafa/kuryeye Kuryeler sekmesi. Kuryeler rafın önünde bekler, paketlerle kapıdan çıkar,
+  dönünce girer. Aşamalar: harap (9×11 m, tahta zemin, lekeli duvar, çivili pencere, harfleri düşmüş tabela "F RDI'S
+  D NER", sandıklar) → tamir (kırmızı-krem dama, "Ferdi's Diner") → teras (önde şemsiyeli masalar, saksılar) → yan dükkân
+  (16 m, sağ yarı yeşil dama, "Ferdi's Kitchen") → Grand (13 m derin, altın şerit); genişleyince masalar ve istasyonlar
+  yerden "pop" eder. Kamera odayı üst çubukla sekme çubuğu arasına sığdırır; büyük salonda yakından başlar, sürükleyerek
+  gezilir, iki parmak / tekerle yakınlaşır. **Harita** düğmesi (üst çubuk) şehri açar; şehirdeyken düğme **Inside** olur,
+  restoranın harita işaretine dokunmak da içeri döndürür. Harita kapalıyken şehir güncellenmez ve çizilmez.
 - **Oyun kapalıyken:** restoran çalışmaya devam eder. Kayıt duvar saatini tutar (`G.at`); oyun yeniden açılınca aradaki
   süre, en fazla 2 saat (`S.AWAY.max`), simülasyonda bir kerede oynatılır (`S.away`): müşteriler gelir, aşçılar pişirir,
   kuryeler teslim eder, sen tıklamazsın (aşçı yoksa bir şey pişmez, kart yerine "kimse pişirmedi" uyarısı). Ayrı bir
@@ -941,8 +959,10 @@ kapatmak (2 saat): planlı aktif oyuncu 10. dk'da kapatırsa +$12K, 30. dk'da +$
 aktif oyuna göre ayarlı olduğundan bir dönüş sonraki birkaç aşamayı birden aldırıyor (denge açık konu). Tarayıcı testi
 `node tools/idle3.mjs` (telefon: hikâye, COOK ve bekleme, masaların ödemesi, aşçı + Hot Dog menüde, beceriler, Menü sekmesi,
 motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
-bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş ve kartı, 10 dk uyuyan sekme; 38 kontrol,
-görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için).
+bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş ve kartı, 10 dk uyuyan sekme; içeride: açılış
+görünümü, oturan müşteri ve balonu, kendine dokununca pişirme, yeni aşçı ve istasyonu, Harita düğmesi ve işaretten dönüş,
+aşamaya göre masa sayısı; 46 kontrol,
+görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için), `?view=city` (haritayla aç).
 
 Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 saat sınırını büyüten bir yükseltme ya da
 reklamla ×2; mutfak yetişemeyince en eski fiş önce kuralı yüzünden 120 sn sabırlı teslimatlar 60 sn sabırlı masaları
