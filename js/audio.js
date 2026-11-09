@@ -3,6 +3,16 @@
 // wind, tyres at the limit, pops on the overrun).
 import { S } from './state.js';
 
+// 0.25 s of silence as a 16-bit mono WAV, looped in an <audio> to hold the iOS media session (see createAudio)
+function silentLoop() {
+  const n = 2000, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+  const a = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' })));
+  a.loop = true; a.preload = 'auto'; a.setAttribute('playsinline', ''); a.setAttribute('x-webkit-airplay', 'deny');
+  return a;
+}
+
 export function createAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
   let ctx = null, master, sfxBus, musicBus, engineBus;
@@ -17,8 +27,24 @@ export function createAudio() {
   // A trip to the background leaves the context 'suspended', or on iOS 'interrupted' (WebKit's own state), and only a
   // resume() brings it back; iOS may take that only inside a tap, and a touch counts as one on the way up, not down.
   // Hidden, the context is put to sleep on purpose, so nothing plays behind the home screen.
-  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) ctx.resume().catch(() => {}); }
-  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else wake(); });
+  // iOS also plays Web Audio in its 'ambient' session, which the ring/silent switch mutes, and most iPhones sit on silent:
+  // the game was mute there while a video still played. 'playback' (iOS 17+) is the session a video gets: it plays through
+  // the switch (and, like any game with its own music, pauses another app's music). Older iOS: a silent looping <audio>
+  // started inside a tap moves the page into that session too; it is paused whenever the page is hidden.
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let keep = null, primed = false;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; else if (IOS) keep = silentLoop(); } catch { /* not settable */ }
+  function wake(e) {
+    if (!ctx || ctx.state === 'closed' || document.hidden) return;
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (!e?.isTrusted || e.type === 'focus' || e.type === 'pageshow') return;
+    // inside the tap itself: a one-sample sound, which older WebKit wants before it lets the context out of 'suspended'
+    if (!primed || ctx.state !== 'running') { primed = true; const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050); s.connect(ctx.destination); s.start(0); }
+    if (keep?.paused) keep.play().catch(() => {});
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { keep?.pause(); if (ctx) ctx.suspend().catch(() => {}); } else wake();
+  });
   for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, wake, { capture: true, passive: true });
   addEventListener('pageshow', wake); addEventListener('focus', wake);
 

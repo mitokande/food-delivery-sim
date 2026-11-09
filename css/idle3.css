@@ -1,0 +1,280 @@
+/* Uncle's Diner (idle3.html): on top of game.css and idle.css. */
+
+/* the second HUD row: fame, and the "what to do next" banner */
+.diner .hud2 { position: absolute; top: calc(66px + var(--safe-t)); left: 8px; right: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.diner .hud2 > * { pointer-events: auto; }
+.famebar { display: flex; align-items: center; gap: 8px; width: min(100%, 340px); padding: 3px 12px 3px 4px; border-radius: 16px; background: var(--panel); box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.3); }
+.famebar.up { animation: cashpop .7s cubic-bezier(.3,1.6,.5,1); }
+.fm-lv { position: relative; display: grid; place-items: center; width: 34px; height: 30px; }
+.fm-lv .ic { width: 34px; height: 34px; }
+.fm-lv b { position: absolute; font: 400 14px/1 var(--display); color: #fff; -webkit-text-stroke: 3px #7a4a00; paint-order: stroke fill; margin-top: 2px; }
+.fm-track { position: relative; flex: 1; height: 12px; border-radius: 6px; background: rgba(0,0,0,.45); overflow: hidden; }
+.fm-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 6px; background: linear-gradient(90deg, #ffd56b, #f2a541); transition: width .3s; }
+.fm-text { font-size: 12.5px; color: #c8d3ee; white-space: nowrap; }
+.fm-text b { font-family: var(--display); font-weight: 400; font-size: 15px; color: #fff; }
+.neckb { display: inline-flex; align-items: center; gap: 6px; max-width: min(100%, 420px); padding: 4px 12px 4px 6px; border-radius: 14px; font-size: 13px; font-weight: 600; text-align: left; line-height: 1.2;
+  background: var(--panel); box-shadow: inset 0 0 0 2px rgba(91,209,59,.5), 0 3px 0 rgba(0,0,0,.3); color: #dfe8ff; }
+.neckb .ic { width: 26px; height: 26px; flex: none; object-fit: contain; }
+.neckb.bad { box-shadow: inset 0 0 0 2px rgba(232,67,47,.9), 0 3px 0 rgba(0,0,0,.3); background: linear-gradient(180deg, rgba(110,30,24,.95), rgba(70,20,18,.95)); animation: neckpulse 1.3s ease-in-out infinite; }
+.neckb.warn { box-shadow: inset 0 0 0 2px rgba(255,197,61,.8), 0 3px 0 rgba(0,0,0,.3); }
+.neckb.go { background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; box-shadow: 0 0 0 2.5px #fff, 0 4px 0 2px rgba(0,0,0,.3); animation: bob 1.2s ease-in-out infinite; }
+.neckb.ok { color: #b9e8a8; }
+@keyframes neckpulse { 50% { box-shadow: inset 0 0 0 2px rgba(232,67,47,.4), 0 3px 0 rgba(0,0,0,.3); } }
+@media (min-aspect-ratio: 1/1) and (min-width: 700px) {
+  .diner .hud2 { left: auto; right: 8px; top: calc(60px + var(--safe-t)); align-items: flex-end; width: 380px; }
+}
+
+/* the SMASH button: the middle of the tab bar, bigger than the tabs, a ring while your burger is on the grill */
+.diner .tabs { overflow: visible; }
+.diner .tabs .smash { flex: 0 0 98px; position: relative; height: 54px; padding: 0; background: none; border-radius: 0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.smash .sm-face, .smash .sm-ring { position: absolute; left: 50%; border-radius: 50%; }
+.smash .sm-face { top: -44px; width: 92px; height: 92px; margin-left: -46px; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, #ffb15c, #ff7a2f 45%, #c4480f); box-shadow: 0 0 0 4px #fff, 0 6px 0 3px rgba(0,0,0,.35); transition: filter .15s, transform .08s; }
+.smash .sm-face img { width: 82px; height: 82px; pointer-events: none; }
+.smash .sm-ring { top: -52px; width: 108px; height: 108px; margin-left: -54px; opacity: 0; transition: opacity .15s;
+  background: conic-gradient(#ffd56b calc(var(--p, 0) * 1turn), rgba(10,16,30,.55) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); }
+.smash.busy .sm-ring { opacity: 1; }
+.smash.busy .sm-face { filter: saturate(.55) brightness(.85); }
+.smash.full .sm-face { filter: grayscale(.85) brightness(.75); }
+.smash.ready .sm-face { animation: smglow 1.4s ease-in-out infinite; }
+.smash.first.ready .sm-face { animation: smglow .7s ease-in-out infinite; }
+@keyframes smglow { 50% { box-shadow: 0 0 0 4px #fff, 0 0 0 10px rgba(255,213,107,.55), 0 6px 0 3px rgba(0,0,0,.35); } }
+.smash.hit .sm-face { animation: smhit .22s ease-out; }
+@keyframes smhit { 0% { transform: scale(.86); } 60% { transform: scale(1.05); } }
+.smash.no .sm-face { animation: smno .3s ease-in-out; }
+@keyframes smno { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.smash .sm-n { position: absolute; top: -50px; right: 0; min-width: 34px; height: 24px; padding: 0 6px; border-radius: 12px; background: #2b3d63; border: 2px solid #fff;
+  font: 400 13px/20px var(--display); color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.smash.full .sm-n { background: var(--red); }
+.smash em { position: absolute; left: 0; right: 0; bottom: 2px; font: 400 15px/1 var(--display); font-style: normal; color: #fff; letter-spacing: .04em; -webkit-text-stroke: 3.5px #7a2a00; paint-order: stroke fill; }
+.smash.full em::after { content: ' · FULL'; }
+.smash .sm-pop { position: absolute; left: 50%; top: -60px; display: flex; align-items: center; gap: 2px; transform: translateX(-50%); font: 400 18px var(--display); font-style: normal; color: #fff;
+  -webkit-text-stroke: 3.5px #7a2a00; paint-order: stroke fill; pointer-events: none; animation: smpop .8s ease-out forwards; white-space: nowrap; }
+.smash .sm-pop .ic { width: 24px; height: 24px; }
+@keyframes smpop { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -40px; } }
+.diner .sheet-body { padding-bottom: 54px; }
+.tabs .ic.veh { object-fit: contain; }
+
+/* map: the diner (counter count, a ring while your burger cooks, the walk-in line) and order pins */
+.mk.diner { padding-bottom: 8px; }
+.mk.diner .bub { width: 58px; height: 58px; background: #fff; }
+.mk.diner .bub .art { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; object-position: 50% 45%; }
+.mk.diner .ring { position: absolute; inset: -8px; border-radius: 50%; background: conic-gradient(#ffd56b calc(var(--p, 0) * 1turn), rgba(20,30,50,.0) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); }
+.mk.diner .cnt { background: #2b3d63; }
+.mk.diner .dst { display: flex; gap: 4px; margin-top: 10px; }
+.mk.diner .seats, .mk.diner .wq { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 7px 0 2px; border-radius: 11px; background: #fff; color: var(--ink); font: 400 13px var(--display); font-style: normal; border: 2px solid #2b3d63; }
+.mk.diner .seats .ic, .mk.diner .wq .ic { width: 20px; height: 20px; }
+.mk.diner .seats.full { border-color: var(--red); }
+.mk.diner .wq.long { border-color: var(--red); animation: bob .7s ease-in-out infinite; }
+.mk.diner .dname { margin-top: 4px; font: 400 12px var(--display); font-style: normal; color: #fff; background: #c4480f; padding: 1px 9px; border-radius: 9px; border-bottom: 3px solid #7a2a00; white-space: nowrap; }
+.mk.pin { padding: 0; }
+.mk.pin .pdot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dfe3ea; border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.35); transition: background .3s, transform .3s; }
+.mk.pin .pdot .ic { width: 16px; height: 16px; }
+.mk.pin.open .pdot { background: rgba(200,210,230,.8); filter: grayscale(.4); transform: scale(.85); }
+.mk.pin.packed .pdot { background: #ffc53d; }
+.mk.pin.bike .pdot { background: #5bd13b; animation: bob 1s ease-in-out infinite; }
+.mk.paypop.tip b { color: #ffe08a; -webkit-text-stroke-color: #7a4a00; }
+.mk.paypop.lost b { color: #fff; -webkit-text-stroke-color: var(--red-d); font-size: 15px; }
+.mk.paypop.stall b { color: #e6e9ee; -webkit-text-stroke-color: #2b2f38; font-size: 15px; }
+
+/* Kitchen: the counter, people cards with their skills */
+.counter { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 8px; border-radius: 14px; background: rgba(0,0,0,.25); }
+.counter .slots { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.counter .slots i { display: grid; place-items: center; aspect-ratio: 1; max-height: 34px; border-radius: 9px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.1); }
+.counter .slots i .ic { width: 80%; height: 80%; object-fit: contain; }
+.counter .slots i.b { background: rgba(255,197,61,.25); } .counter .slots i.p { background: rgba(91,209,59,.25); }
+.counter .cq { display: flex; gap: 6px; }
+.counter .cq span { display: flex; flex-direction: column; align-items: center; min-width: 46px; }
+.counter .cq .ic { width: 20px; height: 20px; }
+.counter .cq b { font-family: var(--display); font-weight: 400; font-size: 16px; line-height: 1; }
+.counter .cq small { font-size: 10.5px; color: #b9c6e6; }
+.pcards { gap: 8px; }
+.pcard { padding: 8px 10px 10px; border-radius: 16px; background: linear-gradient(180deg, #2e4470, #24345a); border-bottom: 4px solid #16213a; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.08); }
+.pcard.you { box-shadow: inset 0 0 0 2px rgba(255,138,61,.6); }
+.phead { display: flex; align-items: center; gap: 10px; }
+.pava { flex: none; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: #fff; box-shadow: 0 0 0 2px #fff; }
+.pava .ic { width: 44px; height: 44px; object-fit: cover; object-position: 50% 0; }
+.kt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kt b { font-family: var(--display); font-weight: 400; font-size: 17px; }
+.kt small { font-size: 12px; color: #b9c6e6; }
+.made { display: flex; flex-direction: column; align-items: center; min-width: 40px; }
+.made b { font-family: var(--display); font-weight: 400; font-size: 17px; line-height: 1; }
+.made small { font-size: 10.5px; color: #b9c6e6; }
+.pcard > .pbar { height: 8px; margin: 7px 0 8px; }
+.pcard > .pbar u { transition: width .1s linear; }
+.pcard > .pbar u.held { background: linear-gradient(#ffb0a3, #e8432f); }
+.kbtns { display: grid; gap: 6px; }
+.kbtns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kbtns.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kbtns .kb { min-width: 0; min-height: 0; padding: 4px 4px 5px; flex-direction: column; gap: 0; line-height: 1.1; }
+.kbtns .kb b { font-family: var(--display); font-weight: 400; font-size: 13.5px; white-space: nowrap; }
+.kbtns .kb b .lv { font-style: normal; font-size: 11px; opacity: .8; }
+.kbtns .kb small { font-size: 12.5px; }
+.kbtns .kb em { font-style: normal; font-size: 10.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.kbtns .kb.max { display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(0,0,0,.22); color: #9fb0d6; text-align: center; }
+.kbtns .kb.max small { color: #ffd56b; }
+.row.hire { box-shadow: inset 0 0 0 2px rgba(91,209,59,.45); }
+.row.hire > .ic.veh { object-fit: contain; }
+
+/* Couriers */
+.scoot { display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 18px; background: linear-gradient(180deg, #2e4470, #24345a); box-shadow: inset 0 0 0 2px rgba(255,197,61,.5); }
+.scoot img { width: 100%; height: 150px; object-fit: cover; object-position: 50% 60%; border-radius: 12px; background: #fff; }
+.scoot p { margin: 0 4px; font-size: 14px; color: #dfe8ff; line-height: 1.35; }
+.pbar.goal { height: 20px; }
+.fsum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.fsum span { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 12px; background: rgba(0,0,0,.25); }
+.fsum .ic { width: 22px; height: 22px; }
+.fsum b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+.fsum small { font-size: 11px; color: #b9c6e6; }
+.motor { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; padding: 4px 6px; border-radius: 12px; background: rgba(0,0,0,.22); }
+.motor > .ic { width: 52px; height: 40px; object-fit: contain; }
+.motor .rt b { font-size: 15px; }
+.mnote { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; color: #b9c6e6; }
+.mnote .ic { width: 30px; height: 22px; object-fit: contain; opacity: .85; }
+.mnote small { font-size: 11.5px; }
+.motor .max { font-size: 13px; }
+@media (max-width: 360px) { .kbtns.three { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Diner tab */
+.famebig { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 10px; border-radius: 16px; background: rgba(0,0,0,.25); }
+.famebig > .ic { width: 54px; height: 54px; flex: none; }
+.famebig > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.famebig b { font-family: var(--display); font-weight: 400; font-size: 20px; }
+.famebig small { font-size: 12px; color: #b9c6e6; }
+.hint .link { color: #9fd0ff; }
+
+/* story cards */
+.modal.story .card { padding-top: 12px; }
+.storyimg { margin: 0 0 -6px; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 2px rgba(0,0,0,.06); }
+.storyimg img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+.storyp { margin: 10px 4px 8px; font-size: 15.5px; line-height: 1.4; text-align: center; }
+.modal.story .dots { display: flex; justify-content: center; gap: 6px; margin: 0 0 10px; }
+.modal.story .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(60,40,20,.2); }
+.modal.story .dots i.on { background: #e8432f; }
+
+/* five tabs around the COOK button: tighter labels */
+.diner .tabs button span { font-size: 11px; }
+.diner .tabs button:not(.smash) .ic { width: 28px; height: 28px; }
+.smash .sm-dish { position: absolute; top: -50px; left: 2px; width: 30px; height: 30px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #fff, 0 2px 0 rgba(0,0,0,.3); display: grid; place-items: center; }
+.smash .sm-dish:empty { display: none; }
+.smash .sm-dish .ic { width: 24px; height: 24px; }
+.smash .sm-n[hidden] { display: none; }
+
+/* Restaurant: the picture of the place, its numbers, the next stage */
+.hero { position: relative; border-radius: 16px; overflow: hidden; background: #fff; margin-bottom: 8px; box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
+.hero img { display: block; width: 100%; height: 180px; object-fit: contain; }
+.fsum.four { grid-template-columns: repeat(4, 1fr); }
+.nextst { display: flex; flex-direction: column; gap: 8px; padding: 8px; margin-bottom: 10px; border-radius: 16px; background: linear-gradient(180deg, #2e4470, #24345a); box-shadow: inset 0 0 0 2px rgba(255,197,61,.55); }
+.nxtop { display: flex; gap: 10px; align-items: center; }
+.nxtop img { flex: none; width: 112px; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; background: #fff; }
+.nextst .rt small { font-size: 11.5px; }
+.nextst .rt b { font-size: 16px; }
+.nextst .needs { display: inline-flex; align-items: center; gap: 3px; color: #ffb4a8; font-weight: 700; }
+.nextst .needs .ic { width: 16px; height: 16px; }
+.nextst .btn.big { min-height: 46px; font-size: 19px; }
+
+/* Kitchen: the tickets (what's cooking glows), cards with what each cook brought */
+.counter .tickets { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.counter .tickets i { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,.1); }
+.counter .tickets i .ic { width: 24px; height: 24px; }
+.counter .tickets i.cooking { background: rgba(255,138,61,.45); box-shadow: inset 0 0 0 2px #ff8a3d; }
+.counter .tickets i.deliv::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 3px; background: #5bd13b; border: 1.5px solid #fff; }
+.counter .tickets i.more { width: auto; padding: 0 6px; font: 400 13px var(--display); font-style: normal; }
+.counter .tickets small { font-size: 12px; color: #9fb0d6; }
+.brought { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; padding: 0 7px 0 2px; border-radius: 9px; background: rgba(255,197,61,.22); font: 600 11px var(--font); color: #ffe08a; vertical-align: 2px; }
+.brought .ic { width: 18px; height: 18px; }
+.pcard > .pbar.job { height: 18px; }
+.pcard > .pbar.job em { font-size: 11.5px; line-height: 18px; }
+.row.hire > .ic:first-child, .row.noroom > .ic:first-child { background: #fff; }
+.row.noroom { box-shadow: inset 0 0 0 2px rgba(255,197,61,.45); }
+
+/* Menu: the dishes, the ones still to come greyed out */
+.variety { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; border-radius: 12px; background: rgba(0,0,0,.25); font-size: 13px; color: #dfe8ff; }
+.variety .ic { width: 26px; height: 26px; flex: none; }
+.variety b { color: var(--cash); }
+.dishes { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.dish { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-radius: 14px; background: linear-gradient(180deg, #2e4470, #24345a); border-bottom: 3px solid #16213a; text-align: center; }
+.dish .ic { width: 46px; height: 46px; padding: 4px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #fffaf0, #f1e4cc); margin-bottom: 2px; }
+.dish b { font-family: var(--display); font-weight: 400; font-size: 14px; line-height: 1.1; }
+.dish small { font-size: 11.5px; color: var(--cash); font-weight: 700; }
+.dish em { font-style: normal; font-size: 11px; color: #b9c6e6; }
+.dish.off { opacity: .55; } .dish.off .ic { filter: grayscale(1) brightness(.8); } .dish.off small { color: #b9c6e6; }
+.dish.next { opacity: .9; box-shadow: inset 0 0 0 2px rgba(255,197,61,.7); } .dish.next .ic { filter: grayscale(.4); } .dish.next em { color: #ffd56b; }
+
+/* Kitchen: the order board (who cooks what; what waits, oldest first; table or delivery; held deliveries dimmed) */
+.board { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; padding: 7px 8px 8px; border-radius: 14px; background: rgba(0,0,0,.25); }
+.brow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.blabel { display: inline-flex; align-items: center; gap: 4px; font-family: var(--display); font-weight: 400; font-size: 14px; }
+.blabel .ic { width: 20px; height: 20px; align-self: center; }
+.blabel .qn { font-style: normal; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: #2b3d63; font-size: 13px; line-height: 20px; text-align: center; }
+.bnote { font-size: 11.5px; color: #b9c6e6; white-space: nowrap; }
+.bnote b { color: #fff; font-family: var(--display); font-weight: 400; font-size: 13px; }
+.stove { display: flex; flex-wrap: wrap; gap: 5px; }
+.pot { position: relative; display: inline-flex; align-items: center; gap: 3px; height: 34px; padding: 2px 8px 4px 2px; border-radius: 17px; overflow: hidden; background: rgba(255,255,255,.08); }
+.pot.on { background: rgba(255,138,61,.3); box-shadow: inset 0 0 0 2px #ff8a3d; }
+.pot .pa { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: #fff; flex: none; }
+.pot .pa .ic { width: 28px; height: 28px; object-fit: cover; object-position: 50% 0; }
+.pot > .ic { width: 26px; height: 26px; }
+.pot small { font-size: 11.5px; color: #9fb0d6; padding-right: 2px; }
+.pot > u { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: #ffd56b; }
+.board .k { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.3); font-style: normal; }
+.board .k .ic { width: 13px; height: 13px; object-fit: contain; }
+.pot .k { margin-left: -9px; margin-top: 14px; }
+.board .tickets { display: flex; flex-wrap: wrap; gap: 5px; min-height: 34px; align-items: center; }
+.board .tickets .t { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.1); font-style: normal; }
+.board .tickets .t > .ic { width: 26px; height: 26px; }
+.board .tickets .t .k { position: absolute; right: -4px; bottom: -4px; }
+.board .tickets .t.held { opacity: .38; filter: grayscale(.6); }
+.board .tickets .t.next { box-shadow: inset 0 0 0 2px #ffd56b; }
+.board .tickets .t.next::before { content: 'next'; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); padding: 0 4px; border-radius: 6px; background: #ffd56b; color: #4a2a00; font: 700 9px/12px var(--font); }
+.board .tickets .more { font: 400 13px var(--display); font-style: normal; padding: 0 4px; }
+.board .tickets .none { font-size: 12px; color: #9fb0d6; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: #b9c6e6; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend .sw { width: 14px; height: 14px; border-radius: 4px; background: rgba(255,255,255,.1); opacity: .5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+.board .t.deliv .k, .pot .k.dv, .legend .k.dv { background: #5bd13b; }
+
+/* the "while you were away" card */
+.awaycash { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.awaycash .ic { width: 34px; height: 34px; }
+.awaycash b { font-family: var(--display); font-weight: 400; font-size: 34px; color: #2e9d3a; -webkit-text-stroke: 1px rgba(0,0,0,.08); }
+.awaynote { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 6px 8px; font-size: 13px; line-height: 1.35; text-align: center; color: #6b5a4c; }
+.awaynote .ic { width: 18px; height: 18px; flex: none; }
+.awaycard .rlines { margin: 4px 0; }
+.res.cash.bump { animation: cashpop .6s cubic-bezier(.3,1.6,.5,1); }
+
+/* the restaurant from the inside (inside.js): its own marker layer; the map's markers only on the map */
+#inmarkers { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+body[data-view="inside"] #markers { display: none; }
+.viewbtn { position: relative; width: 44px; height: 40px; padding: 0; border-radius: 14px; flex: none; display: grid; place-items: center;
+  background: linear-gradient(180deg, #34507e, #1d2a44); box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.35); }
+.viewbtn img, .viewbtn .ic { width: 28px; height: 28px; object-fit: contain; }
+.viewbtn small { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); padding: 0 5px; border-radius: 6px; background: #c4480f; color: #fff; font: 400 10.5px/14px var(--display); white-space: nowrap; }
+.mk.inmk { padding-bottom: 4px; }
+/* a customer's order: the dish in a bubble, a ring that empties as they lose patience */
+.mk.order .ob { position: relative; z-index: 0; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.order .ob .ic { width: 25px; height: 25px; }
+.mk.order .ob::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -5px; border: 5px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.mk.order .pat { position: absolute; inset: -4px; z-index: -1; border-radius: 50%; background: conic-gradient(#5bd13b calc((1 - var(--p, 0)) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.order.late .pat { background: conic-gradient(#e8432f calc((1 - var(--p, 0)) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.order.late .ob { animation: bob .6s ease-in-out infinite; }
+.mk.madmk .mad { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #e8432f; border: 2px solid #fff; animation: bob .5s ease-in-out infinite; }
+.mk.madmk .mad .ic { width: 20px; height: 20px; filter: brightness(10); }
+/* the staff: a ring over whoever cooks; TAP over you when an order waits */
+.mk.staff { pointer-events: auto; }
+.mk.staff .cb { position: relative; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.staff .cb .ring { position: absolute; inset: -4px; z-index: -1; border-radius: 50%; background: conic-gradient(#ffd56b calc(var(--p, 0) * 1turn), rgba(20,30,50,.35) 0); }
+.mk.staff .cb { z-index: 0; }
+.mk.staff .cb .ic { width: 24px; height: 24px; }
+.mk.staff .tapme { display: block; padding: 3px 10px 4px; border-radius: 12px; background: linear-gradient(180deg, #ffd56b, #f2a541); color: #4a2a00; font: 400 15px var(--display); box-shadow: 0 0 0 2.5px #fff, 0 3px 0 2px rgba(0,0,0,.3); animation: bob .9s ease-in-out infinite; }
+/* the next cook's station (grey), the bags waiting for a courier */
+.mk.ghost { display: flex; flex-direction: column; align-items: center; }
+.mk.ghost .gh { display: flex; align-items: center; gap: 2px; padding: 3px 6px; border-radius: 14px; background: rgba(255,255,255,.85); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.mk.ghost .gh .ic { width: 20px; height: 20px; } .mk.ghost .gh .ic + .ic { width: 24px; height: 24px; filter: grayscale(.7); opacity: .8; }
+.mk.ghost em { margin-top: 3px; font: 400 11px/14px var(--display); font-style: normal; color: #fff; background: rgba(20,30,50,.7); padding: 0 6px; border-radius: 7px; }
+.mk.shelfmk .sh { display: flex; align-items: center; gap: 3px; padding: 2px 9px 2px 4px; border-radius: 14px; background: #5bd13b; border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.mk.shelfmk .sh .ic { width: 22px; height: 22px; } .mk.shelfmk .sh b { font: 400 15px var(--display); color: #fff; -webkit-text-stroke: 3px #1f5e12; paint-order: stroke fill; }
+.mk.order .ob { width: 28px; height: 28px; } .mk.order .ob .ic { width: 21px; height: 21px; }
+.mk.order .pat { inset: -3px; }

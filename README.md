@@ -24,6 +24,16 @@ resets the city for Stars. Its own save (`fds_idle_v1`), no analytics. Design an
 kitchen → shelf → courier → door and cool down on the way; hot deliveries earn the day's stars. Its own save (`fds_idle2_v1`),
 no analytics. Notes and balance: DOCS.md §12.
 
+`idle3.html` is **Uncle's Diner**, an idle restaurant manager: your distant uncle left you a run-down diner and an old
+scooter, and all you can cook is a smash burger. Customers take a table and order; tap COOK to cook an order yourself, hire
+cooks (each brings a new dish to the menu) and couriers, level their skills and motors, and expand the place in five
+stages, from the run-down diner to a grand two-building restaurant. You watch it from the inside (customers walk in, sit
+and eat, the cooks work the stations of their dishes); the Map button shows the city, where the building is rebuilt
+for each stage and the couriers ride. The staff keep the
+place running while the game is closed (up to 2 hours, shown on a "while you were away" card). Its own save
+(`fds_idle3_v2`), no analytics. The story and stage art in `assets/story/` is AI-generated (`tools/genart.mjs`). Notes and
+balance: DOCS.md §13.
+
 ## Run locally
 
 Any static file server works, e.g. `npx serve .` or `python3 -m http.server`, then open `index.html`.

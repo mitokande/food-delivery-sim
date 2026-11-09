@@ -419,7 +419,8 @@ rehber "bir sipariş seç" adımına döner.
 
 ## 7. Varlıklar
 
-Hepsi CC0 veya burada yapıldı (CREDITS.md). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
+Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Uncle's Diner'ın hikâye görselleri yapay zekâ ile üretildi
+(`tools/genart.mjs`, istemler dosyada; anahtar ortam değişkeninden okunur, repoda yok). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
 Mini Characters (animasyonlu: idle, walk, drive, sit, emote…). Oyuncu araçları, kask ve restoran binaları Blender'da
 script ile (`tools/blender/`). Arama: 3d.shep.bot (24 kaynak, lisans bilgisiyle).
 
@@ -450,7 +451,9 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
-| `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
+| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `assets/story/` | Uncle's Diner'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
+| `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
 | `admin/` | analitik paneli: `index.php` giriş + kabuk, `api.php` salt-okunur sorgular, `app.js` görünümler + SVG grafikler (isimleri oyunun `data.js`'inden alır) |
@@ -883,3 +886,85 @@ Sonraki aşamalar (önerideki sıra): 2) üç bölüm, bölüm seçimi, oyun kap
 kadro seçimi; 4) olay kartları, günlük kutu, haftalık etkinlik, ödüllü reklam, Adapty VIP. Her aşamadan önce analitik
 (bölüm başı/sonu, yıldız) eklenmeli.
 
+## 13. Uncle's Diner (`idle3.html`, idle restoran yöneticisi, 1. aşama, 9 Kasım 2026)
+
+Kullanıcı Hot Chain'i beğenmedi ve döngüyü kendisi verdi: uzak bir amcadan miras kalan harap bir lokanta ve eski bir motor;
+şef değiliz, öğrencilikte sadece smash burger öğrendik; tek tıkla yemek yapılır, her tık yapma süresi kadar bekler; belli bir
+paradan sonra kurye tutulur; aşçılar alınır ve geliştirilir; kuryenin motoru ve becerileri geliştirilir. İlk sürüm fazla burger
+odaklı bulundu ("bu oyun idle restaurant manager olacak"): aşçı aldıkça yemek çeşidi artmalı, restoran hem fiziksel hem içerik
+olarak büyümeli. Ayrı kayıt (`fds_idle3_v2`), analitik yok; diğer prototipler olduğu gibi duruyor.
+
+- **Hikâye:** ilk açılışta dört kart (mektup, lokanta, motor, menü); ilk aşçıdan sonra kurye alınabilir olunca bir kart daha
+  (motor); her genişlemede yeni aşamanın görseliyle bir kart. Görseller yapay zekâ ile üretildi (§7). Kart açıkken oyun durur.
+- **Masa → mutfak → masa:** müşteri boş masa varsa oturur (yoksa kapıda en fazla 4 kişi 25 sn bekler, sonra gider), menüden
+  rastgele bir yemek ister; sipariş mutfağa fiş olarak düşer (eskisi önce). Boştaki aşçı sıradaki fişi pişirir; **COOK**
+  butonu (sekme çubuğunun ortası) sıradaki fişi senin pişirmeni sağlar: bir tık bir yemek, yemeğin süresinin %40'ı kadar
+  bekler (Speed ile ×0,87/seviye). Yemek masaya gelince müşteri öder (fiyat × pişirenin kalitesi), 12 sn yer ve kalkar;
+  60 sn içinde yemeği gelmezse ödemeden gider.
+- **Menü (içerik büyümesi):** Smash Burger ile başlar; her aşçı bir yemek getirir: Hot Dog, Döner, Pizza, Noodles, Fish &
+  Chips, Sushi, Ice Cream ($4–19, 5–16 sn). Her yeni yemek müşteriyi +%18 artırır. Menü sekmesi gelecek yemekleri gri
+  gösterir, "sıradaki aşçı getirir" işaretiyle.
+- **Restoran aşamaları (fiziksel büyüme):** harap lokanta (6 masa, 1 aşçı, 1 kurye) → tamir edilmiş ($120, Şöhret 2: 10 masa,
+  2/2) → teras ($500, Şöhret 3: 16 masa, 3/3) → yan dükkânı alan Ferdi's Restaurant ($2500, Şöhret 5: 26 masa, 5/4) → Ferdi's
+  Grand ($9000, Şöhret 7: 40 masa, 7/6); her aşama müşteri çekimini de artırır (×1 → ×1,75). Haritada bina her aşamada yeniden
+  inşa edilir: şehrin kendi bina üreticisi (`arch.js`) aynı arsayı farklı ayarla kurar (`buildLotArch` / `buildLotView`;
+  şehir bu iki arsayı boş bırakır, `buildCityView(…, { skip })`). Harap: soluk duvar, tente/tabela/çatı süsü yok; tamir: marka
+  rengi, kırmızı tente, "Ferdi's Diner" tabelası, çatıda dev burger; teras: önde şemsiyeli kafe masaları; 4. aşamada yandaki
+  arsa da restoranın olur ("Ferdi's Kitchen", 3 kat); 5.'de iki bina 4 kat, balkonlar, ikinci çatıda pizza. Bina yerden
+  yükselerek değişir. Restoran sekmesinde aşamanın çizimi (beş aşama birbirinin düzenlemesi olarak üretildi, hep aynı bina).
+- **Kuryeler:** ilki $75 (amcanın Rust Bucket'ı: 7 m/s, %30 ihtimalle 6 sn çalışmaz), sonrakiler $220 / $700 / $2200 …, aşama
+  kotası kadar. Sipariş kapılardan gelir (220 m içindeki 188 kapı), menüden rastgele yemek; ücret yemek + $3 + metre başına
+  $0,04 + bahşiş. Kuryelerin bir seferde taşıyabileceğinden fazla paket önceden pişirilmez (masalara öncelik). Motor merdiveni
+  ve Riding / Bag / Charm becerileri önceki sürümdeki gibi.
+- **Sipariş panosu (Mutfak sekmesi):** "Ocakta" satırı herkesin elinde ne pişirdiğini (ilerleme çubuğuyla, sen boştaysan
+  "tap COOK"), "Bekleyen siparişler" en eskisi solda olmak üzere fişleri gösterir; her fişte masa ya da motor rozeti,
+  sıradaki fiş "next" ile işaretli. Kuryelerin o an alabileceğinden fazla teslimat fişi soluk durur ("kurye bekliyor"):
+  kurye dönene kadar pişirilmez, masa fişleri öne geçer (`queueView`). Kullanıcı ilk sürümdeki işaretsiz şeridi anlamamıştı.
+- **Şerit:** önce yol gösterir (COOK'a bas → aşçı al → kurye tut → genişle → yeni aşçı), sonra darboğazı söyler: masalar
+  yemek bekliyor / masa yok, müşteri gidiyor / siparişler 50 sn'den uzun kurye bekliyor / aşçılar boşta. Gerekli kişi için
+  yer yoksa "genişle" der ve Restoran sekmesine götürür. Harita işaretinde restoranın küçük resmi, dolu masa sayısı, kapıdaki
+  sıra ve bekleyen fiş sayısı; kapılarda sipariş iğneleri yemeğin ikonuyla.
+- **Restoranın içi (ana görünüm, `inside.js`):** Kullanıcı "harita değil de restoran içi mi göstersek" dedi; PM
+  değerlendirmesindeki "yönetici fantezisi görünmüyor" eksiğine karşılık. Ön duvarı ve sağ duvarı olmayan bir kesit; kamera
+  sağ önden, hafif yandan bakıyor (dikey telefonda odanın eni ekranı doldursun diye). Arka duvar boyunca mutfak (menüdeki
+  her yemeğe bir istasyon: ızgara, sosis ızgarası, döner, pizza fırını, wok, fritöz, suşi tezgâhı, dondurma dolabı; yemek
+  kitinin modelleri ve duvarda yemeğin ikonu; sıradaki aşçının getireceği yemeğin yeri gri, "Next cook"), önünde tezgâh,
+  solda kuryelerin paket rafı, salonda iki kişilik masalar, önde diz boyu duvar ve kapı, kaldırım ve sokak. Her şey
+  simülasyonun durumundan: `G.tables`'taki her müşteri sokaktan gelip kapıdan girer, bir sandalyeye oturur, siparişi
+  balonda (sabır halkası azalır, son üçte birde kırmızı), yemek tezgâhtan masaya uçar, oturarak yer (`sit` bacakları +
+  `interact-right` kolları), ödeyince "+$" ve çıkıp sağa yürür; yemeği gelmeyen kızgın balonla gider; kapıdaki sıra
+  dışarıda bekler. Sen ve aşçılar (şef şapkalı; seninki kırmızı bantlı) pişirdiğiniz yemeğin istasyonuna yürürsünüz,
+  üstünüzde ilerleme halkası; boştayken ve sipariş varken üstünde **TAP**. Mutfağa ya da kendine dokunmak COOK'la aynı;
+  bir aşçıya dokunmak Mutfak, rafa/kuryeye Kuryeler sekmesi. Kuryeler rafın önünde bekler, paketlerle kapıdan çıkar,
+  dönünce girer. Aşamalar: harap (9×11 m, tahta zemin, lekeli duvar, çivili pencere, harfleri düşmüş tabela "F RDI'S
+  D NER", sandıklar) → tamir (kırmızı-krem dama, "Ferdi's Diner") → teras (önde şemsiyeli masalar, saksılar) → yan dükkân
+  (16 m, sağ yarı yeşil dama, "Ferdi's Kitchen") → Grand (13 m derin, altın şerit); genişleyince masalar ve istasyonlar
+  yerden "pop" eder. Kamera odayı üst çubukla sekme çubuğu arasına sığdırır; büyük salonda yakından başlar, sürükleyerek
+  gezilir, iki parmak / tekerle yakınlaşır. **Harita** düğmesi (üst çubuk) şehri açar; şehirdeyken düğme **Inside** olur,
+  restoranın harita işaretine dokunmak da içeri döndürür. Harita kapalıyken şehir güncellenmez ve çizilmez.
+- **Oyun kapalıyken:** restoran çalışmaya devam eder. Kayıt duvar saatini tutar (`G.at`); oyun yeniden açılınca aradaki
+  süre, en fazla 2 saat (`S.AWAY.max`), simülasyonda bir kerede oynatılır (`S.away`): müşteriler gelir, aşçılar pişirir,
+  kuryeler teslim eder, sen tıklamazsın (aşçı yoksa bir şey pişmez, kart yerine "kimse pişirmedi" uyarısı). Ayrı bir
+  kazanç formülü yok, yani kapalıyken kazanç oyun açıkken boşta beklemekle aynı. 1 dakikadan uzun kalınca "While you were
+  away" kartı: geçen süre, kazanç, servis edilen masa ve teslimat, kazanılan Şöhret, 2 saat sınırına takıldıysa bunun notu ve o
+  sürede restoranı en çok neyin tuttuğu (mutfak / masa / kurye / boş aşçılar) için bir öneri; **Collect** kartı kapatır.
+  Sekme gizlenince ya da telefon kilitlenince kareler durur; iki kare arasında 3 sn'den uzun boşluk da aynı şekilde
+  oynatılır. 8 saat sunucuda ~0,3 sn sürüyor. Kartın görseli de yapay zekâyla üretildi (`away`).
+
+Denge: `node tools/idle3sim.mjs [dakika] [oyuncu] [--log]`. 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı (Hot Dog) 0:58,
+kurye 3:16, 2. aşama 4:51, 2. aşçı (Döner) 7:41, teras 11:19, Pizza 18:53, yan bina 26:26, Noodles 38:10, Fish & Chips 60:15,
+Grand 66:49; gelir 1. dk $32/dk → 10. dk $140 → 30. dk $504 → 60. dk $1200. Hiç tıklamayan planlı oyuncu: 2. aşama 6:35,
+teras 20:01, yan bina 43:21, 60. dk $453/dk. "En ucuzunu al" oyuncusu genişlemeyi geç alıyor (2. aşama 15:30). Oyunu
+kapatmak (2 saat): planlı aktif oyuncu 10. dk'da kapatırsa +$12K, 30. dk'da +$42K, 60. dk'da +$114K; fiyatlar 1 saatlik
+aktif oyuna göre ayarlı olduğundan bir dönüş sonraki birkaç aşamayı birden aldırıyor (denge açık konu). Tarayıcı testi
+`node tools/idle3.mjs` (telefon: hikâye, COOK ve bekleme, masaların ödemesi, aşçı + Hot Dog menüde, beceriler, Menü sekmesi,
+motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
+bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş ve kartı, 10 dk uyuyan sekme; içeride: açılış
+görünümü, oturan müşteri ve balonu, kendine dokununca pişirme, yeni aşçı ve istasyonu, Harita düğmesi ve işaretten dönüş,
+aşamaya göre masa sayısı; 46 kontrol,
+görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için), `?view=city` (haritayla aç).
+
+Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 saat sınırını büyüten bir yükseltme ya da
+reklamla ×2; mutfak yetişemeyince en eski fiş önce kuralı yüzünden 120 sn sabırlı teslimatlar 60 sn sabırlı masaları
+geçiyor (tek aşçılı Grand'da masalar hiç servis edilmiyor); garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
+aşamaların konusu; "cızırtı" sesi yok (COOK şimdilik `land` sesi).
