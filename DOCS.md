@@ -419,7 +419,8 @@ rehber "bir sipariş seç" adımına döner.
 
 ## 7. Varlıklar
 
-Hepsi CC0 veya burada yapıldı (CREDITS.md). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
+Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Uncle's Diner'ın hikâye görselleri yapay zekâ ile üretildi
+(`tools/genart.mjs`, istemler dosyada; anahtar ortam değişkeninden okunur, repoda yok). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
 Mini Characters (animasyonlu: idle, walk, drive, sit, emote…). Oyuncu araçları, kask ve restoran binaları Blender'da
 script ile (`tools/blender/`). Arama: 3d.shep.bot (24 kaynak, lisans bilgisiyle).
 
@@ -450,6 +451,8 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `js/ui/ui.js` + `css/game.css` | hub (üst bar, 5 sekme, alt panel), sürüş HUD'u, modallar, toast |
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
+| `idle3.html` · `js/idle3/` + `css/idle3.css` | Uncle's Diner, kullanıcının verdiği idle döngüsü (§13): `sim.js` saf kurallar (SMASH, tezgâh, aşçılar, kuryeler, şöhret), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `assets/story/` | Uncle's Diner'ın hikâye görselleri ve SMASH ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -882,4 +885,43 @@ okumadan başlar, `?noti` hoş geldin kartı yok, `?speed=N` günü N kat hızl�
 Sonraki aşamalar (önerideki sıra): 2) üç bölüm, bölüm seçimi, oyun kapalıyken ilerleme; 3) kurye ve araç kartları, sandık,
 kadro seçimi; 4) olay kartları, günlük kutu, haftalık etkinlik, ödüllü reklam, Adapty VIP. Her aşamadan önce analitik
 (bölüm başı/sonu, yıldız) eklenmeli.
+
+## 13. Uncle's Diner (`idle3.html`, kullanıcının döngüsü, 1. aşama, 9 Kasım 2026)
+
+Kullanıcı Hot Chain'i beğenmedi ve döngüyü kendisi verdi: uzak bir amcadan miras kalan harap bir lokanta ve eski bir motor;
+şef değiliz, öğrencilikte sadece smash burger öğrendik. Tek tıkla burger yapılır, her tık yapma süresi kadar bekler; belli bir
+paraya ulaşınca kurye tutulur ve dışarıya teslimat başlar; içeriye aşçı alınır ve becerileri geliştirilir; kuryenin motoru ve
+becerileri geliştirilir. Ayrı kayıt (`fds_idle3_v1`), analitik yok; diğer prototipler olduğu gibi duruyor.
+
+- **Hikâye:** ilk açılışta dört kart (mektup, lokanta, motor, menü), görseller yapay zekâ ile üretildi (§7). Lokanta Old Town'daki
+  burgercinin binası ("Ferdi's Diner"); kart açıkken oyun durur. Kurye ilk kez alınabilir olunca bir kart daha (motor).
+- **SMASH:** sekme çubuğunun ortasında büyük buton. Bir tık bir burger; burger pişerken (3 sn, Speed ile ×0,87/seviye) buton
+  halkayla dolar, yeni tık işlemez. Tezgâh 6 yer; dolunca tık da aşçılar da bekler.
+- **Müşteriler:** içeri gelenler (Fame 1'de dakikada 12, sıra en fazla 6, 30 sn bekler sonra aç gider) burgeri $4 × kalite
+  ile alır. Kurye varken kapılardan sipariş gelir (lokantaya 220 m yol mesafesindeki 189 kapı; dakikada 3,2; 100 sn içinde
+  alınmazsa iptal). Hazır burger en uzun bekleyene gider (içerideki müşteri ya da sipariş); sipariş burgeri paketlenir, ama
+  kuryelerin bir seferde taşıyabileceğinden fazla paket beklemez (yoksa içerideki müşteriler boşuna gider).
+- **Teslimat ücreti:** burger + $3 + metre başına $0,04 + bahşiş ($2 × (1 + 0,25 × Charm), siparişten 50 sn sonra azalmaya
+  başlar). Ortalama ~$14, içeriden satışın yaklaşık 3 katı.
+- **Kadro:** aşçı (en fazla 4: $40 / $180 / $700 / $2400; yeni aşçı 8 sn), beceriler Speed (süre ×0,87) ve Quality (fiyat +%12),
+  ikisi de 10 seviye; sen de aynı iki beceriyi geliştirirsin. Kurye (en fazla 4: $75 / $220 / $700 / $2200), her biri eski bir
+  motorla başlar. Motor merdiveni: Rust Bucket (amcanınki, 7 m/s, 1 paket, %30 ihtimalle 6 sn çalışmaz) → Zippy 50 $120
+  (9,5 m/s) → Vespetta 125 $500 (11 m/s, 2 paket) → Volt $1600 (13 m/s) → Viper 600 $5000 (16 m/s). Kurye becerileri: Riding
+  (+%7 hız), Bag (+1 paket, 2 seviye: $300 / $2000), Charm (+%25 bahşiş). Sonraki kişilerin beceri eğitimi ×1,6 pahalı.
+- **Şöhret:** satılan her burger sayılır; 20 / 50 / 100 / 180 / 300 / 480 / 750 / 1100 … satışta seviye atlar, her seviye
+  müşteriyi (içeri ve sipariş) +%30 artırır.
+- **Şerit:** önce yol gösterir (SMASH'e bas → aşçı al → kurye tut), sonra darboğazı söyler (müşteri burger bekliyor / siparişler
+  kurye bekliyor / tezgâh dolu, müşteri lazım); dokununca ilgili sekmeyi açar. Harita: lokanta işaretinde tezgâhtaki burger
+  sayısı, senin burgerinin halkası ve içerideki sıra; kapılarda sipariş iğneleri (gri: burger bekliyor, sarı: paketlendi,
+  yeşil: yolda); satışlar, bahşişler, "Won't start!" ve "Left hungry" haritada uçar.
+
+Denge: `node tools/idle3sim.mjs [dakika] [bot] [--log]`. 40 dakikalık 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı 0:47, kurye
+2:33, Zippy 6:44, 2. kurye 10:43, Vespetta 26:04; gelir 1. dakikada $48/dk → 10. dk $170 → 40. dk $475. Hiç tıklamayan planlı
+oyuncu 40. dakikada $317/dk (tıklamak erken oyunda belirgin, sonra aşçılar devralıyor). "En ucuzunu al" oyuncusu kuryeyi 6:56'da
+alıyor, 40. dakikada $403/dk. Tarayıcı testi `node tools/idle3.mjs` (telefon: hikâye, SMASH ve bekleme süresi, içeriden satış,
+aşçı + beceriler, motor kartı, kurye, teslimat, motor + kurye becerileri, Diner sekmesi, kayıt + yeniden yükleme; 25 kontrol,
+görüntüler `idle3-*.png`). URL: `?fresh` kaydı okumadan başlar, `?noti` hikâyeyi atlar, `?speed=N` N kat hızlı (test için).
+
+Açık konular: oyun kapalıyken ilerleme yok; lokantayı tamir etme (tabela, cam, ikinci ızgara) ve menüye yeni yemek gibi
+sonraki adımlar kullanıcının kararını bekliyor; ses efektlerinde "cızırtı" yok (SMASH şimdilik `land` sesi).
 
