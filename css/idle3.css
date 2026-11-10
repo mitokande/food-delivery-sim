@@ -148,7 +148,15 @@
 /* story cards */
 .modal.story .card { padding-top: 12px; }
 .storyimg { margin: 0 0 -6px; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 2px rgba(0,0,0,.06); }
-.storyimg img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+.storyimg { position: relative; }
+.storyimg > img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+/* Uncle Ferdi's portrait: a framed photo in the corner of a story picture, and on the button that reopens his letter */
+.ferdi { display: block; flex: none; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 35%, #fffaf0, #f1e4cc); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #e0a63a; }
+.ferdi img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.storyimg .ferdi { position: absolute; right: 12px; bottom: 16px; width: 72px; height: 72px; transform: rotate(4deg); box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px #e0a63a, 0 5px 12px rgba(40,20,0,.35); }
+.btn.reread { gap: 10px; }
+/* the motors are wider than they are tall */
+.ic.veh { object-fit: contain; }
 .storyp { margin: 10px 4px 8px; font-size: 15.5px; line-height: 1.4; text-align: center; }
 .modal.story .dots { display: flex; justify-content: center; gap: 6px; margin: 0 0 10px; }
 .modal.story .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(60,40,20,.2); }

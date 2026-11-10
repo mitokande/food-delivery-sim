@@ -41,6 +41,7 @@ const closeModal = async (x) => { await page.waitForSelector(`.modal.in [data-x=
 await boot('idle3.html?fresh&speed=4');
 await page.waitForSelector('.modal.story .btn', { timeout: 10000 });
 await shot('0-story');
+check(await ev('document.querySelector(".modal.story .ferdi img").naturalWidth > 0'), "the letter shows Uncle Ferdi's portrait");
 const t0 = await ev('game.G.t'); await wait(1200);
 check(await ev('game.G.t') === t0, 'the restaurant waits under the story');
 for (let i = 0; i < 4; i++) await closeModal('next');
@@ -88,6 +89,7 @@ check(await ev('!!document.querySelector(".tabs [data-tab=menu] .dot:not([hidden
 await shot('2-kitchen');
 await openTab('menu');
 check(await ev('document.querySelectorAll(".dish.on").length') === 2 && await ev('document.querySelectorAll(".dish.off").length') === 6, 'the Menu shows 2 dishes on, 6 to come');
+check(await page.waitForFunction('[...document.querySelectorAll(".dish .ic")].every((i) => i.naturalWidth > 0 && i.src.includes("assets/story/dish-"))', { timeout: 10000, polling: 100 }).then(() => true, () => false), 'every dish on the Menu has its own picture');
 await shot('3-menu');
 
 // the scooter: a story card once a courier is affordable, then hiring one
@@ -126,6 +128,7 @@ for (const sk of ['ride', 'bag', 'charm']) { await tap(`[data-act="skill"][data-
 check(await ev('game.G.couriers[0].ride === 1 && game.G.couriers[0].bag === 1 && game.G.couriers[0].charm === 1'), 'riding, bag and charm levelled');
 await page.waitForFunction(`(() => { const b = game.bikes.get(${rid}); return b && b.veh === 'zippy' && b.bike; })()`, { timeout: 30000, polling: 250 });
 check(true, 'the bike on the map is the new motor');
+check(await ev('(() => { const i = document.querySelector(".motor > .ic.veh"); return i.naturalWidth > 0 && i.src.endsWith("assets/story/veh-zippy.webp"); })()'), "the courier's card shows the new motor's picture");
 await shot('5-couriers');
 await closeSheet();
 await ev('document.querySelector(".mk.diner").click()'); await wait(300);
@@ -142,6 +145,7 @@ await tap('[data-act="expand"]'); await wait(400);
 check(await ev('game.G.stage') === 1, 'the restaurant expands to stage 2');
 check(await ev(`game.restaurant().group.uuid !== '${g0}'`), 'the building on the map is rebuilt');
 await page.waitForSelector('.modal.story.in [data-x="ok"]', { timeout: 5000 });
+check(await ev('!!document.querySelector(".modal.story.in .storyimg .ferdi")'), 'Uncle Ferdi looks on from the expansion card');
 await shot('7-expanded');
 await closeModal('ok');
 check(await ev('game.S.stageOf(game.G).seats') === 10 && await ev('game.S.roomFor(game.G, "cook")'), 'more tables and room for a second cook');

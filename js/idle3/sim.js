@@ -14,14 +14,14 @@ export const DINER = 'sunny'; // the city lot the restaurant stands on (the burg
 // ---------------------------------------------------------------- the menu: you start with the burger; each cook brings the next dish
 // price $ · time: s a new cook needs (you cook at YOU_K of that)
 export const DISHES = [
-  { id: 'burger', name: 'Smash Burger', icon: 'food-burger', price: 4, time: 8 },
-  { id: 'hotdog', name: 'Hot Dog', icon: 'food-hotdog', price: 5, time: 8 },
-  { id: 'doner', name: 'Döner', icon: 'food-doner', price: 7, time: 10 },
-  { id: 'pizza', name: 'Pizza', icon: 'food-pizza', price: 11, time: 14 },
-  { id: 'noodle', name: 'Noodles', icon: 'food-noodle', price: 10, time: 11 },
-  { id: 'fish', name: 'Fish & Chips', icon: 'food-fish', price: 14, time: 14 },
-  { id: 'sushi', name: 'Sushi', icon: 'food-sushi', price: 19, time: 16 },
-  { id: 'icecream', name: 'Ice Cream', icon: 'food-icecream', price: 8, time: 5 },
+  { id: 'burger', name: 'Smash Burger', price: 4, time: 8 },
+  { id: 'hotdog', name: 'Hot Dog', price: 5, time: 8 },
+  { id: 'doner', name: 'Döner', price: 7, time: 10 },
+  { id: 'pizza', name: 'Pizza', price: 11, time: 14 },
+  { id: 'noodle', name: 'Noodles', price: 10, time: 11 },
+  { id: 'fish', name: 'Fish & Chips', price: 14, time: 14 },
+  { id: 'sushi', name: 'Sushi', price: 19, time: 16 },
+  { id: 'icecream', name: 'Ice Cream', price: 8, time: 5 },
 ];
 export const DISH = Object.fromEntries(DISHES.map((d) => [d.id, d]));
 export const VARIETY = 0.18; // customers × (1 + step × (dishes − 1))
