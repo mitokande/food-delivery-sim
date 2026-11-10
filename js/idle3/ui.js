@@ -5,10 +5,13 @@ import * as S from './sim.js';
 import { app } from '../native.js';
 
 export const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
-const VICON = (id) => `<img class="ic veh" src="assets/icons/veh-${id}.png" alt="" draggable="false">`; // (vehicle icons are png only)
+// this game's own art (assets/story): the story panels, the dishes, the couriers' motors and Uncle Ferdi
 const ART = (n) => `assets/story/${n}.webp`;
 const STAGE_ART = (i) => ART(i === 0 ? 'diner' : `stage${i + 1}`);
-const DICON = (id) => ICON(S.DISH[id].icon);
+export const DICON = (id) => `<img class="ic" src="${ART('dish-' + id)}" alt="" draggable="false">`;
+const VICON = (id) => `<img class="ic veh" src="${ART('veh-' + id)}" alt="" draggable="false">`;
+// his portrait, on the cards where he has a say: the letter, and each time the restaurant grows
+const FERDI = `<span class="ferdi"><img src="${ART('ferdi')}" alt="Uncle Ferdi" draggable="false"></span>`;
 const $ = (sel, root = document) => root.querySelector(sel);
 const M = S.money;
 const perMin = (n) => `${(Math.round(n * 10) / 10).toString()}/min`;
@@ -33,7 +36,7 @@ const STAGE_TEXT = [
 
 // the story: shown on the first visit (and from the Restaurant tab)
 const STORY = [
-  { img: 'letter', title: 'A letter', text: 'Your great-uncle Ferdi, whom you met exactly once at a wedding, has passed away. To everyone\'s surprise, he left everything he owned <b>to you</b>.' },
+  { img: 'letter', ferdi: true, title: 'A letter', text: 'Your great-uncle Ferdi, whom you met exactly once at a wedding, has passed away. To everyone\'s surprise, he left everything he owned <b>to you</b>.' },
   { img: 'diner', title: 'Everything', text: 'Everything turns out to be one tired little diner in Old Town. The awning is torn, a window is boarded up, and the sign lost its letters years ago.' },
   { img: 'scooter', title: '…and a scooter', text: 'In the back alley stands his old delivery scooter. Rust, tape, and a black puff of smoke. It starts on the third kick. Usually.' },
   { img: 'smash', title: 'The menu', text: 'You are no chef. In your student years you learned exactly one thing: <b>the smash burger</b>. So that\'s the menu, for now.<br>Tap <b>COOK</b> to cook each order. Every cook you hire brings a dish of their own.' },
@@ -64,7 +67,7 @@ export function createDinerUI(game) {
       <button data-act="tab" data-tab="restaurant">${ICON('ui-building')}<span>Restaurant</span><i class="dot" hidden></i></button>
       <button data-act="tab" data-tab="kitchen">${ICON('ui-people')}<span>Kitchen</span><i class="dot" hidden></i></button>
       <button class="smash ready" type="button" aria-label="Cook the next order"><span class="sm-ring"></span><span class="sm-face"><img src="${ART('cook-btn')}" alt="" draggable="false"></span><b class="sm-n">0</b><i class="sm-dish"></i><em>COOK</em></button>
-      <button data-act="tab" data-tab="menu">${ICON('food-burger')}<span>Menu</span><i class="dot" hidden></i></button>
+      <button data-act="tab" data-tab="menu">${DICON('burger')}<span>Menu</span><i class="dot" hidden></i></button>
       <button data-act="tab" data-tab="couriers">${VICON('rustbucket')}<span>Couriers</span><i class="dot" hidden></i></button>
     </nav>
   </div>
@@ -156,7 +159,7 @@ export function createDinerUI(game) {
         <div class="rl"><span>${ICON('ui-heart')} Tips</span><b data-live="tips"></b></div>
         <div class="rl"><span>${ICON('ui-cash')} Earned</span><b data-live="earned"></b></div>
       </div>
-      <button class="btn ghost" data-act="story">${ICON('ui-gift')}Read Uncle Ferdi's letter again</button>
+      <button class="btn ghost reread" data-act="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <div class="hint">Prototype, phase 1. <a class="link" href="idle2.html">Hot Chain</a> · <a class="link" href="idle.html">The first idle prototype</a> · <a class="link" href="index.html">The courier game</a></div>`;
   }
 
@@ -205,7 +208,7 @@ export function createDinerUI(game) {
       <div class="variety">${ICON('ui-people')}<span>${G.menu.length} dish${G.menu.length > 1 ? 'es' : ''} bring <b>×${S.varietyMult(G).toFixed(2)}</b> customers. Each new one: +${Math.round(S.VARIETY * 100)}%.</span></div>
       <div class="dishes">${S.DISHES.map((d) => {
         const on = G.menu.includes(d.id), isNext = next && next.id === d.id;
-        return `<div class="dish ${on ? 'on' : 'off'} ${isNext ? 'next' : ''}">${ICON(d.icon)}<b>${d.name}</b>
+        return `<div class="dish ${on ? 'on' : 'off'} ${isNext ? 'next' : ''}">${DICON(d.id)}<b>${d.name}</b>
           ${on ? `<small>${M(d.price)} · ${sec(d.time)}</small><em>${G.sold[d.id] || 0} sold</em>` : `<small>${M(d.price)}</small><em>${isNext ? 'the next cook brings it' : 'a later cook'}</em>`}</div>`;
       }).join('')}</div>
       <div class="hint">Customers pick from the menu at random. Pricier dishes take longer to cook.</div>`;
@@ -376,7 +379,7 @@ export function createDinerUI(game) {
   function newDish() { if (tab === 'menu' && !isClosed()) for (const d of G.menu) seenDish.add(d); }
   function stageUp(i) {
     const st = S.STAGES[i];
-    const m = modal(`<div class="storyimg"><img src="${STAGE_ART(i)}" alt=""></div>
+    const m = modal(`<div class="storyimg"><img src="${STAGE_ART(i)}" alt="">${FERDI}</div>
       <div class="ribwrap"><span class="ribbon">${st.name}</span></div>
       <p class="storyp">${STAGE_TEXT[i]}</p>
       <div class="rlines"><div class="rl"><span>${ICON('ui-people')} Tables</span><b>${st.seats}</b></div><div class="rl"><span>${ICON('ui-star')} Room for cooks</span><b>${st.cooks}</b></div><div class="rl"><span>${ICON('ui-route')} Room for couriers</span><b>${st.couriers}</b></div></div>
@@ -400,7 +403,7 @@ export function createDinerUI(game) {
   // ---------- story ----------
   function story(i = 0) {
     const p = STORY[i], last = i === STORY.length - 1;
-    const m = modal(`<div class="storyimg"><img src="${ART(p.img)}" alt=""></div>
+    const m = modal(`<div class="storyimg"><img src="${ART(p.img)}" alt="">${p.ferdi ? FERDI : ''}</div>
       <div class="ribwrap"><span class="ribbon">${p.title}</span></div>
       <p class="storyp">${p.text}</p>
       <div class="dots">${STORY.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>

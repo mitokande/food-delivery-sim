@@ -42,6 +42,27 @@ export const ART = {
   'cook-btn': { size: '1024x1024', background: 'transparent', prompt: 'Game UI icon, stylized 3D cartoon, chunky and glossy: a white chef hat '
     + 'leaning on a sizzling frying pan with a small flame under it, a few sizzle sparks. Centered, fills most of the frame, transparent background, '
     + 'no text, no letters, no outline frame, no shadow on the ground.' },
+  // Uncle Ferdi's portrait (the letter and the expansion cards); tools/genart-webp.py cuts him out of the white
+  ferdi: { size: '1024x1024', prompt: 'Stylized 3D cartoon character portrait for a cozy mobile tycoon game. Chunky rounded shapes, soft shadows, warm light, '
+    + 'bright saturated palette, clean plain white background. Uncle Ferdi: a round, kind old man with a big bushy grey moustache, rosy cheeks, twinkling eyes, '
+    + 'a red apron over a cream shirt with rolled sleeves, holding a spatula, giving a warm wink and a thumbs up. Head and upper body, centered. '
+    + 'No text, no letters, no numbers, no logos.' },
+  // icon sheets: every dish, and every motor, on one picture so they share a look; tools/genart-webp.py cuts them apart.
+  // The order is sim.js's (DISHES, MOTORS), and the motors' colours are those of the 3D models on the map.
+  dishes: { size: '1536x1024', background: 'transparent', prompt: 'Game UI icon sheet, stylized 3D cartoon, chunky and glossy food icons, soft shading, '
+    + 'bright appetizing colors. Eight separate dishes arranged in a neat grid of 4 columns and 2 rows with generous empty space between them, '
+    + 'each one centered in its cell and the same size: a smash burger with melting cheese, a hot dog with mustard, a döner kebab wrap, '
+    + 'a pizza with a slice pulled away, a bowl of noodles with chopsticks, fish and chips in a paper cone, a sushi set on a small wooden board, '
+    + 'an ice cream cone with two scoops. Transparent background, no text, no letters, no outline frames, no ground shadows.' },
+  vehicles: { size: '1536x1024', background: 'transparent', prompt: 'Game UI vehicle upgrade sheet, stylized 3D cartoon, chunky and glossy, soft shading, '
+    + 'bright colors. Five delivery vehicles side by side in one row, all facing right, the same scale, evenly spaced with clear empty space between them '
+    + 'so that none of them touch or overlap, each with a delivery box on the back, getting better from left to right: '
+    + '1) a battered old pastel mint-green moped with rust patches and silver duct tape, a tan cardboard box strapped on the back; '
+    + '2) a small plain white 50cc scooter with a black seat and a coral-red delivery box; '
+    + '3) a stylish bright red retro Italian-style scooter with a red delivery box; '
+    + '4) a sleek white electric scooter with glowing cyan light strips and a blue delivery box; '
+    + '5) a fast bright lime-green sport motorbike with a black delivery box. '
+    + 'Transparent background, no smoke, no text, no letters, no numbers, no ground shadows.' },
   // the store apps' icon: only the subject, mobile/scripts/icon-diner.mjs puts it on the boot screen's gradient
   'app-icon': { size: '1024x1024', background: 'transparent', prompt: 'Mobile game app icon subject, stylized 3D cartoon, chunky, rounded and glossy: '
     + 'a big juicy smash cheeseburger with melting cheese, lettuce and a sesame bun, wearing a puffy white chef hat tilted to one side, '

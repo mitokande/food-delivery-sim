@@ -420,7 +420,7 @@ rehber "bir sipariş seç" adımına döner.
 
 ## 7. Varlıklar
 
-Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Idle Restaurant Manager'ın hikâye görselleri yapay zekâ ile üretildi
+Hepsi CC0 veya burada yapıldı (CREDITS.md); istisna `assets/story/`: Idle Restaurant Manager'ın hikâye görselleri, yemek ve motor ikonları, Ferdi Amca portresi yapay zekâ ile üretildi
 (`tools/genart.mjs`, istemler dosyada; anahtar ortam değişkeninden okunur, repoda yok). Kenney: City Kit Commercial/Suburban/Roads/Industrial, Car Kit, Food Kit,
 Mini Characters (animasyonlu: idle, walk, drive, sit, emote…). Oyuncu araçları, kask ve restoran binaları Blender'da
 script ile (`tools/blender/`). Arama: 3d.shep.bot (24 kaynak, lisans bilgisiyle).
@@ -453,7 +453,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
-| `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu: yapay zekâ ile üretildi (`tools/genart.mjs`, OpenAI `gpt-image-2.6-flare`), webp kopyaları `tools/genart-webp.py` |
+| `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
 | `api/` | `collect.php` toplayıcı, `lib.php` şema + ingest, `config.php` (+ sunucuya özel `config.local.php`), `cli.php` (init / set-password / info / prune) |
@@ -956,6 +956,14 @@ kapatır, sonra oyunu arka plana alır. Uygulamada Ayarlar'daki kurye oyunu bağ
   sürede restoranı en çok neyin tuttuğu (mutfak / masa / kurye / boş aşçılar) için bir öneri; **Collect** kartı kapatır.
   Sekme gizlenince ya da telefon kilitlenince kareler durur; iki kare arasında 3 sn'den uzun boşluk da aynı şekilde
   oynatılır. 8 saat sunucuda ~0,3 sn sürüyor. Kartın görseli de yapay zekâyla üretildi (`away`).
+- **Oyunun kendi ikonları (10 Kasım 2026):** yemekler ve kuryelerin motorları artık kurye oyunuyla ortak `assets/icons/`
+  ikonlarını değil, `assets/story/dish-<id>.webp` ve `veh-<id>.webp` dosyalarını kullanır (`ui.js`: `DICON`, `VICON`): Menü,
+  sekme çubuğu, sipariş panosu, şerit, balonlar, harita iğneleri ve mutfak duvarındaki tabelalar. Sekiz yemek tek bir
+  sayfada, beş motor tek bir sayfada üretildi (aynı görünüm için), `tools/genart-webp.py` saydam sayfayı bağlı parçalarına
+  göre keser (`sim.js`'teki sıra: `DISHES`, `MOTORS`). Motorların renkleri haritadaki 3B modellerle aynı (Rust Bucket nane
+  yeşili ve paslı, Zippy beyaz, Vespetta kırmızı, Volt beyaz-camgöbeği, Viper yeşil). Ortak ikonlar değişmedi; kurye oyunu
+  ve diğer prototipler eskisi gibi. **Ferdi Amca** (`ferdi.webp`, kasketli, bıyıklı, kırmızı önlüklü) çerçeveli bir portre
+  olarak mektup kartında, her genişleme kartında ve Restoran sekmesindeki "mektubu yeniden oku" düğmesinde durur.
 
 Denge: `node tools/idle3sim.mjs [dakika] [oyuncu] [--log]`. 9 Kasım ayarı: aktif + planlı oyuncu ilk aşçı (Hot Dog) 0:58,
 kurye 3:16, 2. aşama 4:51, 2. aşçı (Döner) 7:41, teras 11:19, Pizza 18:53, yan bina 26:26, Noodles 38:10, Fish & Chips 60:15,
@@ -967,7 +975,7 @@ aktif oyuna göre ayarlı olduğundan bir dönüş sonraki birkaç aşamayı bir
 motor kartı, kurye + teslimat, motor ve kurye becerileri, Şöhret kilidi, genişleme ve binanın yeniden inşası, Grand'da yan
 bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş ve kartı, 10 dk uyuyan sekme; içeride: açılış
 görünümü, oturan müşteri ve balonu, kendine dokununca pişirme, yeni aşçı ve istasyonu, Harita düğmesi ve işaretten dönüş,
-aşamaya göre masa sayısı; 46 kontrol,
+aşamaya göre masa sayısı, yeni görsellerin yüklenmesi; 50 kontrol,
 görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için), `?view=city` (haritayla aç).
 
 Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 saat sınırını büyüten bir yükseltme ya da

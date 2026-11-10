@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { makeChar, loadKit, getNode } from '../assets.js';
 import { createMarkers } from '../hub.js';
 import * as S from './sim.js';
-import { ICON } from './ui.js';
+import { ICON, DICON } from './ui.js';
 
 const CH = 2.0; // character scale (Kenney mini characters, 0.8 tall → 1.6 m, big heads)
 const H = { counter: 0.62, table: 0.48, seat: 0.27, wall: 3.0 }; // (furniture sized for the characters' short legs)
@@ -54,7 +54,7 @@ function canvasTex(w, h, draw, repeat) {
 const iconTex = new Map();
 function iconTexture(name) {
   if (!iconTex.has(name)) {
-    const t = new THREE.TextureLoader().load(`assets/icons/${name}.webp`, undefined, undefined, () => { t.image = null; });
+    const t = new THREE.TextureLoader().load(`assets/story/${name}.webp`, undefined, undefined, () => { t.image = null; });
     t.colorSpace = THREE.SRGBColorSpace; iconTex.set(name, t);
   }
   return iconTex.get(name);
@@ -296,7 +296,7 @@ export async function createInside(game, canvas, markerEl) {
       default: break;
     }
     // its sign on the wall: the dish's icon
-    const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: iconTexture(S.DISH[dish].icon), transparent: true, alphaTest: 0.1 }));
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: iconTexture('dish-' + dish), transparent: true, alphaTest: 0.1 }));
     sg.position.set(0, 1.62, -0.38); g.add(sg);
     return g;
   }
@@ -318,7 +318,7 @@ export async function createInside(game, canvas, markerEl) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(1.4, H.counter, 0.8), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.28, depthWrite: false }));
       m.position.y = H.counter / 2; g.add(m);
       hitBox(1.4, 1.4, 1.0, L.stationX(gi), 0, L.stZ, 'next', stationGroup);
-      ghostMk = markers.add({ x: L.stationX(gi), y: 1.5, z: L.stZ, cls: 'mk inmk ghost', html: `<span class="gh">${ICON('ui-lock')}${ICON(nd.icon)}</span><em>Next cook</em>`, onTap: () => game.ui.setTab('kitchen') });
+      ghostMk = markers.add({ x: L.stationX(gi), y: 1.5, z: L.stZ, cls: 'mk inmk ghost', html: `<span class="gh">${ICON('ui-lock')}${DICON(nd.id)}</span><em>Next cook</em>`, onTap: () => game.ui.setTab('kitchen') });
     }
     stationKey = G.menu.join() + '|' + G.stage;
   }
@@ -424,7 +424,7 @@ export async function createInside(game, canvas, markerEl) {
         v.c?.play('walk', 0.15);
         guests.set(tb.id, v);
       }
-      if (tb.st === 'wait' && !v.mkOn) { v.mkOn = true; bubble(v, `<span class="ob">${ICON(S.DISH[tb.dish].icon)}<i class="pat"></i></span>`, 'order'); }
+      if (tb.st === 'wait' && !v.mkOn) { v.mkOn = true; bubble(v, `<span class="ob">${DICON(tb.dish)}<i class="pat"></i></span>`, 'order'); }
       if (tb.st === 'eat' && !v.served) { v.served = true; dropMk(v.mk); v.mk = null; v.mkOn = false; serve(v, snap); }
       if (v.mk && tb.st === 'wait') { const p = Math.min(1, (G.t - tb.t0) / S.WALK.patience); v.mk.el.style.setProperty('--p', p.toFixed(3)); v.mk.el.classList.toggle('late', p > 0.66); }
     }
@@ -527,7 +527,7 @@ export async function createInside(game, canvas, markerEl) {
       const job = p.job;
       const can = id === 'you' && !job && S.canCook(G) === 'ok';
       if (job || can) {
-        const html = job ? `<span class="cb"><i class="ring"></i>${ICON(S.DISH[job.dish].icon)}</span>` : `<span class="tapme">TAP</span>`;
+        const html = job ? `<span class="cb"><i class="ring"></i>${DICON(job.dish)}</span>` : `<span class="tapme">TAP</span>`;
         const key = job ? 'job' + job.dish : 'tap';
         if (!v.mk) { v.mk = markers.add({ x: v.x, y: 2.4, z: v.z, cls: 'mk inmk staff', html, onTap: id === 'you' ? () => game.cook() : () => game.ui.setTab('kitchen') }); v.mkKey = key; }
         else if (v.mkKey !== key) { v.mk.el.innerHTML = html; v.mkKey = key; }

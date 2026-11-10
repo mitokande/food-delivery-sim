@@ -25,7 +25,7 @@ import { TILE, RESTAURANT } from '../data.js';
 import { app, keep, restore } from '../native.js';
 import { buzz } from '../haptics.js';
 import * as S from './sim.js';
-import { createDinerUI, ICON } from './ui.js';
+import { createDinerUI, ICON, DICON } from './ui.js';
 import { createInside } from './inside.js';
 
 window.__started = true;
@@ -119,7 +119,7 @@ const game = {
     buzz(a === 'expand' ? 40 : a === 'cook' || a === 'courier' || a === 'motor' ? 25 : 12);
     if (a === 'cook') {
       const c = G.cooks[G.cooks.length - 1], d = S.DISH[c.dish]; audio.play('ui-levelup');
-      ui.toast(d ? `${ICON('char-' + c.char)} ${c.name} joins and brings ${ICON(d.icon)} ${d.name}!` : `${ICON('char-' + c.char)} ${c.name} joins the kitchen!`, 'good');
+      ui.toast(d ? `${ICON('char-' + c.char)} ${c.name} joins and brings ${DICON(d.id)} ${d.name}!` : `${ICON('char-' + c.char)} ${c.name} joins the kitchen!`, 'good');
       if (d) ui.newDish(d.id);
     } else if (a === 'courier') {
       const c = G.couriers[G.couriers.length - 1]; audio.play('ui-unlock');
@@ -219,7 +219,7 @@ function syncPins() {
     let m = pins.get(+id);
     if (!m) {
       const [x, z] = doorPos(o.door);
-      m = markers.add({ x, y: 4, z, cls: 'mk pin open', html: `<span class="pdot">${ICON(S.DISH[o.dish].icon)}</span>` });
+      m = markers.add({ x, y: 4, z, cls: 'mk pin open', html: `<span class="pdot">${DICON(o.dish)}</span>` });
       m.el.tabIndex = -1; m.el.style.pointerEvents = 'none';
       pins.set(+id, m);
     }
