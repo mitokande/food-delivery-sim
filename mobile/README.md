@@ -52,6 +52,7 @@ Before each release, raise the version in both projects:
 
 - Android: `versionCode` (+1 every upload) and `versionName` in `android/app/build.gradle`
 - iOS: `MARKETING_VERSION` (e.g. 1.0.1) and `CURRENT_PROJECT_VERSION` (+1 every upload) in Xcode → target App → General
+  (Xcode Cloud numbers its own builds, so for those only `MARKETING_VERSION` matters)
 
 ### Google Play
 
@@ -81,6 +82,36 @@ Before each release, raise the version in both projects:
 1. On the Mac: `git pull`, then `cd mobile && npm ci && npm run ios && npx cap open ios`.
 2. In Xcode: target App → Signing & Capabilities → choose your team (automatic signing).
 3. Product → Archive, then Distribute App → App Store Connect. Test it with TestFlight, then submit.
+
+### Xcode Cloud
+
+Branch `build` is the iOS release branch: Xcode Cloud archives whatever is pushed to it and sends the build to
+TestFlight, so a release needs no Mac. To build what is on `main`:
+
+```sh
+git push origin main:build
+```
+
+What the repo holds for it:
+
+- `ios/App/ci_scripts/ci_post_clone.sh` runs on Apple's machine right after the clone: it installs Node 22, then
+  `npm ci` and `npm run ios` (step 1 above). Without it the Swift packages can't resolve, because they are local paths
+  into `node_modules`.
+- `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`: the shared scheme `App` (Xcode Cloud only sees shared
+  schemes).
+- `Package.resolved` stays committed: Xcode Cloud doesn't resolve package versions by itself. After a Capacitor or Adapty
+  update, open the project on the Mac once and commit the changed file.
+
+Setting it up, once, on the Mac (signed in to Xcode with the developer account):
+
+1. Do step 1 above on branch `build`, then Xcode → Integrate → Create Workflow… and pick the product `App`.
+2. Grant Xcode Cloud access to the GitHub repo when it asks, and let it make the app record in App Store Connect if
+   there isn't one (bundle ID `com.mithatcanturan.fooddeliverysim`).
+3. Edit the workflow: *Start Conditions* → Branch Changes → `build` only; *Environment* → the latest released Xcode
+   (26 or newer, for the Adapty SDK); *Actions* → Archive, iOS, deployment preparation "TestFlight and App Store";
+   *Post-Actions* → TestFlight Internal Testing with your tester group.
+4. If builds were uploaded by hand before: App Store Connect → the app → Xcode Cloud → Settings → Build Number → set
+   the next build number above the last uploaded one.
 
 `Info.plist` already sets `ITSAppUsesNonExemptEncryption = NO` (HTTPS only), so there are no export-compliance
 questions. `ios/App/App/PrivacyInfo.xcprivacy` declares the UserDefaults use (the save copy) and what analytics collects.
