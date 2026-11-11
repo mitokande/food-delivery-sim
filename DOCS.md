@@ -417,6 +417,15 @@ rehber "bir sipariş seç" adımına döner.
   plana alır), kaydın uygulamanın kendi ayarlarında ikinci kopyası (web görünümünün deposu boşalırsa geri konur),
   analitiğin site adresi. Webde hiçbir şey yapmaz. Analitik uygulamadan da gelir: `collect.php` `https://localhost` ve
   `capacitor://localhost` kökenlerini kabul eder, panelde tarayıcı "App". Yayın adımları: `mobile/README.md`.
+  **Xcode Cloud (10 Kasım 2026;** kullanıcı: "repomuzun içine build diye bi branch açıp bunu xcode cloud a bağlayabilir
+  miyiz"): `build` dalı iOS yayın dalıdır, ona itilen her şeyi Xcode Cloud arşivleyip TestFlight'a yollar
+  (`git push origin main:build`). Depoda bunun için iki dosya var: `mobile/ios/App/ci_scripts/ci_post_clone.sh` (Apple'ın
+  makinesinde klondan hemen sonra Node 22 kurar, `npm ci` ve `npm run ios` çalıştırır; Swift paketleri `node_modules`
+  içindeki yerel yollar olduğu için bu olmadan paketler çözülemez) ve paylaşılan şema `App.xcscheme` (Xcode Cloud sadece
+  paylaşılan şemaları görür). İş akışının kendisi (GitHub izni, başlama koşulu, Xcode sürümü, TestFlight) depoda değil,
+  App Store Connect'te durur ve Mac'te Xcode'dan bir kez kurulur: adımlar `mobile/README.md` → "Xcode Cloud". Yapı
+  numarasını Xcode Cloud verir. Betik sunucuda sadece `npm ci && npm run ios` kısmıyla denendi (izlenen hiçbir dosya
+  değişmiyor); iOS derlemesinin kendisi burada denenemez, ilk Xcode Cloud çalışması asıl testtir.
 
 ## 7. Varlıklar
 
