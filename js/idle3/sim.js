@@ -9,6 +9,7 @@ import { TILE, FIRST_NAMES, CHAR_IDS } from '../data.js';
 import { findPath } from '../city/graph.js';
 
 export const KEY = 'fds_idle3_v2';
+export const TUNE = 'fds_idle3_tune'; // (the balance lab's values, idle3-lab.html: only a playtest reads them, see tune() below)
 export const DINER = 'sunny'; // the city lot the restaurant stands on (the burger joint's)
 
 // ---------------------------------------------------------------- the menu: you start with the burger; each cook brings the next dish
@@ -24,10 +25,10 @@ export const DISHES = [
   { id: 'icecream', name: 'Ice Cream', price: 8, time: 5 },
 ];
 export const DISH = Object.fromEntries(DISHES.map((d) => [d.id, d]));
-export const VARIETY = 0.18; // customers × (1 + step × (dishes − 1))
-export const YOU_K = 0.4; // you cook a dish in this share of a new cook's time
-export const QUAL_STEP = 0.12; // price × (1 + step × the quality level of whoever cooked it)
-export const SPEED_K = 0.87; // cooking time × this per speed level
+export let VARIETY = 0.18; // customers × (1 + step × (dishes − 1))
+export let YOU_K = 0.4; // you cook a dish in this share of a new cook's time
+export let QUAL_STEP = 0.12; // price × (1 + step × the quality level of whoever cooked it)
+export let SPEED_K = 0.87; // cooking time × this per speed level
 
 // ---------------------------------------------------------------- the restaurant grows: tables, room for cooks and couriers, appeal
 export const STAGES = [
@@ -49,7 +50,7 @@ export const WALK = { rate: 8, door: 4, doorPatience: 25, patience: 60, eat: 12 
 export const DELIV = { rate: 3, patience: 120, radius: 220, fee: 3, perM: 0.04, tip: 2 };
 export const openMax = (G) => 3 + 2 * G.couriers.length;
 export const FAME = [0, 20, 50, 100, 180, 300, 480, 750, 1100, 1600, 2300, 3200, 4500, 6500, 9000];
-export const FAME_STEP = 0.25; // customers × (1 + step × (level − 1))
+export let FAME_STEP = 0.25; // customers × (1 + step × (level − 1))
 
 // ---------------------------------------------------------------- couriers
 export const COURIER_HIRE = [75, 220, 700, 2200, 6000, 14000];
@@ -61,25 +62,26 @@ export const MOTORS = [
   { id: 'volt', name: 'Volt E-Scooter', speed: 13, cap: 2, stall: 0, cost: 1600 },
   { id: 'viper', name: 'Viper 600', speed: 16, cap: 2, stall: 0, cost: 5000 },
 ];
-export const STALL = 6;
-export const PICKUP = 1.5, HANDOVER = 2.5; // s at the counter, s at each door
-export const RIDE_STEP = 0.07; // speed × (1 + step × riding level)
-export const CHARM_STEP = 0.25; // tips × (1 + step × charm level)
+export let STALL = 6;
+export let PICKUP = 1.5, HANDOVER = 2.5; // s at the counter, s at each door
+export let RIDE_STEP = 0.07; // speed × (1 + step × riding level)
+export let CHARM_STEP = 0.25; // tips × (1 + step × charm level)
 
 // ---------------------------------------------------------------- skills
-// who: 'you' | 'cook' | 'rider'. Price of level L → L + 1 for the n-th hire (0-based; later hires cost more to train)
+// who: 'you' | 'cook' | 'rider'. Price of level L → L + 1 for the n-th hire (0-based; later hires cost more to train:
+// × hire for each one before them)
 export const SKILLS = {
-  speed: { max: 10, who: ['you', 'cook'], base: 12, g: 1.7 },
-  quality: { max: 10, who: ['you', 'cook'], base: 18, g: 1.75 },
-  ride: { max: 10, who: ['rider'], base: 20, g: 1.7 },
-  charm: { max: 10, who: ['rider'], base: 15, g: 1.7 },
-  bag: { max: 2, who: ['rider'], costs: [300, 2000] }, // +1 order a trip per level
+  speed: { max: 10, who: ['you', 'cook'], base: 12, g: 1.7, hire: 1.6 },
+  quality: { max: 10, who: ['you', 'cook'], base: 18, g: 1.75, hire: 1.6 },
+  ride: { max: 10, who: ['rider'], base: 20, g: 1.7, hire: 1.6 },
+  charm: { max: 10, who: ['rider'], base: 15, g: 1.7, hire: 1.6 },
+  bag: { max: 2, who: ['rider'], costs: [300, 2000], hire: 1.5 }, // +1 order a trip per level
 };
 export const skillCost = (sk, L, n = 0) => {
   const s = SKILLS[sk];
   if (L >= s.max) return null;
-  if (s.costs) return Math.round(s.costs[L] * Math.pow(1.5, n));
-  return Math.round(s.base * Math.pow(s.g, L) * Math.pow(1.6, n));
+  if (s.costs) return Math.round(s.costs[L] * Math.pow(s.hire, n));
+  return Math.round(s.base * Math.pow(s.g, L) * Math.pow(s.hire, n));
 };
 // (null: none left; roomFor says whether this stage has room for one more)
 export const cookHireCost = (G) => COOK_HIRE[G.cooks.length] ?? null;
@@ -474,3 +476,47 @@ export const short = (n) => {
   return (n < 0 ? '-' : '') + t + u[i];
 };
 export const money = (n) => '$' + (Math.abs(n) < 100 ? (Math.round(n * 10) / 10).toString() : short(Math.round(n)));
+
+// ---------------------------------------------------------------- tuning (the balance lab, idle3-lab.html)
+// Every balance number above has a path: 'YOU_K', 'WALK.rate', 'DISHES.pizza.price', 'COOK_HIRE.2'. tune() puts the
+// shipped values back and then sets the given ones ({ path: number }). Only the lab and a playtest (idle3.html?lab)
+// call it; the game as players get it never does. The delivery zone is cut when the world is made, so tune first.
+const TABLES = { DISHES, STAGES, COOK_HIRE, COURIER_HIRE, WALK, DELIV, FAME, MOTORS, SKILLS, AWAY };
+const SCALARS = {
+  VARIETY: [() => VARIETY, (v) => { VARIETY = v; }], YOU_K: [() => YOU_K, (v) => { YOU_K = v; }],
+  QUAL_STEP: [() => QUAL_STEP, (v) => { QUAL_STEP = v; }], SPEED_K: [() => SPEED_K, (v) => { SPEED_K = v; }],
+  FAME_STEP: [() => FAME_STEP, (v) => { FAME_STEP = v; }], STALL: [() => STALL, (v) => { STALL = v; }],
+  PICKUP: [() => PICKUP, (v) => { PICKUP = v; }], HANDOVER: [() => HANDOVER, (v) => { HANDOVER = v; }],
+  RIDE_STEP: [() => RIDE_STEP, (v) => { RIDE_STEP = v; }], CHARM_STEP: [() => CHARM_STEP, (v) => { CHARM_STEP = v; }],
+};
+function leaves(o, path, out) { // (rows with an id are named by it: DISHES.pizza, not DISHES.3)
+  for (const k of Object.keys(o)) {
+    const v = o[k], p = `${path}.${v && v.id ? v.id : k}`;
+    if (typeof v === 'number') out[p] = v; else if (v && typeof v === 'object') leaves(v, p, out);
+  }
+  return out;
+}
+export function tunables() { // { path: the number it has now }
+  const out = {};
+  for (const k in SCALARS) out[k] = SCALARS[k][0]();
+  for (const k in TABLES) leaves(TABLES[k], k, out);
+  return out;
+}
+export const SHIPPED = Object.freeze(tunables());
+function put(path, v) {
+  if (SCALARS[path]) { SCALARS[path][1](v); return; }
+  const seg = path.split('.');
+  let o = TABLES[seg[0]];
+  for (let i = 1; i < seg.length - 1; i++) o = Array.isArray(o) && !(seg[i] in o) ? o.find((x) => x.id === seg[i]) : o[seg[i]];
+  o[seg[seg.length - 1]] = v;
+}
+export function tune(over = {}) { // → what now differs from the shipped game
+  const set = {};
+  for (const p in SHIPPED) put(p, SHIPPED[p]);
+  for (const p in over) {
+    const v = +over[p];
+    if (!(p in SHIPPED) || !Number.isFinite(v) || v < 0 || v === SHIPPED[p]) continue;
+    put(p, v); set[p] = v;
+  }
+  return set;
+}

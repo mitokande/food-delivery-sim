@@ -18,7 +18,10 @@ const PAGE = 'idle3.html'; // the apps' game
 const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'assets/story'];
 // the site's other games (the courier game's page, the earlier idle prototypes): not in the apps. The courier game's
 // modules stay, the diner is built on them (the city, the sky, the audio, the bikes)
-const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md'];
+// (the balance lab, idle3-lab.html, and its playtest bar are tools for the web: main.js loads the bar only with ?lab,
+// which the apps never have)
+const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md',
+  'js/idle3/lab.js', 'js/idle3/lab-worker.js', 'js/idle3/labbar.js', 'js/idle3/bot.js', 'css/idle3-lab.css'];
 const CDN = /cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com/;
 
 const die = (msg) => { console.error('build-web: ' + msg); process.exit(1); };
