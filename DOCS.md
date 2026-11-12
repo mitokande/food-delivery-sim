@@ -462,6 +462,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle.html` · `js/idle/` + `css/idle.css` | idle + yönetim modu (§11): `econ.js` saf ekonomi (DOM/three.js yok), `main.js` açılış + harita + döngü, `ui.js` arayüz |
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
+| `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -986,6 +987,32 @@ bina, sipariş panosu, kayıt + yeniden yükleme, 2 saat kapalı kalıp dönüş
 görünümü, oturan müşteri ve balonu, kendine dokununca pişirme, yeni aşçı ve istasyonu, Harita düğmesi ve işaretten dönüş,
 aşamaya göre masa sayısı, yeni görsellerin yüklenmesi; 50 kontrol,
 görüntüler `idle3-*.png`). URL: `?fresh`, `?noti`, `?speed=N`, `?away=<sn>` (kayıt o kadar eskiymiş gibi: kartı görmek için), `?view=city` (haritayla aç).
+
+**Denge laboratuvarı** (`idle3-lab.html`, 11 Kasım 2026): oyunun denge sayılarını (133 alan: yemekler, mutfak ve aşçı
+becerileri, aşamalar, müşteriler ve şöhret eşikleri, teslimat ve motorlar, oyun kapalıyken) değiştirip sonucu hemen görmek
+için. Her değişiklikte bot oyuncu (`js/idle3/bot.js`; seçilebilir: planlı + sürekli tıklayan, planlı + 5 dk tıklayıp izleyen,
+planlı + 1 dk tıklayıp izleyen, en ucuzunu alan) oyunu 30 / 60 / 120 dk bir Web Worker'da oynar ve **yayındaki değerlerle** karşılaştırılır:
+altı kutu (kazanç, sondaki $/dk, aşama, şöhret, kaybedilen müşteri, alacak bir şey için en uzun bekleme), dakikalık kazanç
+grafiği (log / doğrusal, mavi = yayındaki, turuncu = seninki; tablo görünümü var), "ne ne zaman geliyor" tablosu (aşçılar,
+kuryeler, aşamalar; fark sütunuyla), restoranı neyin tuttuğu (mutfak, masa, çanta, sessizlik) ve oyun 2 saat kapalıyken
+kazanç. Değişen alan turuncu çerçevelenir, "Your changes" listesinden ✕ ile geri alınır; **Copy changes** değişiklikleri
+JSON olarak panoya koyar, **Paste…** geri yükler, **Reset all** hepsini siler (Undo ile geri gelir). Değerler aralığa
+çekilir (ör. koltuk sayısı çift ve odanın sığdırdığı kadar: aşamalara göre en çok 24 / 24 / 30 / 56 / 72).
+
+Değişiklikler `{ "yol": değer }` biçiminde düz bir nesnedir (ör. `{ "WALK.rate": 10, "DISHES.pizza.price": 60 }`),
+`localStorage['fds_idle3_tune']` içinde durur; yollar `sim.js`'teki `tunables()` / `SHIPPED` ile aynıdır, `tune(nesne)`
+uygular (bilinmeyen, sayı olmayan ve negatif değerler atlanır; `tune()` yayındaki değerlere döner). Sayılar `sim.js`'te
+`export let` olduğu için diğer modüller güncel değeri görür.
+
+**Deneme oyunu** (`idle3.html?lab`): gerçek oyun, laboratuvardaki sayılarla ve **ayrı bir kayıtla** (`fds_idle3_v2_lab`;
+oyuncunun asıl kaydına dokunmaz). Laboratuvardaki "New playtest" sıfırdan (`?lab&fresh`), "Continue playtest" kaldığı
+yerden açar. Oyunun sol üstündeki **LAB** çubuğu: hız ×1 / 2 / 5 / 10 / 20, nakit +$100 / +$1K / +$10K, zaman atlama 1 dk /
+10 dk / 2 sa (kapalı oyun gibi oynatılır, kartıyla), baştan başla, laboratuvara dön. Laboratuvar başka sekmede açıkken
+değiştirilen sayı çalışan oyuna anında ulaşır (`storage` olayı); koltuk sayısı ya da teslimat yarıçapı değişirse sayfa
+kayıt korunarak yeniden yüklenir (oda ve bölge açılışta kurulur). `?lab` olmadan oyun her zaman yayındaki değerlerle
+oynar; mağaza uygulamaları `?lab`'i hiç okumaz. Beğenilen ayarı yayına almak: Copy changes ile alınan JSON'daki değerler
+`sim.js`'e yazılır. Test: `node tools/idle3lab.mjs <klasör>` (laboratuvar masaüstü + telefon, deneme oyunu ve çubuğu,
+`?lab`'siz oyunun etkilenmediği; görüntüler `idle3lab-*.png`).
 
 Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 saat sınırını büyüten bir yükseltme ya da
 reklamla ×2; mutfak yetişemeyince en eski fiş önce kuralı yüzünden 120 sn sabırlı teslimatlar 60 sn sabırlı masaları

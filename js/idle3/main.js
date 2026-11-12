@@ -31,22 +31,32 @@ import { createInside } from './inside.js';
 window.__started = true;
 const q = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-const SPEED = Math.max(0.25, Math.min(20, +(q.get('speed') || 1)));
+let SPEED = Math.max(0.25, Math.min(20, +(q.get('speed') || 1)));
+// a playtest (idle3.html?lab; never in the store apps): the balance lab's numbers (idle3-lab.html, S.tune) on a save of
+// its own, with a small bar to speed the game up, hand out cash and skip time (labbar.js). Without ?lab the lab's
+// numbers never reach the game
+const LAB = q.has('lab') && !app;
+const KEY = LAB ? S.KEY + '_lab' : S.KEY;
+const tuning = () => { try { return S.tune(JSON.parse(localStorage.getItem(S.TUNE) || '{}')); } catch { return S.tune(); } };
+if (LAB) tuning(); // (before the world is made: the delivery zone is cut from DELIV.radius)
+// (the lab's "New playtest" comes with ?fresh; reloading that page later goes on with the playtest it started)
+if (LAB && q.has('fresh')) { const u = new URL(location.href); u.searchParams.delete('fresh'); history.replaceState(null, '', u); }
 
 // ---------------------------------------------------------------- the save (its own key)
-await restore(S.KEY); // the store apps' copy, if the phone emptied the web view's storage
+await restore(KEY); // the store apps' copy, if the phone emptied the web view's storage
 let G = S.fresh();
 let fresh = true;
 try {
-  const raw = q.has('fresh') ? null : localStorage.getItem(S.KEY);
+  const raw = q.has('fresh') ? null : localStorage.getItem(KEY);
   if (raw) {
     const d = JSON.parse(raw);
     if (d && d.v === 2) { const f = S.fresh(); G = { ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }; fresh = false; }
   }
 } catch (e) { console.warn('idle3 save load failed', e); }
+if (LAB) G.tables.length = Math.min(G.tables.length, S.stageOf(G).seats); // (the lab may have taken seats away since the save)
 // (G.at: the wall clock at the last save, so the next visit knows how long the place ran without you)
 let wiped = false; // (erased: the page is about to reload, and leaving it must not write the save back)
-const save = () => { if (wiped) return; G.at = Date.now(); const j = JSON.stringify(G); keep(S.KEY, j); try { localStorage.setItem(S.KEY, j); } catch { /* private mode */ } };
+const save = () => { if (wiped) return; G.at = Date.now(); const j = JSON.stringify(G); keep(KEY, j); try { localStorage.setItem(KEY, j); } catch { /* private mode */ } };
 // how long the game was closed (?away=<s> pretends, to see the card)
 const gone = q.has('away') ? +q.get('away') || 0 : !fresh && G.at ? Math.max(0, (Date.now() - G.at) / 1000) : 0;
 
@@ -136,8 +146,8 @@ const game = {
   applySettings() { applyVolumes(); const nq = quality(); if (nq !== QV) { QV = nq; resize(); } },
   async reset() {
     wiped = true; // (pagehide and visibilitychange save: without this the reload wrote the save straight back)
-    try { localStorage.removeItem(S.KEY); } catch { /* fine */ }
-    await Promise.race([keep(S.KEY, null), new Promise((r) => setTimeout(r, 1500))]);
+    try { localStorage.removeItem(KEY); } catch { /* fine */ }
+    await Promise.race([keep(KEY, null), new Promise((r) => setTimeout(r, 1500))]);
     location.reload();
   },
 };
@@ -410,6 +420,7 @@ addEventListener('appback', (e) => {
 });
 addEventListener('pagehide', save);
 window.game = Object.assign(game, { scene, camera, renderer, hubCam, markers, traffic, bikes, restaurant: () => rest, catchUp, inside });
+if (LAB) (await import('./labbar.js')).createLabBar(game, { tuning, catchUp, syncMap, save, speed: (v) => (v == null ? SPEED : (SPEED = v)) });
 window.ready = true;
 // (the loop runs under the story cards; the diner waits for them)
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }

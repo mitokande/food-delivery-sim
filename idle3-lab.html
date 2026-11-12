@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a2e">
+<meta name="robots" content="noindex">
+<title>Balance Lab · Idle Restaurant Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/idle3-lab.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="title">
+    <h1>Balance Lab</h1>
+    <p>Idle Restaurant Manager · change a number, a bot plays the game with it, and you see what moved. A playtest is the real game with your numbers, on a save of its own.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="idle3.html?lab&amp;noti&amp;fresh" target="idle3-playtest">New playtest</a>
+    <a class="btn" href="idle3.html?lab&amp;noti" target="idle3-playtest">Continue playtest</a>
+    <button class="btn" data-act="copy">Copy changes</button>
+    <button class="btn" data-act="paste">Paste…</button>
+    <button class="btn" data-act="reset">Reset all</button>
+  </div>
+</header>
+<main>
+  <section id="params" aria-label="The game's numbers"></section>
+  <section id="results" aria-label="What the bot's game looked like"></section>
+</main>
+<dialog id="paste">
+  <form method="dialog">
+    <h2>Paste values</h2>
+    <p>The text "Copy changes" gives: <code>{ "WALK.rate": 10 }</code>. It replaces what is changed now.</p>
+    <textarea spellcheck="false" rows="10"></textarea>
+    <p class="err" hidden></p>
+    <div class="actions"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="ok">Use these</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+<script type="module" src="js/idle3/lab.js?v=1"></script>
+</body>
+</html>
