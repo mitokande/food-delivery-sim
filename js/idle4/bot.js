@@ -1,8 +1,13 @@
 // Players that play Ferdi's (sim.js) by themselves, to check the pacing: when the staff, the stations (dishes) and the
-// room levels come, and what the place earns along the way. Nobody taps in this game, so a player is only a buyer:
-// "cheap" buys the cheapest thing it can afford; "plan" renovates a room as soon as it can (and saves up for it), hires
-// staff and builds stations as soon as there is room for them, else buys the cheapest thing. Used by tools/idle4sim.mjs.
+// room levels come, and what the place earns along the way. Nobody cooks or serves by tapping in this game, so a player
+// is a buyer who also claims the quests, opens the mail and picks the tips up (every TIP_EVERY seconds: someone who
+// looks in now and then): "cheap" buys the cheapest thing it can afford; "plan" renovates a room as soon as it can
+// (and saves up for it), hires staff and builds stations as soon as there is room for them, else buys the cheapest
+// thing. Used by tools/idle4sim.mjs.
 import * as S from './sim.js';
+import * as Q from './quests.js';
+
+export const TIP_EVERY = 30;
 
 const afford = (G) => S.prices(G).filter((p) => p.cost <= G.cash);
 const cheapest = (list) => list.sort((a, b) => a.cost - b.cost)[0] || null;
@@ -13,7 +18,7 @@ const BUY = {
     // staff and new stations first (they take work off you and the cooks), then a renovation as soon as it can (the
     // office first: it gates the rest), tables, else the cheapest thing; while a renovation within reach waits for
     // cash (under three minutes of income), only small things
-    const hire = cheapest(ok.filter((p) => ['cooks', 'waiters', 'registers'].includes(p.id) || ((p.id || '').startsWith('st:') && S.itemOf(G, p.room, p.id) === 0)));
+    const hire = cheapest(ok.filter((p) => ['cooks', 'waiters', 'registers', 'lockers'].includes(p.id) || ((p.id || '').startsWith('st:') && S.itemOf(G, p.room, p.id) === 0)));
     if (hire) return hire;
     const ups = all.filter((p) => p.a === 'up').sort((a, b) => (a.room === 'office' ? -1 : 0) - (b.room === 'office' ? -1 : 0) || a.cost - b.cost);
     const u = ups[0];
@@ -37,9 +42,12 @@ const label = (G, p) => {
 // Plays `minutes` from a new game. → { G, marks: { what: s }, buys, mins: [a row a minute], diag, gone }
 export function play(name, minutes) {
   const G = S.fresh();
-  const marks = {}, buys = [], mins = [], diag = {}, gone = [];
-  let lastE = 0;
+  const marks = {}, buys = [], mins = [], diag = {}, gone = [], quests = [];
+  let lastE = 0, tipT = 0;
   for (let t = 0; t < minutes * 60; t += 0.5) {
+    for (let q; (q = Q.claim(G));) quests.push({ t: G.t, text: q.text, cash: q.cash });
+    for (const m of G.mail.filter((x) => !x.read)) S.openMail(G, m.id);
+    if (G.t - tipT >= TIP_EVERY) { tipT = G.t; for (const tp of [...G.tips]) S.collectTip(G, tp.id); }
     for (let i = 0; i < 6; i++) {
       const p = BUY[PLAYERS[name]](G); if (!p) break;
       const key = label(G, p);
@@ -52,10 +60,10 @@ export function play(name, minutes) {
     if (Math.abs(G.t % 60) < 0.01 || Math.abs((G.t % 60) - 60) < 0.01) {
       const m = Math.round(G.t / 60);
       if ([10, 30, 60].includes(m)) gone.push({ m, earned: S.away(structuredClone(G), S.AWAY.max).earned });
-      mins.push({ m, earned: G.stats.earned - lastE, lv: S.officeLv(G), menu: S.menu(G).length, cooks: S.nCooks(G), waiters: S.nWaiters(G),
+      mins.push({ m, earned: G.stats.earned - lastE, lv: S.officeLv(G), menu: S.menu(G).length, cooks: S.nCooks(G), waiters: S.nWaiters(G), team: `${S.staffCount(G)}/${S.staffCap(G)}`,
         rooms: S.ROOM_IDS.map((r) => S.lvOf(G, r)).join(''), lost: G.stats.lost });
       lastE = G.stats.earned;
     }
   }
-  return { name, G, marks, buys, mins, diag, gone };
+  return { name, G, marks, buys, mins, diag, gone, quests };
 }

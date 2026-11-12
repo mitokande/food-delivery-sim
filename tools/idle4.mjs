@@ -3,6 +3,8 @@
 // it's fixed up), a tap on a room opening its panel, repairing a room (the builder, the timer, the room rebuilt),
 // benches, a new station bringing a dish, the cashier and a register (people pay on their way out), renovation rules
 // (items at their caps, the office first), save + reload, the restaurant running while the game is closed.
+// Phase 2: the quest bar (progress, claim, the next one), tips by the chairs (a tap picks one up), the mailbox (a
+// letter with a gift; the takings of a long absence), the team's cap and the staff room (lockers), the locked features.
 //   node tools/idle4.mjs [outdir=tools/shots]   (phone viewport; screenshots idle4-*.png)
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
@@ -45,8 +47,9 @@ check(titles.join() === 'A letter,Everything,A visitor,The menu' && await ev('ga
 
 // the building: labels on every room, the ruins, the hint
 check(await ev('document.querySelectorAll("#markers .mk.rlab").length') === 8, 'every room has a label');
-check(await ev('document.querySelector("#markers .rl.ruin") && document.querySelectorAll("#markers .rl.soon").length === 2'), 'ruined rooms show a repair price, the later phases\' rooms "coming soon"');
-check(await ev('document.querySelector(".hint .ht").textContent.includes("cook")'), 'the hint says to hire a cook');
+check(await ev('document.querySelector("#markers .rl.ruin") && document.querySelectorAll("#markers .rl.soon").length === 1'), 'ruined rooms show a repair price, the courier bay "coming soon"');
+check(await ev('document.querySelector(".quest .qtext").textContent.includes("Hire a cook (0/1)")'), 'the first quest: hire a cook (0/1)');
+check(await ev('document.querySelector(".teamv").textContent') === '0/5', 'the top bar shows the team: 0/5');
 // you do everything: cook, carry, bring the bill
 check(await until('game.G.staff[0].job && game.G.staff[0].job.kind === "cook"', 60000), 'you cook the first order yourself');
 check(await until('game.G.stats.served > 0', 90000), 'and serve it and bring the bill: the first customer paid');
@@ -64,7 +67,12 @@ await shot('3-kitchen-panel');
 check(await until('game.G.staff.find((s) => s.role === "cook").job?.kind === "cook"', 40000), 'the cook takes the next order');
 check(await ev('!game.S.youCook(game.G) && game.S.youServe(game.G)'), 'you only wait tables now');
 await page.click('#sheet [data-act="close"]'); await wait(400);
-check(await ev('!game.ui.room && !document.querySelector(".hint").hidden'), 'the panel closes, the hint is back');
+check(await ev('!game.ui.room && !document.querySelector(".quest").hidden'), 'the panel closes, the quest bar is back');
+check(await ev('document.querySelector(".quest").classList.contains("done") && document.querySelector(".quest .claim") != null'), 'the quest is done: Claim');
+const c0 = await ev('game.G.cash');
+await page.click('.quest'); await wait(400);
+check(await ev('game.G.quest.i') === 1 && await ev('game.G.cash') >= c0 + 10 - 0.01 && await ev('document.querySelector(".quest .qtext").textContent.includes("Hire a waiter")'), 'claiming pays $10, the next quest comes');
+await shot('2b-quest');
 await cash(50); check(await buy('item', 'dining', 'waiters'), 'hiring a waiter');
 check(await until('game.G.staff[0].at === "host"', 30000), 'nobody needs you on the floor: you wait at the door (the office is in ruins)');
 
@@ -79,6 +87,25 @@ await cash(100); check(await buy('item', 'entrance', 'benches'), 'a bench in the
 await cash(200); check(await buy('up', 'office'), 'fixing up the office');
 check(await until('game.S.officeLv(game.G) === 1', 40000), 'the office is fixed up: restaurant level 1');
 check(await until('game.G.staff[0].at === "office"', 40000), 'and you sit down in it');
+// the post: the health office writes when the office is fixed up (with a gift)
+check(await until('game.S.unread(game.G) > 0 && !document.querySelector(".slot.mail .badge").hidden', 5000), 'a letter: the mailbox shows it');
+await page.click('.slot.mail'); await wait(500);
+check(await ev('document.querySelectorAll(".modal.mailbox .mrow").length') >= 1, 'the mailbox lists it');
+await page.click('.modal.mailbox .mrow'); await wait(500);
+check(await ev('document.querySelector(".modal.lettercard .letter h2").textContent') === 'Inspection passed', 'the letter opens');
+await shot('4b-letter');
+const c1 = await ev('game.G.cash');
+await page.click('.modal.lettercard [data-x="ok"]'); await wait(400);
+check(await ev('game.G.cash') >= c1 + 40 - 0.01 && await ev('game.G.stats.letters') === 1 && await ev('game.S.unread(game.G)') === 0, 'Collect: its gift is in the cash');
+// a tip by a chair: a tap picks it up
+await ev('game.G.tips.length = 0'); await wait(200); await ev('game.G.tips.push({ id: 99999, seat: "d:0:0", amount: 7 })'); await ev('game.world.focus("dining", 20)'); await wait(1200);
+check(await ev('!!document.querySelector("#markers .mk.tipm")'), 'a tip by a chair shows');
+const c2 = await ev('game.G.cash');
+await ev('document.querySelector("#markers .mk.tipm").click()'); await wait(300);
+check(await ev('game.G.cash') >= c2 + 7 - 0.01 && await ev('game.G.stats.tips') === 1 && !(await ev('game.G.tips.some((t) => t.id === 99999)')), 'a tap picks it up: +$7');
+// a locked feature
+await page.click('.slot.locked[data-f="map"]'); await wait(300);
+check(await ev('[...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("City map: opens at restaurant level 4"))'), 'a locked feature says when it opens');
 check(await ev('document.querySelector(".lvb b").textContent') === '1', 'the top bar shows the restaurant level');
 
 // a station brings a dish; the cashier and a register
@@ -91,17 +118,34 @@ check(await until(`game.G.stats.served > ${paidBefore}`, 60000), 'and pay at the
 
 // renovation: not before everything in the room is at its cap; never above the office + 1
 check(await ev('game.S.upBlock(game.G, "dining")') === 'items', 'the dining hall waits for everything in it to be maxed');
-await ev(`(() => { const g = game.G; g.cash = 1e6; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null) game.S.act(g, 'item', 'dining', id); })()`);
+await ev(`(() => { const g = game.G; g.cash = 1e6; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === null, 'maxed: it can be renovated');
 await ev('game.openRoom("dining")'); await wait(500);
 check(await ev('!!document.querySelector("#sheet .reno.ready [data-act=up]")'), 'the panel offers the renovation');
 await shot('5-dining-ready');
 await page.click('#sheet .reno [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "dining") === 2', 60000), 'the dining hall goes to level 2');
-await ev(`(() => { const g = game.G; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null) game.S.act(g, 'item', 'dining', id); })()`);
+await ev(`(() => { const g = game.G; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === 'office', 'level 3 waits for the office to go up first');
 check(await ev('document.querySelectorAll("#sheet .irow").length >= 4 && document.querySelector("#sheet .reno .why").textContent.includes("Office")'), 'the panel says so');
 await ev('game.ui.closeRoom()');
+
+// the team: full at 5 without a staff room; its lockers make room for more (a new hire changes at one first)
+await wait(300);
+const team = await ev('[game.S.staffCount(game.G), document.querySelector(".teamv").textContent, game.G.staff.map((s) => s.role).join()]');
+check(team[0] === 5 && team[1] === '5/5', 'a team of 5: full without a staff room' + (team[0] === 5 && team[1] === '5/5' ? '' : ': ' + team.join(' | ')));
+await cash(1e5);
+check(!(await buy('item', 'kitchen', 'cooks')) && await ev('game.S.itemBlock(game.G, "kitchen", "cooks")') === 'staff', 'no sixth hire');
+await ev('game.openRoom("kitchen")'); await wait(500);
+check(await ev('!!document.querySelector("#sheet .buy.teamfull")'), 'the kitchen panel says the team is full');
+await page.click('#sheet .buy.teamfull'); await wait(500);
+check(await ev('game.ui.room') === 'staff', 'which leads to the staff room');
+await page.click('#sheet [data-act="up"]');
+check(await until('game.S.lvOf(game.G, "staff") === 1', 60000), 'the staff room is repaired');
+check(await buy('item', 'staff', 'lockers') && await ev('game.S.staffCap(game.G)') === 6, 'a locker: room for 6');
+check(await buy('item', 'kitchen', 'cooks') && await ev('game.G.staff.at(-1).job?.kind') === 'locker', 'the new cook changes at a locker first');
+await ev('game.ui.closeRoom()'); await ev('game.world.focus("staff", 16)'); await wait(1500);
+await shot('5b-staff');
 
 // a busier restaurant (played on fast) and how it looks
 await ev(`(() => { const g = game.G, S = game.S; for (let t = 0; t < 900; t += 0.5) { for (let i = 0; i < 4; i++) { const p = S.prices(g).filter((x) => x.cost <= g.cash).sort((a, b) => a.cost - b.cost)[0]; if (!p || !S.act(g, p.a, p.room, p.id)) break; } S.tick(g, 0.5); } game.world.snap(); })()`);
@@ -123,8 +167,11 @@ await ev('game.save()');
 await boot('idle4.html?away=7200');
 check(await until('!!document.querySelector(".modal.awaycard.in")', 10000), 'two hours away: the card');
 check(await ev('game.G.stats.served') > 0 && await ev('/\\$/.test(document.querySelector(".awaygrid b").textContent)'), 'it says what the restaurant earned');
+const held = await ev('(game.G.mail.find((m) => m.kind === "away" && !m.read) || {}).cash || 0'), c3 = await ev('game.G.cash');
+check(held > 0, 'the takings wait in the mailbox');
 await shot('7-away');
 await page.click('.modal.in [data-x="ok"]'); await wait(400);
+check(await ev('game.G.cash') >= c3 + held - 0.01 && !(await ev('game.G.mail.some((m) => m.kind === "away" && !m.read)')), 'Collect: they are in the cash');
 
 check(!errors.length, 'no errors' + (errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''));
 await browser.close(); server.close();

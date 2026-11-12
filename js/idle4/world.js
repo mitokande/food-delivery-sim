@@ -39,7 +39,9 @@ const STYLE = {
     { floor: 'carpet:#7a2f2f', wall: ['#f3e6c8', '#4e3424', '#d4a640'] }, { floor: 'carpet:#2f3f6a', wall: ['#f6ead0', '#2f2a3a', '#e8bd4f'] }, { floor: 'carpet:#5a1f3a', wall: ['#f8eed6', '#2a1f2a', '#f0c75a'] }],
   terrace: [{ floor: 'rubble', wall: RUIN.wall }, { floor: 'pavers:#cfc6b3', wall: ['#e8dcc4', '#a08a6c', '#7a6a55'] }, { floor: 'deck:#b07f52', wall: ['#f1e2c4', '#b4532d', '#7a2a00'] },
     { floor: 'deck:#b07f52', wall: ['#f1e2c4', '#2f6f5b', '#d4a640'] }, { floor: 'deck:#9a6a42', wall: ['#f6e8cc', '#6a2e1f', '#d4a640'] }, { floor: 'deck:#9a6a42', wall: ['#f8ecd2', '#5a1f2c', '#e8bd4f'] }],
-  bay: [{ floor: 'dust', wall: RUIN.wall }], staff: [{ floor: 'dust', wall: RUIN.wall }],
+  staff: [RUIN, { floor: 'tiles:#cfd6dc:#b4bcc4', wall: ['#e6e9ec', '#8a96a3', '#5f6b78'] }, { floor: 'planks:#b58f68', wall: ['#eef0f2', '#5f8fb0', '#3f6680'] },
+    { floor: 'checker:#eef0f2:#2f9a8c', wall: ['#f4f1e8', '#2f9a8c', '#1f6e64'] }, { floor: 'carpet:#4a5a7a', wall: ['#f6efe2', '#c4482f', '#7a2a00'] }, { floor: 'marble:#eef0ea', wall: ['#fbf6e8', '#3a4e7a', '#d4a640'] }],
+  bay: [{ floor: 'dust', wall: RUIN.wall }],
 };
 const styleOf = (room, lv) => { const s = STYLE[room]; return s[Math.min(lv, s.length - 1)]; };
 const FACADE = ['#c98c63', '#a76445', '#6e3b28']; // (brick: the outside of the building)
@@ -306,7 +308,7 @@ export async function createWorld(game, markerEl) {
     }
     // door posts on every door (the street door gets a frame and an open door leaf)
     for (const d of P.DOORS) {
-      if (d.a === 'bay' || d.b === 'bay' || d.a === 'staff' || d.b === 'staff') continue;
+      if (d.shut) continue; // (the courier bay's doors: phase 4)
       const post = M('#7a5a40');
       const h = d.front ? 2.2 : WALL.in;
       for (const k of [-1, 1]) {
@@ -416,7 +418,7 @@ export async function createWorld(game, markerEl) {
     // tape across the way in
     const tape = M('#f2c230', { roughness: 0.5 });
     for (const dr of P.DOORS) if (dr.a === room || dr.b === room) {
-      const o = dr.a === room ? dr.b : dr.a; if (o === 'street' || (lvNow(o) === 0 && !(dr.a === 'staff' || dr.b === 'staff'))) continue;
+      const o = dr.a === room ? dr.b : dr.a; if (o === 'street' || lvNow(o) === 0) continue;
       const t = dr.axis === 'z' ? box(dr.w + 0.1, 0.08, 0.03, tape, dr.x, 0.9, dr.z, g, false) : box(0.03, 0.08, dr.w + 0.1, tape, dr.x, 0.9, dr.z, g, false);
       t.rotation[dr.axis === 'z' ? 'z' : 'x'] = 0.15;
     }
@@ -558,9 +560,38 @@ export async function createWorld(game, markerEl) {
         for (const x of [11.6, 27.6]) cyl(0.04, 0.04, 2.7, M('#4a3a2c'), x, 0, 20.25, g, 6);
       }
     },
+    // the staff room: a locker for everyone the lockers make room for, a table to sit at, coffee, a sofa from Lv 2
+    staff(g, lv, it, tag) {
+      if (!lv) return;
+      const at = (kit, name, s, x, z, ry = 0, y = 0) => { const p = piece(kit, name, s, ry); p.position.set(x, y, z); g.add(p); return p; };
+      for (let k = 0; k < Math.min(it.lockers, P.LOCKER_SLOTS.length); k++) {
+        const L = P.LOCKER_SLOTS[k], lg = tag(locker(lv, k), `locker:${k}`);
+        lg.position.set(L.x - Math.sin(L.ry) * 0.2, 0, L.z - Math.cos(L.ry) * 0.2); lg.rotation.y = L.ry; g.add(lg);
+      }
+      at('fbits', 'table_medium', [KK * 0.8, KK, KK * 0.8], 25.0, 13.4);
+      for (const [dx, dz, ry] of [[-0.75, 0, Math.PI / 2], [0.75, 0, -Math.PI / 2], [0, 0.75, Math.PI]]) at('fbits', 'chair_A_wood', KK, 25.0 + dx, 13.4 + dz, ry);
+      const mug = food('cup-coffee', 0.12); mug.position.set(25.2, H.table + 0.01, 13.3); g.add(mug);
+      // the coffee corner on the back wall (the machine with the upgrade), the uniforms on a rack
+      at('rbits', 'kitchencounter_straight_A', [KK, KK * 1.2, KK], 26.6, 8.15 + KK);
+      if (it.coffee > 0) tag(at('furniture', 'kitchenCoffeeMachine', KN * 1.1, 26.4, 8.55, 0, KK * 1.2), 'coffee');
+      if (it.coffee >= 5) at('furniture', 'kitchenCoffeeMachine', KN * 1.1, 27.0, 8.55, 0, KK * 1.2);
+      if (it.uniforms > 0) tag(at('furniture', 'coatRackStanding', KN * 1.1, 27.4, 12.0), 'rack');
+      if (lv >= 2) { at('fbits', lv >= 4 ? 'couch_pillows' : 'couch', KK, 27.25, 15.4, -Math.PI / 2); at('fbits', 'rug_rectangle_A', [0.9, 0.3, 0.9], 25.2, 15.4, Math.PI / 2); }
+      if (lv >= 3) { at('fbits', 'cabinet_small', KK, 24.0, 16.5, Math.PI); at('furniture', 'televisionVintage', KN, 24.0, 16.5, Math.PI, KK); }
+      plant(g, 27.4, 16.5, 0.9);
+      if (lv >= 2) at('fbits', 'pictureframe_large_A', KK, 25.55, 8.16, 0, 0.95);
+    },
     bay(g) { soonRoom(g, 'bay'); },
-    staff(g) { soonRoom(g, 'staff'); },
   };
+  // a locker (front: +z); a little nicer every level
+  const LOCKER_LOOK = [null, ['#7d8a96', '#5c6772'], ['#5f8fb0', '#466e8a'], ['#2f9a8c', '#227265'], ['#c4482f', '#933221'], ['#3a4e7a', '#2a3a5c']];
+  function locker(lv, k) {
+    const g = new THREE.Group(), [a, b] = LOCKER_LOOK[Math.min(lv, 5)];
+    box(0.48, 1.35, 0.4, M(k % 2 ? b : a, { roughness: 0.55, metalness: 0.25 }), 0, 0, 0, g);
+    for (const y of [1.05, 1.12, 1.19]) box(0.26, 0.025, 0.02, M('#1f2329'), 0, y, 0.2, g, false);
+    box(0.04, 0.16, 0.03, M('#e8e2d4', { metalness: 0.6, roughness: 0.3 }), 0.16, 0.62, 0.21, g, false);
+    return g;
+  }
   function soonRoom(g, room) {
     const R = P.ROOMS[room], cx = (R.x0 + R.x1) / 2, cz = (R.z0 + R.z1) / 2;
     // scaffolding: the next phases' rooms
@@ -847,6 +878,51 @@ export async function createWorld(game, markerEl) {
     for (const [id, m] of passPlates) if (!live.has(id)) { m.removeFromParent(); passPlates.delete(id); }
   }
 
+  // ---------- tips by the chairs (a tap picks one up) ----------
+  const tipViews = new Map(); // tip id → { g, mk }
+  const coinMat = M('#f2c230', { metalness: 0.55, roughness: 0.3 }), billMat = M('#7cc46a', { roughness: 0.8 });
+  function tipSpot(t, n) {
+    // on the floor in front of the chair, a little apart if there are several
+    const sp = P.SPOTS[t.seat] || P.SPOTS.front;
+    return [sp.x + (n % 2 ? 0.18 : -0.12), sp.z + 0.5 + (n > 1 ? 0.18 : 0)];
+  }
+  function syncTips() {
+    const g = G(), live = new Set(), per = {};
+    for (const t of g.tips) {
+      live.add(t.id);
+      let v = tipViews.get(t.id);
+      if (!v) {
+        const n = per[t.seat] = (per[t.seat] || 0) + 1, [x, z] = tipSpot(t, n - 1);
+        const tg = new THREE.Group(); tg.position.set(x, 0, z);
+        for (let k = 0; k < 3; k++) cyl(0.09, 0.09, 0.035, coinMat, (k - 1) * 0.04, k * 0.035, (k % 2) * 0.03, tg, 12);
+        const bill = box(0.26, 0.012, 0.14, billMat, 0.12, 0, -0.08, tg, false); bill.rotation.y = 0.5;
+        dyn.add(tg);
+        const mk = markers.add({ x, y: 0.55, z, cls: 'mk tipm', html: `<span class="tipb">${S.money(t.amount)}</span>`, onTap: () => game.collectTip(t.id) });
+        v = { g: tg, mk, x, z, t: 0 }; tipViews.set(t.id, v);
+      } else per[t.seat] = (per[t.seat] || 0) + 1;
+    }
+    for (const [id, v] of tipViews) if (!live.has(id)) { v.g.removeFromParent(); dropMk(v.mk); tipViews.delete(id); }
+  }
+  function tipsTick(dt) { for (const v of tipViews.values()) { v.t += dt; v.g.rotation.y = Math.sin(v.t * 2) * 0.15; } }
+
+  // ---------- the mailbox by the front door (its flag is up when there's mail) ----------
+  const MAILBOX = { x: 1.15, z: 23.65 };
+  const mailbox = new THREE.Group(); mailbox.position.set(MAILBOX.x, 0, MAILBOX.z); scene.add(mailbox);
+  cyl(0.05, 0.06, 0.75, M('#3a3f4a'), 0, 0, 0, mailbox, 8);
+  box(0.36, 0.3, 0.5, M('#c4302b', { roughness: 0.5 }), 0, 0.75, 0, mailbox);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 14, 1, false, 0, Math.PI), M('#c4302b', { roughness: 0.5 }));
+  lid.rotation.set(Math.PI / 2, 0, Math.PI / 2); lid.position.set(0, 1.05, 0); lid.castShadow = true; mailbox.add(lid);
+  box(0.26, 0.2, 0.02, M('#1f2329'), 0, 0.82, 0.26, mailbox, false);
+  const flag = new THREE.Group(); flag.position.set(0.2, 0.95, -0.1); mailbox.add(flag);
+  box(0.03, 0.34, 0.03, M('#f2c230'), 0, 0, 0, flag); box(0.03, 0.12, 0.16, M('#f2c230'), 0, 0.22, 0.06, flag);
+  const mailMk = markers.add({ x: MAILBOX.x, y: 1.75, z: MAILBOX.z, cls: 'mk mailm', html: '', onTap: () => game.openMailbox() });
+  let mailKey = null;
+  function syncMailbox(dt) {
+    const n = S.unread(G());
+    flag.rotation.z += ((n ? 0 : -Math.PI / 2) - flag.rotation.z) * Math.min(1, dt * 6);
+    if (mailKey !== n) { mailKey = n; mailMk.el.innerHTML = `<span class="mailb ${n ? 'new' : ''}">✉${n ? `<b>${n}</b>` : ''}</span>`; }
+  }
+
   // ---------- pops: "+$12" where someone paid, "Full!" at the door ----------
   const popsUI = [];
   function pop(x, z, html, cls, y = 2.2) {
@@ -861,6 +937,7 @@ export async function createWorld(game, markerEl) {
   let fullT = 0;
   function event(e) {
     if (e.kind === 'paid') { const v = views.get('c' + e.cust); if (v) pop(v.x, v.z, `+${S.money(e.amount)}`, 'cash'); }
+    else if (e.kind === 'tipped') { const v = tipViews.get(e.tip); if (v) pop(v.x, v.z, `+${S.money(e.amount)}`, 'cash tip', 1.0); }
     else if (e.kind === 'lost' && e.why === 'full') { if (fullT <= 0) { pop(P.SPOTS.front.x + 1.2, P.SPOTS.front.z, 'Full!', 'lost', 1.8); fullT = 1.2; } }
     else if (e.kind === 'built') { rebuildRoom(e.room, true); buildWalls(); burst(e.room); }
   }
@@ -986,9 +1063,11 @@ export async function createWorld(game, markerEl) {
     syncCustomers(dt, false);
     syncStaff(dt, false);
     syncPass();
+    syncTips();
+    syncMailbox(dt);
     syncLabels();
     fullT -= dt;
-    popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt);
+    popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt); tipsTick(dt);
     camTick(dt);
     markers.update(w, h);
     void g;
@@ -1004,6 +1083,8 @@ export async function createWorld(game, markerEl) {
     setShift(px) { cam.tshift = px; },
     resize(w, h) { W = w; Hh = h; applyCam(); },
     rebuildWalls: buildWalls,
-    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size }),
+    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size }),
+    // where a thing is on screen (px), for the tests: a tip, the mailbox
+    screenOf(what) { const p = what === 'mailbox' ? [MAILBOX.x, 1.2, MAILBOX.z] : (() => { const v = tipViews.get(what); return v ? [v.x, 0.1, v.z] : null; })(); if (!p) return null; const v = new THREE.Vector3(...p).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * Hh]; },
   };
 }

@@ -9,6 +9,7 @@ import { S as courierSave } from '../state.js'; // (audio.js reads its volumes f
 import { keep, restore } from '../native.js';
 import { buzz } from '../haptics.js';
 import * as S from './sim.js';
+import * as Q from './quests.js';
 import { createUI } from './ui.js';
 import { createWorld } from './world.js';
 
@@ -25,7 +26,7 @@ try {
   const raw = q.has('fresh') ? null : localStorage.getItem(S.KEY);
   if (raw) {
     const d = JSON.parse(raw);
-    if (d && d.v === 1) { const f = S.fresh(); G = { ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }; fresh = false; }
+    if (d && d.v === 1) { const f = S.fresh(); G = S.migrate({ ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }); fresh = false; }
   }
 } catch (e) { console.warn('idle4 save load failed', e); }
 let wiped = false;
@@ -71,6 +72,26 @@ const game = {
     save(); ui.renderRoom();
     return true;
   },
+  // a tap on a tip by a chair; the quest bar's Claim; a letter's (or the takings') Collect
+  collectTip(id) {
+    const a = S.collectTip(G, id);
+    if (!a) return;
+    world.event({ kind: 'tipped', tip: id, amount: a });
+    audio.play('ui-coins', { vol: 0.55 }); buzz(10); ui.live();
+  },
+  claimQuest() {
+    const q = Q.claim(G);
+    if (!q) return;
+    audio.play('ui-levelup'); setTimeout(() => audio.play('ui-coins', { vol: 0.6 }), 200); buzz(30);
+    ui.claimed(q); save(); ui.live(); ui.renderRoom();
+  },
+  openMail(id) {
+    const m = S.openMail(G, id);
+    if (!m) return;
+    if (m.cash) { audio.play('ui-coins'); buzz(20); }
+    save(); ui.live(); ui.renderRoom();
+  },
+  openMailbox() { ui.mailbox(); },
   openRoom(room) {
     if (ui.room === room) { ui.closeRoom(); return; }
     ui.openRoom(room);
@@ -119,6 +140,7 @@ function frame() {
       if (e.kind === 'paid') { if (coinT <= 0) { audio.play('ui-coins', { vol: 0.3 }); coinT = 0.4; } }
       else if (e.kind === 'order') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.15 }); bellT = 3; } }
       else if (e.kind === 'lost' && e.why !== 'full') audio.play('order-late', { vol: 0.2 });
+      else if (e.kind === 'tip') audio.play('pickup-bonus', { vol: 0.25 });
       else if (e.kind === 'built') { audio.play('ui-unlock'); setTimeout(() => audio.play('crowd-cheer', { vol: 0.5 }), 400); buzz(40); ui.built(e.room, e.lv); save(); }
     }
   }
