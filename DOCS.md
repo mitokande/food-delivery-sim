@@ -463,6 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `world.js` izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, kamera), `ui.js` üst çubuk + oda paneli + ipucu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1018,3 +1019,72 @@ Açık konular: kapalıyken kazanç ile fiyat eğrisinin dengesi (yukarıda); 2 
 reklamla ×2; mutfak yetişemeyince en eski fiş önce kuralı yüzünden 120 sn sabırlı teslimatlar 60 sn sabırlı masaları
 geçiyor (tek aşçılı Grand'da masalar hiç servis edilmiyor); garson/kasiyer gibi başka personel, yemek başına istasyon ve ikinci şube sonraki
 aşamaların konusu; "cızırtı" sesi yok (COOK şimdilik `land` sesi).
+
+## 14. Ferdi's (`idle4.html`, Idle Restaurant Manager'ın yeniden yapımı, 1. faz: bina, 12 Kasım 2026)
+
+Kullanıcı bir polis şefi idle oyununu (izometrik kesit bina, adı yazılı odalar, seviye rozetleri ve yeşil oklar, tahtalı
+harap odalar, üstte saat / personel / nakit / güç / elmas, "tehdit altında" geri sayımı, altta tek görev şeridi, kilitli
+düğmeler, harita) oynadı ve oyunun hissini o yöne götürmek, oyunu fazlar halinde yeniden yapmak istedi. Plan (sohbette,
+kullanıcının cevaplarıyla): 1) bina, 2) üst çubuk + görevler + kilitli özellikler (personel odası, mektup kutusu), 3) gün
+saati + etkinlikler (rakip zincirin tehdidi, eleştirmen, denetçi), 4) derinlik (oda yöneticileri, kurye rampasında
+kuryeler ve motorlar, temizlik), 5) harita ve şubeler (prestij), 6) elmas, ödüllü reklam, Adapty, analitik ve uygulamanın
+bu oyuna geçmesi. Kararlar: ayrı sayfa ve ayrı kayıt (`fds_idle4_v1`; idle3 ve mağaza uygulaması değişmedi), kurye
+rampası 4. fazda, COOK tıklaması yok, rakibin adı ve yüzü var. Türün mekanikleri alındı; o oyunun görünüşü, adları ve
+rozet şekli alınmadı. Analitik yok.
+
+- **Bina (`plan.js`):** 28×23 m, sokak önde. Ofis | mutfak | kurye rampası (4. faz) / kasa | salon | personel odası (2.
+  faz) / giriş | teras. Kapılar odaları bağlar; rotalar oda grafında genişlik öncelikli aranır, her nokta (sandalye,
+  bank, ocak, kasa, sıra) kendi giriş yolunu (`via`) taşır. Simülasyon her yürüyüşü bu rotaların uzunluğundan zamanlar,
+  görünüm karakterleri aynı rotada yürütür: garson masaya simülasyonun "yemek geldi" dediği anda varır.
+- **Müşterinin yolu:** kaldırımdan kapıya; boş masa varsa oturur (önce boş masa, sonra yarım masa; önce salon, sonra
+  teras), yoksa girişte banka oturur (sabır 30 sn × çiçekler), bank da yoksa yürüyüp gider ("Full!"). Oturunca menüden
+  rastgele bir yemek ister (70 sn sabır, sonra kızgın gider). Mutfakta o yemeğin ocağı boşsa bir aşçı pişirir ve tabağı
+  ocağın önündeki tezgâha (pass) koyar; garson alıp masaya götürür; müşteri 12 sn yer. Kasa yokken garson hesabı masaya
+  getirir; kasada yazar kasa varsa müşteri kasadaki sıraya (8 kişi) girer, masası hemen boşalır, kasiyer ödemeyi alır
+  (kek vitrini kasada ödeyene ek). Açık mutfak: ocaklar salona bakan tezgâhın hemen arkasında (aşçıların yürümesi kısa).
+- **Sen:** başta her işi sen yaparsın (pişirir, tabağı kendin götürür, hesabı getirirsin). Aşçı alınca pişirmeyi, garson
+  alınca servisi bırakırsın; ikisi de varsa ofise gidip masada oturursun (ofis harapsa kapıda beklersin). Şef şapkan
+  yalnızca pişirirken var.
+- **Odalar (`sim.js` `ROOMS`):** her odanın seviyesi (0 = harap, en çok 5) ve eşyaları var: sayılar (masa, bank, aşçı,
+  garson, yazar kasa; oda seviyesine göre üst sınır) ve yükseltmeler (tabela, çiçekler, rahat sandalyeler, tepsiler,
+  kart okuyucu, kek vitrini, defter, el ilanı, eğitim, şemsiyeler; üst sınır oda seviyesi × 5). Mutfakta her yemeğe bir
+  ocak (sırayla; mutfak seviyesine göre 2 / 3 / 5 / 6 / 8 ocak): ocağı kurmak yemeği menüye ekler, seviyesi yemeği hem
+  hızlandırır (×0,95) hem pahalılaştırır (×1,10). Bir odayı bir üst seviyeye **renove etmek** için odadaki her şey üst
+  sınırında olmalı (paneldeki "3/4"); renovasyon tüm sınırları yükseltir ve odanın görünüşünü değiştirir (zemin, duvar
+  renkleri, eşyalar). **Ofisin seviyesi restoranın seviyesidir**: hiçbir oda ofisten bir seviyeden fazla yukarı çıkamaz;
+  teras restoran seviyesi 2 ister. Harap odalar tamir edilir (para + süre). Aynı anda tek bir oda üzerinde çalışılır
+  (baretli usta, toz, geri sayım; bitince konfeti). Personel odası ve kurye rampası "Coming soon" (iskele).
+- **Görünüm (`world.js`):** ortografik izometrik kamera (sağ önden, 44° aşağı), sürükleyerek kaydırma (bırakınca kayar),
+  iki parmak / tekerle yakınlaştırma, odaya dokununca odanın paneli açılır ve kamera odaya gider (panel açıkken bina
+  yukarı kayar). Duvarlar odaların arasında, her yüzü kendi odasının renginde, kalın krem kapaklı; arka dış duvarlar
+  yüksek, ön ve sağ dış duvarlar alçak (içi görünsün); mutfakla salonun arası tezgâh; giriş vitrinli. Oda etiketleri:
+  seviye rozeti, ad, sayaç (oturan/koltuk, bekleyen/bank, kasadaki sıra, mutfaktaki sipariş), para yetiyorsa yeşil ok;
+  harap odada "Repair $X" (yetiyorsa yeşil, kilitliyse gri), çalışılırken ilerleme halkası ve kalan süre. Müşteri
+  balonları: sipariş ve sabır halkası, "$" (hesap bekliyor), bankta uzun bekleyince "…"; ödeyince "+$". Etraf: kaldırım,
+  yol, ağaçlar, lambalar, arkada ve solda komşu binalar. Ofiste Ferdi Amca'nın portresi duvarda.
+- **Arayüz (`ui.js`):** üst çubuk (sen + restoran seviyesi rozeti, Ferdi's ve dakikalık kazanç, nakit, ayarlar), altta
+  ipucu (önce yol gösterir: aşçı → garson → giriş → ofis → sosis ızgarası → kasa → yazar kasa; sonra hazır renovasyon ya
+  da tamir, sonra darboğaz: mutfak / tezgâhta bekleyen tabaklar / masa / ödeme sırası / boş masalar); dokununca ilgili
+  odayı açar (2. fazın görev şeridinin öncüsü). Oda paneli: her eşya bir satır (ikon, ad, seviye ya da sayı, şimdi →
+  sonraki etki, ilerleme çubuğu, Hire / Add / Build / Upgrade düğmesi ya da MAX), altta renovasyon satırı (neden
+  bekliyor: "Max out everything here first (3/4)", "Upgrade Ferdi's Office to Lv 2 first", "Another room is being worked
+  on"). Hikâye: mektup, bina, **rakip Victor Gristle** (Gristle Burger zincirinin sahibi; "Bu harabeyi senden alayım."
+  Hayır dersin. "Göreceğiz."; görsel `rival.webp`, Higgsfield GPT Image 2.6, §7), menü. Kapalıyken: 2 saate kadar
+  oynatılır (renovasyonlar da biter), "While you were away" kartı.
+
+Denge: `node tools/idle4sim.mjs [dakika] [cheap|plan] [--log]` (tıklama olmadığı için oyuncu yalnızca alıcıdır; "plan"
+personel ve yeni ocakları hemen alır, renovasyonu yapabildiği anda yapar, yaklaşmışsa para biriktirir). 12 Kasım ayarı,
+"plan": ilk aşçı 0:00, garson 4:00, Hot Dog 4:14, ofis (restoran Lv 1) 6:38, kasa 10:25, salon Lv 2 14:00, Döner 19:30,
+restoran Lv 2 22:17, teras 25:18, Pizza 32:37, restoran Lv 3 37:34, Lv 4 50:57, Lv 5 79:19 (her şey en üstte ~80 dk).
+Gelir: 2. dk $35/dk, 5. dk $94, 10. dk $178, 20. dk $876, 30. dk $2,7K, 60. dk $43K. Kapalıyken kazanç açıkken ile aynı
+(ayrı formül yok); oda yöneticileri 4. fazda bunu değiştirecek. Kaybedilen müşteri geç oyunda artıyor (masa sınırı),
+bu açık konu. Tarayıcı testi `node tools/idle4.mjs` (telefon: hikâye ve rakip, odaların etiketleri, harabeler, ipucu,
+her işi senin yapman, odaya dokununca panel, aşçı ve garson alınca senin çekilmen, kapıda / ofiste bekleyişin, tamir ve
+süresi, tek seferde tek oda, bank, ofis ve restoran seviyesi, ocak ve yeni yemek, kasa ve sıradan ödeme, renovasyon
+kuralları ve panel, kalabalık restoran, kayıt + yeniden yükleme, 2 saat kapalı; 42 kontrol, görüntüler `idle4-*.png`).
+Hızlı görüntü: `node tools/idle4shot.mjs <klasör> [sorgu] [js] [ms] [adet] [en] [boy]`. URL: `?fresh`, `?noti`,
+`?speed=N`, `?away=<sn>`.
+
+Açık konular: denge (özellikle geç oyunda gelir patlaması ve kaybedilen müşteri; idle3 gibi bir denge laboratuvarı
+2. fazda eklenebilir), müşteriler masaların arasından düz yürüyor (yol bulma yok), Kenney Furniture Kit indirilemedi
+(izin sistemi; eşyalar kutu ve silindirlerden), telefonda gerçek performans ölçülmedi.

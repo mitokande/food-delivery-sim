@@ -47,6 +47,10 @@ export const ART = {
     + 'bright saturated palette, clean plain white background. Uncle Ferdi: a round, kind old man with a big bushy grey moustache, rosy cheeks, twinkling eyes, '
     + 'a red apron over a cream shirt with rolled sleeves, holding a spatula, giving a warm wink and a thumbs up. Head and upper body, centered. '
     + 'No text, no letters, no numbers, no logos.' },
+  // the rival in Ferdi's (idle4.html): Victor Gristle of the Gristle Burger chain, at the boarded-up door (a story card)
+  rival: { size: '1536x1024', prompt: `${STYLE} A smug villainous restaurant-chain tycoon standing in front of the boarded-up door of a small run-down `
+    + 'old-town diner: a portly middle-aged man in a shiny purple-grey suit, slicked-back black hair, thin pencil moustache, gold pinky ring, a toothpick '
+    + 'in his grin, arms crossed, one eyebrow raised; a sleek black car parked behind him. Comic, charming, not scary. Waist-up, centered, room around him.' },
   // icon sheets: every dish, and every motor, on one picture so they share a look; tools/genart-webp.py cuts them apart.
   // The order is sim.js's (DISHES, MOTORS), and the motors' colours are those of the 3D models on the map.
   dishes: { size: '1536x1024', background: 'transparent', prompt: 'Game UI icon sheet, stylized 3D cartoon, chunky and glossy food icons, soft shading, '

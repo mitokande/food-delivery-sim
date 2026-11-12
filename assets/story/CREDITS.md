@@ -15,4 +15,8 @@ same prompts:
 - `veh-*`: the couriers' five motors, cut from one sheet (`vehicles`).
 - `ferdi`: Uncle Ferdi's portrait, cut out of its white background.
 
+This was generated on 2026-11-12 with GPT Image 2.6 through Higgsfield (model `gpt_image_2_6`, quality medium, 1k, 3:2), from its
+prompt in `tools/genart.mjs`:
+- `rival`: Victor Gristle, the rival in Ferdi's (`idle4.html`), on a story card.
+
 The webp copies, and the cutting, were made by `tools/genart-webp.py`.
