@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1181,3 +1181,39 @@ Olaylar: 22:57 kamyon (45) başarılı, 28:54 eleştirmen 5★, 33:58 minibüs, 
 61:08 denetçi A, 67:47 kamyon başarılı, 75:44 eleştirmen 5★, 84:25 kamyon başarısız. Tarayıcı testi 70 kontrol
 (yeni: saat, kilitli Events, kamyon şeridi, kameranın kamyona gitmesi, olaylar kartı ve parayla gönderme, etiketli
 eleştirmen, 23:00'te gece, kapalıyken yeni olay yok).
+
+### 14.3 4. faz: kurye rampası, yöneticiler, masa toplama (12 Kasım 2026)
+
+Kullanıcı 3. fazı birleştirdi ("merged the pr go to phase 4"). Dal `idle-phase4`.
+
+- **Kurye rampası (artık gerçek oda):** restoran Lv 2'de tamir edilir ($2,5K / 45 sn; seviyeler $15K / $80K / $300K /
+  $700K). Eşyalar: kurye (oda seviyesine göre 1 / 2 / 3 / 4 / 5; ekip sınırına sayılır), motorlar (yolculuk %4 kısalır /
+  seviye), teslimat uygulaması (sipariş %6 artar), sıcak çantalar (teslimat %5 fazla öder). Uygulamadan siparişler
+  gelir (kurye başına dakikada 2 × uygulama × günün saati; kurye başına en çok 3 açık sipariş; kimse pişirmeye
+  başlamazsa 150 sn'de iptal). Aşçı pişirir, mutfağın yanındaki rampaya geçip rafa çantayı bırakır. Kurye çantayı
+  alır, motoruna biner, gidiş-dönüş 36 sn (motorlarla kısalır) sonra para gelir: fiyat × 1,5 × çantalar. Masa
+  gerekmez. Görünüm: kurye oyununun motorları (`js/ride/vehicle.js` `makeBike`, kasklı sürücü, `drive`
+  animasyonu), motor seviyesine göre Rust Bucket → Zippy → Vespetta → Volt → Viper. Rampa garaj kapısından çıkıp yan
+  sokaktan kaldırıma, sağa doğru gider, aynı yoldan döner (5 sn çıkış, 5 sn dönüş; arası görünmez). Rafta bekleyen
+  çantalar, "DELIVERY" tabelası, tablet, lastikler, garaj kapısında sarı-siyah şerit. Mutfak ile rampa arasındaki kapı
+  açıldı; rampa ile personel odası arasındaki kapı kapalı kaldı.
+- **Masa toplama:** yiyip kalkan müşterinin yerinde kirli tabak kalır (`G.dirty`), toplanana kadar oraya kimse
+  oturmaz. Garsonlar (garson yoksa sen) tabak servisinden sonra toplar (masanın kirli iki yerini birden, 1,2 sn ×
+  yeni "Bus tubs" yükseltmesi). Kasa yokken hesabı getiren garson masayı da toplar (erken oyun yavaşlamasın diye).
+  Denetçinin notuna temizlik de girer.
+- **Yöneticiler (restoran Lv 3'ten):** her odaya bir kişi, bir kerelik ücretle: Rosa (giriş, bankta %25 daha uzun
+  bekleme, $3K), Marco (salon, garsonlar %10 hızlı, $6K), Aiko (mutfak, aşçılar %10 hızlı, $8K), Mr. Patel (kasa, ödeme
+  %20 hızlı, $5K), Lou (teras, %10 pahalı, $15K), Greta (personel odası, ekip +2, $10K), Dex (rampa, %15 fazla
+  sipariş, $20K). Ayrıca "Buys for you": açıkken odanın eşyalarından en ucuzunu, nakdin en çok yarısı tutuyorsa,
+  saniyede bir alır (oyun kapalıyken almaz; tadilatlara dokunmaz). Sağdaki **Managers** düğmesi (Lv 3'te açılır)
+  yöneticiler kartını açar; her odanın panelinin başında da yöneticinin satırı var (işe al ya da düğmesi). Yönetici
+  odasında kravatla durur, başında adı yazar.
+- **Görevler:** "Open the Courier Bay", "Hire a courier", "Hire a manager", "Make 50 deliveries", "Have 4 managers".
+- **Kayıt:** `G.online`, `G.bags`, `G.dirty`, `G.clearing`, `G.mgr`; `stats.delivered`, `lostOnline`, `cleared`.
+- "Menü" (günün yemeği gibi bir seçim) bu fazda yapılmadı.
+
+Denge (bot "plan", 90 dk): ofis Lv 1 5:17, Lv 2 20:08, rampa 29:34, ilk kurye 30:19, Lv 3 37:31, yedi yönetici
+38:55–44:01, Lv 4 56:56, Lv 5 80:44 (3. fazda 72:29; masa toplama ve yeni eşyalar biraz yavaşlattı). 90 dakikada 302
+teslimat, 2.476 masa toplama, 41 görev. Tarayıcı testi 83 kontrol (yeni: kilitli Managers, rampa tamiri, kurye,
+pişirilip çantalanan ve motorla çıkan sipariş, garajdan çıkan motor, ödeme, masa toplama, yöneticiler kartı, işe alma,
+odada duran yönetici, yöneticinin alışverişi, düğmesi).

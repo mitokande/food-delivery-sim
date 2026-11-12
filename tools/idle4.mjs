@@ -7,6 +7,9 @@
 // letter with a gift; the takings of a long absence), the team's cap and the staff room (lockers), the locked features.
 // Phase 3: the clock and the night, the events button (locked before restaurant level 2), Victor's truck (the banner,
 // the camera to it, paying to move it on), a critic with a tag over his head, nothing new while the game is closed.
+// Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
+// left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
+// you, the switch).
 //   node tools/idle4.mjs [outdir=tools/shots]   (phone viewport; screenshots idle4-*.png)
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
@@ -49,12 +52,14 @@ check(titles.join() === 'A letter,Everything,A visitor,The menu' && await ev('ga
 
 // the building: labels on every room, the ruins, the hint
 check(await ev('document.querySelectorAll("#markers .mk.rlab").length') === 8, 'every room has a label');
-check(await ev('document.querySelector("#markers .rl.ruin") && document.querySelectorAll("#markers .rl.soon").length === 1'), 'ruined rooms show a repair price, the courier bay "coming soon"');
+check(await ev('document.querySelector("#markers .rl.ruin") && !document.querySelector("#markers .rl.soon") && [...document.querySelectorAll("#markers .rl.ruin")].some((e) => e.textContent.includes("Courier Bay") && e.textContent.includes("Restaurant Lv 2"))'), 'ruined rooms show a repair price (the courier bay: from restaurant level 2)');
 check(await ev('document.querySelector(".quest .qtext").textContent.includes("Hire a cook (0/1)")'), 'the first quest: hire a cook (0/1)');
 check(await ev('document.querySelector(".teamv").textContent') === '0/5', 'the top bar shows the team: 0/5');
 check(/^0[89]:\d\d$/.test(await ev('document.querySelector(".clk").textContent')), 'the clock: morning');
 await page.click('.slot.events'); await wait(300);
 check(await ev('document.querySelector(".slot.events").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Events: opens at restaurant level 2"))'), 'events: locked before restaurant level 2');
+await page.click('.slot.managers'); await wait(300);
+check(await ev('document.querySelector(".slot.managers").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Managers: opens at restaurant level 3"))'), 'managers: locked before restaurant level 3');
 // you do everything: cook, carry, bring the bill
 check(await until('game.G.staff[0].job && game.G.staff[0].job.kind === "cook"', 60000), 'you cook the first order yourself');
 check(await until('game.G.stats.served > 0', 90000), 'and serve it and bring the bill: the first customer paid');
@@ -123,14 +128,14 @@ check(await until(`game.G.stats.served > ${paidBefore}`, 60000), 'and pay at the
 
 // renovation: not before everything in the room is at its cap; never above the office + 1
 check(await ev('game.S.upBlock(game.G, "dining")') === 'items', 'the dining hall waits for everything in it to be maxed');
-await ev(`(() => { const g = game.G; g.cash = 1e6; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
+await ev(`(() => { const g = game.G; g.cash = 1e6; for (const id of Object.keys(game.S.ROOMS.dining.items)) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === null, 'maxed: it can be renovated');
 await ev('game.openRoom("dining")'); await wait(500);
 check(await ev('!!document.querySelector("#sheet .reno.ready [data-act=up]")'), 'the panel offers the renovation');
 await shot('5-dining-ready');
 await page.click('#sheet .reno [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "dining") === 2', 60000), 'the dining hall goes to level 2');
-await ev(`(() => { const g = game.G; for (const id of ['tables', 'waiters', 'comfort', 'service']) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
+await ev(`(() => { const g = game.G; for (const id of Object.keys(game.S.ROOMS.dining.items)) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === 'office', 'level 3 waits for the office to go up first');
 check(await ev('document.querySelectorAll("#sheet .irow").length >= 4 && document.querySelector("#sheet .reno .why").textContent.includes("Office")'), 'the panel says so');
 await ev('game.ui.closeRoom()');
@@ -171,6 +176,36 @@ await page.click('.modal.eventscard [data-x="repel"]'); await wait(500);
 check(await ev('!game.G.event && game.G.evLog[0].kind === "threat" && game.G.evLog[0].paid > 0'), 'paid: the truck moves on');
 await ev('game.S.startEvent(game.G, "critic")');
 check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'a critic walks in with a tag over his head');
+// the courier bay: repair it, hire a courier; an order from the app is cooked, bagged, ridden out on a motor and paid
+await ev('(() => { const g = game.G; g.event = null; g.evNext = g.t + 9999; g.cash = Math.max(g.cash, 1e7); })()');
+// (the busy restaurant above may have done it already)
+if (!(await ev('game.S.lvOf(game.G, "bay")'))) await until('!game.G.build', 60000), await buy('up', 'bay');
+check(await until('game.S.lvOf(game.G, "bay") >= 1', 60000), 'the courier bay is repaired');
+if (!(await ev('game.S.nCouriers(game.G)'))) await buy('item', 'bay', 'couriers');
+check(await ev('game.G.staff.some((s) => s.role === "courier")'), 'a courier');
+check(await until('game.G.staff.some((s) => s.role === "courier" && s.job?.kind === "deliver" && s.st === "work" && s.anim === "ride")', 120000), 'a delivery order cooked, bagged and taken out');
+check(await until('game.world.peek().bikes.some((b) => b.on && b.x > 27)', 8000), 'the courier rides out of the garage on a motor');
+await ev('game.world.lookAt(27, 8, 18)'); await wait(1200); await shot('9-courier');
+check(await until('game.G.stats.delivered > 0', 60000), 'delivered and paid');
+// tables left dirty are cleared by the waiters
+check(await ev('game.G.stats.cleared') > 0, 'waiters clear the tables people leave');
+// managers: locked before restaurant level 3; then hire the head chef, who stands in the kitchen and buys things
+await ev('(() => { const g = game.G; if (g.rooms.office.lv < 3) g.rooms.office.lv = 3; g.mgr = {}; })()'); await wait(300);
+await page.click('.slot.managers'); await wait(500);
+check(await ev('document.querySelectorAll(".modal.managerscard .mgrrow").length') === 7, 'the managers card: one for each room');
+await shot('9b-managers');
+await page.click('.modal.managerscard [data-act="mgr"][data-room="kitchen"]'); await wait(600);
+check(await ev('!!game.G.mgr.kitchen && game.G.mgr.kitchen.auto'), 'the head chef is hired (and buys for you)');
+await page.click('.modal.managerscard [data-x="close"]'); await wait(300);
+check(await until('game.world.peek().managers === 1', 3000), 'and stands in the kitchen');
+await ev('(() => { const g = game.G; g.rooms.kitchen.it["st:burger"] = 1; g.cash = Math.max(g.cash, 1e7); })()'); // (something to buy)
+const kit0 = await ev('Object.values(game.G.rooms.kitchen.it).reduce((a, b) => a + b, 0)');
+check(await until(`Object.values(game.G.rooms.kitchen.it).reduce((a, b) => a + b, 0) > ${kit0}`, 8000), 'the head chef buys things in the kitchen');
+await ev('game.openRoom("kitchen")'); await wait(500);
+check(await ev('!!document.querySelector("#sheet .mgrrow.on")'), 'the kitchen panel shows the head chef');
+await page.click('#sheet [data-act="mgrauto"]'); await wait(300);
+check(await ev('game.G.mgr.kitchen.auto === false'), 'the switch: no more buying');
+await ev('game.ui.closeRoom()');
 // the night
 await ev('(() => { const g = game.G, h = game.S.hourOf(g); g.t += ((23 - h + 24) % 24) / 24 * game.S.DAY.len; })()'); await wait(800);
 check(await ev('game.world.scene.background.getHSL({}).l < 0.25 && document.querySelector(".clk").textContent.startsWith("23")'), 'at 23:00 it is night');

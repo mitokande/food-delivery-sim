@@ -10,6 +10,9 @@
 // earns while the game is closed waits in the mailbox, with the letters people send. A chain of quests leads the way.
 // The day goes round (a lunch and a dinner rush, quiet nights), and from restaurant level 2 things happen: Victor's food
 // truck threatens to park outside, a food critic, a celebrity or the health inspector walks in, a tour van stops.
+// The courier bay takes orders from the delivery app: the cooks bag them, couriers ride them out on their motors.
+// A table someone has left is dirty until a waiter clears it. Managers (from restaurant level 3) look after a room:
+// a bonus, and if you like they buy its things for you.
 // Pure: no DOM, no three.js. G is plain JSON (the save). Every walk is timed on the floor plan's routes (plan.js), the
 // same ones the view walks the characters along.
 import * as P from './plan.js';
@@ -57,6 +60,7 @@ export const ROOMS = {
       waiters: { kind: 'n', name: 'Waiter', caps: [0, 2, 3, 4, 5, 6], cost: [25, 150, 900, 3500, 10000, 25000], what: 'Brings plates to the tables' },
       comfort: { kind: 'lv', name: 'Comfy chairs', base: 8, g: 1.26, what: 'People pay more' },
       service: { kind: 'lv', name: 'Trays & shoes', base: 9, g: 1.26, what: 'Waiters walk faster' },
+      tubs: { kind: 'lv', name: 'Bus tubs', base: 6, g: 1.26, what: 'Tables are cleared faster' },
     },
   },
   kitchen: {
@@ -102,15 +106,44 @@ export const ROOMS = {
       uniforms: { kind: 'lv', name: 'Uniforms', base: 12, g: 1.26, what: 'More people leave a tip' },
     },
   },
-  bay: { name: 'Courier Bay', soon: 'phase 4', start: 0, gate: 99, up: [], items: {} },
+  bay: {
+    name: 'Courier Bay', start: 0, gate: 2, up: [[2500, 45], [15000, 75], [80000, 120], [300000, 170], [700000, 210]],
+    blurb: 'Orders from the delivery app: the cooks bag them, the couriers ride them out on their motors. No table needed.',
+    items: {
+      couriers: { kind: 'n', name: 'Courier', caps: [0, 1, 2, 3, 4, 5], cost: [400, 2500, 9000, 30000, 80000], what: 'Rides the orders out' },
+      motors: { kind: 'lv', name: 'Motors', base: 60, g: 1.26, what: 'Rides are quicker' },
+      app: { kind: 'lv', name: 'Delivery app', base: 50, g: 1.26, what: 'More delivery orders' },
+      bags: { kind: 'lv', name: 'Hot bags', base: 55, g: 1.26, what: 'Deliveries pay more' },
+    },
+  },
 };
 export const ROOM_IDS = Object.keys(ROOMS);
 // effect of one level of each upgrade
 export const STEP = { sign: 0.04, ads: 0.04, decor: 0.1, comfort: 0.08, service: 0.05, ledger: 0.05, training: 0.025, speed: 0.07, upsell: 0.05, parasols: 0.08, stPrice: 0.1, stSpeed: 0.95,
-  coffee: 0.03, uniforms: 0.06 };
+  coffee: 0.03, uniforms: 0.06, app: 0.06, bags: 0.05, motors: 0.04, tubs: 0.06 };
 // the team: this many can work here without a staff room, one more for every locker in it
 export const STAFF_BASE = 5;
-const HIRE = { cooks: 'cook', waiters: 'waiter', registers: 'cashier' };
+const HIRE = { cooks: 'cook', waiters: 'waiter', registers: 'cashier', couriers: 'courier' };
+// deliveries: orders a minute for each courier (× the app, × the time of day), at most `max` open for each courier, s
+// before an order nobody started cooking is cancelled, a ride there and back with plain motors (s), what a delivery
+// costs on top of the price
+export const DELIVERY = { rate: 2, max: 3, patience: 150, ride: 36, fee: 1.5 };
+// clearing a table: s at it (× bus tubs)
+export const CLEAR = 1.2;
+// managers: one for a room, from restaurant level MGR_LV; a bonus (k), and they buy the room's things if you let them
+// (when it costs at most MGR_SPEND of the cash)
+export const MGR_LV = 3, MGR_SPEND = 0.5;
+export const MANAGERS = {
+  entrance: { name: 'Rosa', title: 'Host', char: 'female-c', cost: 3000, k: 1.25, what: 'People wait 25% longer on the benches' },
+  dining: { name: 'Marco', title: 'Head waiter', char: 'male-f', cost: 6000, k: 1.1, what: 'Waiters walk 10% faster' },
+  kitchen: { name: 'Aiko', title: 'Head chef', char: 'female-d', cost: 8000, k: 1.1, what: 'Cooks work 10% faster' },
+  cashier: { name: 'Mr. Patel', title: 'Head cashier', char: 'male-d', cost: 5000, k: 1.2, what: 'Paying is 20% quicker' },
+  terrace: { name: 'Lou', title: 'Terrace host', char: 'female-a', cost: 15000, k: 1.1, what: 'People outside pay 10% more' },
+  staff: { name: 'Greta', title: 'Staff manager', char: 'female-f', cost: 10000, k: 2, what: 'Two more on the team' },
+  bay: { name: 'Dex', title: 'Dispatcher', char: 'male-e', cost: 20000, k: 1.15, what: '15% more delivery orders' },
+};
+export const hasMgr = (G, room) => !!G.mgr?.[room];
+const mgrK = (G, room) => (hasMgr(G, room) ? MANAGERS[room].k : 1);
 // tips: the chance a paying customer leaves one by their chair (× uniforms), its share of the bill; at most this many
 // lie about at a time
 export const TIPS = { chance: 0.12, share: 0.4, max: 6 };
@@ -134,8 +167,9 @@ export function fresh(keep = {}) {
     staff: [], cust: [],
     seats: {}, benches: {}, // seat / bench id → customer id
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
+    online: [], bags: [], dirty: {}, clearing: {}, mgr: {}, // (delivery orders, bags on the shelf, seats to clear and who's on it, managers: room → { auto })
     acc: { walk: 0.7 },
-    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0 },
+    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0, delivered: 0, lostOnline: 0, cleared: 0 },
     sold: {},
     tips: [], // { id, seat, amount }
     mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
@@ -205,17 +239,22 @@ export function rushOf(G) { const h = hourOf(G); return h >= 12 && h < 14.5 ? 'l
 export const modK = (G, k) => { let x = 1; for (const m of G.mods) if (m.k === k && G.t < m.until) x *= m.x; return x; };
 export const avgBill = (G) => (G.stats.served > 10 ? G.stats.earned / G.stats.served : 10);
 export const trainK = (G) => step(G, 'office', 'training');
-export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * step(G, 'staff', 'coffee') * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') : 1);
+export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * step(G, 'staff', 'coffee') * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') * mgrK(G, 'dining') : 1);
 export const staffCount = (G) => G.staff.length - 1; // (not you)
-export const staffCap = (G) => STAFF_BASE + (lvOf(G, 'staff') > 0 ? itemOf(G, 'staff', 'lockers') : 0);
+export const staffCap = (G) => STAFF_BASE + (lvOf(G, 'staff') > 0 ? itemOf(G, 'staff', 'lockers') : 0) + (hasMgr(G, 'staff') ? MANAGERS.staff.k : 0);
+export const nCouriers = (G) => (lvOf(G, 'bay') > 0 ? itemOf(G, 'bay', 'couriers') : 0);
+export const onlineRate = (G) => nCouriers(G) * DELIVERY.rate * step(G, 'bay', 'app') * mgrK(G, 'bay') * dayK(G); // a minute
+export const rideTime = (G) => DELIVERY.ride * Math.pow(1 - STEP.motors, itemOf(G, 'bay', 'motors'));
+export const clearTime = (G) => CLEAR * Math.pow(1 - STEP.tubs, itemOf(G, 'dining', 'tubs'));
+export const deliveryPrice = (G, dish) => DISH[dish].price * stPrice(itemOf(G, 'kitchen', `st:${dish}`)) * step(G, 'office', 'ledger') * DELIVERY.fee * step(G, 'bay', 'bags');
 export const tipChance = (G) => TIPS.chance * step(G, 'staff', 'uniforms');
-export const cookTime = (G, dish) => stTime(dish, itemOf(G, 'kitchen', `st:${dish}`)) / trainK(G);
-export const checkoutTime = (G) => CHECKOUT * Math.pow(1 - STEP.speed, itemOf(G, 'cashier', 'speed')) / trainK(G);
-export const benchPatience = (G) => PATIENCE.bench * step(G, 'entrance', 'decor');
+export const cookTime = (G, dish) => stTime(dish, itemOf(G, 'kitchen', `st:${dish}`)) / trainK(G) / mgrK(G, 'kitchen');
+export const checkoutTime = (G) => CHECKOUT * Math.pow(1 - STEP.speed, itemOf(G, 'cashier', 'speed')) / trainK(G) / mgrK(G, 'cashier');
+export const benchPatience = (G) => PATIENCE.bench * step(G, 'entrance', 'decor') * mgrK(G, 'entrance');
 // what a dish brings at a seat (room: 'dining' | 'terrace'), paid at the table or at the register (the cake display)
 export function priceOf(G, dish, room, atRegister) {
   const L = itemOf(G, 'kitchen', `st:${dish}`);
-  return DISH[dish].price * stPrice(L) * step(G, 'office', 'ledger') * (room === 'terrace' ? step(G, 'terrace', 'parasols') : step(G, 'dining', 'comfort'))
+  return DISH[dish].price * stPrice(L) * step(G, 'office', 'ledger') * (room === 'terrace' ? step(G, 'terrace', 'parasols') * mgrK(G, 'terrace') : step(G, 'dining', 'comfort'))
     * (atRegister ? step(G, 'cashier', 'upsell') : 1);
 }
 
@@ -267,14 +306,23 @@ export function prices(G) {
   for (const room of ROOM_IDS) {
     if (lvOf(G, room) > 0) for (const id in ROOMS[room].items) { const c = itemCost(G, room, id); if (c != null && !itemBlock(G, room, id)) out.push({ a: 'item', room, id, cost: c }); }
     if (!upBlock(G, room)) out.push({ a: 'up', room, cost: upCost(G, room) });
+    if (mgrOpen(G, room)) out.push({ a: 'mgr', room, cost: MANAGERS[room].cost });
   }
   return out;
 }
+// can this room's manager be hired now?
+export const mgrOpen = (G, room) => !!MANAGERS[room] && !hasMgr(G, room) && restaurantLv(G) >= MGR_LV && lvOf(G, room) > 0;
 export const affordable = (G, room) => prices(G).some((p) => p.room === room && p.cost <= G.cash);
 
 function pay(G, cost) { if (cost == null || G.cash + 1e-9 < cost) return false; G.cash -= cost; G.stats.spent += cost; return true; }
-// → false, or what happened: { hire: staff } | { up: room } | { item }
+// → false, or what happened: { hire: staff } | { up: room } | { item } | { mgr: room } (hired) | { auto: room } (switched)
 export function act(G, a, room, id) {
+  if (a === 'mgr') {
+    if (!mgrOpen(G, room) || !pay(G, MANAGERS[room].cost)) return false;
+    G.mgr[room] = { auto: true };
+    return { mgr: room };
+  }
+  if (a === 'auto') { if (!hasMgr(G, room)) return false; G.mgr[room].auto = !G.mgr[room].auto; return { auto: room }; }
   if (a === 'up') {
     if (upBlock(G, room) || !pay(G, upCost(G, room))) return false;
     G.build = { room, to: lvOf(G, room) + 1, t0: G.t, dur: upTime(G, room) };
@@ -319,6 +367,7 @@ export function homeOf(G, s) {
   if (s.role === 'cook') return `kidle:${s.k % 8}`;
   if (s.role === 'waiter') return `widle:${s.k % 6}`;
   if (s.role === 'cashier') return `creg:${s.k}`;
+  if (s.role === 'courier') return `cidle:${s.k % P.MOTORS}`;
   if (youCook(G)) return 'kidle:7';
   if (youServe(G)) return 'widle:5';
   return officeLv(G) > 0 ? 'office' : 'host';
@@ -369,7 +418,23 @@ function happen(G, s, j, on, ev) {
     ev.push({ kind: 'served', cust: c.id, dish: j.dish, seat: c.seat, by: s.id });
     return;
   }
-  if (on === 'bill') { const c = custBy(G, j.cust); if (c && c.st === 'bill') { paid(G, c, false, ev); leaveSeat(G, c, false); } }
+  if (on === 'bill') { const c = custBy(G, j.cust); if (c && c.st === 'bill') { paid(G, c, false, ev); leaveSeat(G, c, false, true); } } // (and clears the table while there)
+  if (on === 'bag') { // (a delivery order, bagged on the shelf in the courier bay)
+    s.carry = null;
+    const o = G.online.find((x) => x.id === j.order);
+    if (o) { o.st = 'bag'; G.bags.push({ id: G.seq++, order: o.id, dish: j.dish, w: null }); }
+    return;
+  }
+  if (on === 'pickbag') { const i = G.bags.findIndex((b) => b.id === j.bag); if (i >= 0) G.bags.splice(i, 1); s.carry = 'bag'; const o = G.online.find((x) => x.id === j.order); if (o) o.st = 'ride'; return; }
+  if (on === 'delivered') {
+    s.carry = null;
+    const i = G.online.findIndex((x) => x.id === j.order); if (i >= 0) G.online.splice(i, 1);
+    const amount = Math.round(deliveryPrice(G, j.dish) * 10) / 10;
+    G.cash += amount; G.stats.earned += amount; G.stats.delivered++; G.sold[j.dish] = (G.sold[j.dish] || 0) + 1;
+    ev.push({ kind: 'delivered', amount, by: s.id, dish: j.dish });
+    return;
+  }
+  if (on === 'clear') { for (const seat of j.seats) { delete G.dirty[seat]; delete G.clearing[seat]; } G.stats.cleared++; ev.push({ kind: 'cleared', table: j.table }); }
 }
 
 // ---------------------------------------------------------------- customers
@@ -388,7 +453,7 @@ function seatFree(G) {
   for (const room of ['dining', 'terrace']) {
     const n = nTables(G, room);
     for (let i = 0; i < n; i++) {
-      const [s0, s1] = P.TABLES[room][i].seats, f0 = !G.seats[s0], f1 = !G.seats[s1];
+      const [s0, s1] = P.TABLES[room][i].seats, f0 = !G.seats[s0] && !G.dirty[s0], f1 = !G.seats[s1] && !G.dirty[s1];
       if (f0 && f1) return s0;
       if (!half && (f0 || f1)) half = f0 ? s0 : s1;
     }
@@ -398,8 +463,8 @@ function seatFree(G) {
 function benchFree(G) { const n = nBenchSeats(G); for (let i = 0; i < n; i++) if (!G.benches[`b:${i}`]) return `b:${i}`; return null; }
 const seatRoom = (seat) => (seat[0] === 'd' ? 'dining' : 'terrace');
 function sitDown(G, c, seat) { G.seats[seat] = c.id; c.seat = seat; walk(G, c, seat, 'sit'); }
-function leaveSeat(G, c, lost) {
-  if (c.seat && G.seats[c.seat] === c.id) delete G.seats[c.seat];
+function leaveSeat(G, c, lost, cleared = false) {
+  if (c.seat && G.seats[c.seat] === c.id) { delete G.seats[c.seat]; if (!cleared && (c.st === 'bill' || c.st === 'eat')) G.dirty[c.seat] = 1; } // (they ate: plates to clear)
   c.mood = lost ? 'mad' : 'happy';
   walk(G, c, c.exit, 'gone');
 }
@@ -469,6 +534,31 @@ function stepSim(G, dt, ev) {
   // 1. people walk in off the street (from the left mostly) and decide at the door
   G.acc.walk += walkRate(G) / 60 * dt * (0.5 + rnd(G));
   while (G.acc.walk >= 1) { G.acc.walk -= 1; spawn(G, rnd(G) < 0.7); }
+  // delivery orders from the app (as many open as the couriers can take); one nobody started cooking in time is cancelled
+  const nc = nCouriers(G);
+  if (nc > 0) {
+    G.acc.online = (G.acc.online || 0) + onlineRate(G) / 60 * dt * (0.5 + rnd(G));
+    while (G.acc.online >= 1) {
+      G.acc.online -= 1;
+      if (G.online.length >= nc * DELIVERY.max) continue;
+      const m = menu(G), dish = m[Math.floor(rnd(G) * m.length)], o = { id: G.seq++, dish, t0: G.t, st: 'ticket' };
+      G.online.push(o); G.tickets.push({ id: G.seq++, dish, cust: null, online: o.id, t0: G.t, vip: false });
+      ev.push({ kind: 'online', order: o.id, dish });
+    }
+  }
+  if (G.online.length) for (const o of G.online) {
+    if (o.st !== 'ticket' || G.t - o.t0 <= DELIVERY.patience) continue;
+    const i = G.tickets.findIndex((t) => t.online === o.id); if (i >= 0) G.tickets.splice(i, 1);
+    o.st = 'gone'; G.stats.lostOnline++; ev.push({ kind: 'lost', why: 'online', order: o.id });
+  }
+  if (G.online.some((o) => o.st === 'gone')) G.online = G.online.filter((o) => o.st !== 'gone');
+  // managers buy their room's things (once a second, not while the game is closed)
+  if (!G.quiet && Math.floor(G.t) !== Math.floor(G.t - dt)) for (const room in G.mgr) {
+    if (!G.mgr[room].auto || !lvOf(G, room)) continue;
+    let best = null;
+    for (const id in ROOMS[room].items) { const c = itemCost(G, room, id); if (c != null && !itemBlock(G, room, id) && c <= G.cash * MGR_SPEND && (!best || c < best.c)) best = { id, c }; }
+    if (best) { const r = act(G, 'item', room, best.id); if (r) ev.push({ kind: 'mgrbuy', room, id: best.id, hire: r.hire || null }); }
+  }
   // 2. customers: arrive where they walked to; give up waiting; finish eating
   for (const c of G.cust) {
     if (c.st === 'go') { if (G.t >= c.t0 + c.dur) arrive(G, c, ev); continue; }
@@ -494,7 +584,7 @@ function stepSim(G, dt, ev) {
     for (const c of G.cust) {
       if (c.st !== 'bill' || G.queue.length >= QMAX) continue;
       G.queue.push(c.id);
-      if (c.seat && G.seats[c.seat] === c.id) delete G.seats[c.seat];
+      if (c.seat && G.seats[c.seat] === c.id) { delete G.seats[c.seat]; G.dirty[c.seat] = 1; }
       walk(G, c, QSPOT(G.queue.length - 1), 'queue');
     }
     // registers: the first in line steps up to a free one
@@ -545,6 +635,23 @@ function dispatch(G, ev) {
         const c = G.cust.find((x) => x.st === 'bill' && !x.billBy);
         if (c) { c.billBy = s.id; startJob(G, s, 'bill', [{ go: P.aisleOf(c.seat) }, { work: BILL, on: 'bill', anim: 'take' }], { cust: c.id }, ev); continue; }
       }
+      // a table to clear (both its seats), nobody on it yet
+      const seat = Object.keys(G.dirty).find((x) => !G.clearing[x]);
+      if (seat) {
+        const [pre, i] = seat.split(':'), room = pre === 'd' ? 'dining' : 'terrace', t = P.TABLES[room][+i];
+        const seats = t.seats.filter((x) => G.dirty[x] && !G.clearing[x]);
+        for (const x of seats) G.clearing[x] = s.id;
+        startJob(G, s, 'clear', [{ go: P.aisleOf(seat) }, { work: clearTime(G), on: 'clear', anim: 'take' }], { seats, table: `${pre}:${i}` }, ev);
+        continue;
+      }
+    }
+    if (s.role === 'courier') {
+      const b = G.bags.find((x) => !x.w);
+      if (b) {
+        b.w = s.id;
+        startJob(G, s, 'deliver', [{ go: 'bagshelf' }, { work: PICK, on: 'pickbag' }, { go: `motor:${s.k % P.MOTORS}` }, { work: rideTime(G), on: 'delivered', anim: 'ride' }], { bag: b.id, order: b.order, dish: b.dish }, ev);
+        continue;
+      }
     }
     if (canCook(G, s)) {
       let i = G.tickets.findIndex((t) => t.vip && !G.stBusy[t.dish]);
@@ -552,9 +659,12 @@ function dispatch(G, ev) {
       if (i >= 0) {
         const t = G.tickets.splice(i, 1)[0], c = custBy(G, t.cust);
         G.stBusy[t.dish] = s.id;
-        // (you, cooking and serving on your own: straight to the table with it)
-        const tail = canServe(G, s) && c ? [{ go: P.aisleOf(c.seat) }, { work: PLACE, on: 'place' }] : [{ work: PLATE, on: 'plate' }];
-        startJob(G, s, 'cook', [{ go: `st:${t.dish}` }, { work: cookTime(G, t.dish), on: 'cooked', anim: 'cook' }, ...tail], { dish: t.dish, cust: t.cust }, ev);
+        // (you, cooking and serving on your own: straight to the table with it; a delivery order: bagged on the shelf in
+        // the courier bay)
+        const o = t.online && G.online.find((x) => x.id === t.online);
+        if (o) o.st = 'cooking';
+        const tail = o ? [{ go: 'bagshelf' }, { work: PLATE, on: 'bag' }] : canServe(G, s) && c ? [{ go: P.aisleOf(c.seat) }, { work: PLACE, on: 'place' }] : [{ work: PLATE, on: 'plate' }];
+        startJob(G, s, 'cook', [{ go: `st:${t.dish}` }, { work: cookTime(G, t.dish), on: 'cooked', anim: 'cook' }, ...tail], { dish: t.dish, cust: t.cust, order: o ? o.id : null }, ev);
         continue;
       }
     }
@@ -658,7 +768,8 @@ function inspected(G, c, ev) {
   const e = G.event;
   if (!e || e.cust !== c.id) return;
   const [a, o] = readiness(G, 'kitchen');
-  const score = 0.6 * (o ? a / o : 0) + 0.4 * (1 - Math.min(1, G.ema.food * 1.5));
+  const seats = 2 * (nTables(G, 'dining') + nTables(G, 'terrace')), dirty = Object.keys(G.dirty).length;
+  const score = 0.5 * (o ? a / o : 0) + 0.3 * (1 - Math.min(1, G.ema.food * 1.5)) + 0.2 * (1 - (seats ? dirty / seats : 0));
   const grade = score >= 0.7 ? 'A' : score >= 0.45 ? 'B' : 'C';
   endEvent(G, e, { ok: grade !== 'C', grade, cash: Math.round(avgBill(G) * { A: 12, B: 5, C: 0 }[grade]), mod: grade === 'A' ? { k: 'walk', x: 1.2, dur: 180, why: 'grade' } : null }, ev);
 }
