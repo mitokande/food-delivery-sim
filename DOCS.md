@@ -1217,3 +1217,12 @@ Denge (bot "plan", 90 dk): ofis Lv 1 5:17, Lv 2 20:08, rampa 29:34, ilk kurye 30
 teslimat, 2.476 masa toplama, 41 görev. Tarayıcı testi 83 kontrol (yeni: kilitli Managers, rampa tamiri, kurye,
 pişirilip çantalanan ve motorla çıkan sipariş, garajdan çıkan motor, ödeme, masa toplama, yöneticiler kartı, işe alma,
 odada duran yönetici, yöneticinin alışverişi, düğmesi).
+
+### 14.4 iOS'ta test (12 Kasım 2026)
+
+Kullanıcı Ferdi's'i iOS'ta da denemek istedi ("lets push this phase to build branch for sending to ios"). Mağaza
+paketinin sayfası artık seçilebilir: `mobile/scripts/build-web.mjs` `APP_PAGE` (`idle3.html` varsayılan, ya da
+`idle4.html`); seçilmeyen oyunun dosyaları pakete girmez. Xcode Cloud'un `ci_post_clone.sh`'ı `APP_PAGE=idle4.html`
+ile derler: `build` dalından TestFlight'a giden iOS sürümleri Ferdi's'tir (ana ekran adı ve ikon yine Idle Restaurant
+Manager). Android ve Mac'te elle `npm run ios` Idle Restaurant Manager'ı paketlemeye devam eder. Geri almak için
+`ci_post_clone.sh`'taki satır çıkarılır. Paket sunucuda çevrimdışı denendi (dışarıya istek yok, hata yok).
