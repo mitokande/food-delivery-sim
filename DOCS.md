@@ -1126,7 +1126,7 @@ Kullanıcı 1. fazı birleştirdi ("pr merged continue phase"). Dal `idle-phase2
   bozuk para + para; üstünde sallanan altın "$X" balonu). Dokununca toplanır. Aynı anda en çok 8 bahşiş; kapalıyken
   toplanmaz.
 - **Posta kutusu:** kapının solunda kaldırımda kırmızı kutu (mektup varken bayrak kalkar, üstünde zarf ve sayı).
-  Mektuplar olaylarla gelir: sağlık müdürlüğü (ofis Lv 1, $40), Mrs. Okafor (150 müşteri, $150), Victor Gristle (Lv 2),
+  Mektuplar olaylarla gelir: sağlık müdürlüğü (ofis Lv 1, $40), Mrs. Okafor (150 müşteri, $150), Victor Gristle (teras açılınca),
   manav Bruno (4 yemek, $1,5K), Old Town Gazette (Lv 3, $4K), Ferdi Amca'nın çekmecedeki notu (Lv 4, $20K), Victor
   yine (Lv 5). Bir dakikadan uzun kapalı kalınca kazanılan para doğrudan nakde değil posta kutusuna gider; "While you
   were away" kartının "Collect $X" düğmesi alır (kart kapanmadan uygulama kapanırsa kutuda bekler).
