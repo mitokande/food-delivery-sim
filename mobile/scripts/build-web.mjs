@@ -22,7 +22,8 @@ const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'ass
 // which the apps never have; Ferdi's, idle4.html, the remake, stays on the web until it replaces idle3)
 const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md',
   'js/idle3/lab.js', 'js/idle3/lab-worker.js', 'js/idle3/labbar.js', 'js/idle3/bot.js', 'css/idle3-lab.css',
-  'js/idle4', 'css/idle4.css', 'assets/story/rival.webp'];
+  'js/idle4', 'css/idle4.css', 'assets/story/rival.webp', 'assets/models/CREDITS-furniture.md',
+  'assets/models/kit-restaurant-bits.glb', 'assets/models/kit-furniture-bits.glb', 'assets/models/kit-furniture.glb'];
 const CDN = /cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com/;
 
 const die = (msg) => { console.error('build-web: ' + msg); process.exit(1); };
