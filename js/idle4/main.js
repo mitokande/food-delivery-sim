@@ -92,6 +92,14 @@ const game = {
     save(); ui.live(); ui.renderRoom();
   },
   openMailbox() { ui.mailbox(); },
+  // pay to have Victor's truck moved on
+  repel() {
+    const ev = [];
+    if (!S.repel(G, ev)) { audio.play('ui-error'); ui.toast('Not enough cash', 'bad'); return; }
+    audio.play('ui-purchase'); buzz(20);
+    for (const e of ev) ui.eventNote(e);
+    save(); ui.live();
+  },
   openRoom(room) {
     if (ui.room === room) { ui.closeRoom(); return; }
     ui.openRoom(room);
@@ -141,6 +149,12 @@ function frame() {
       else if (e.kind === 'order') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.15 }); bellT = 3; } }
       else if (e.kind === 'lost' && e.why !== 'full') audio.play('order-late', { vol: 0.2 });
       else if (e.kind === 'tip') audio.play('pickup-bonus', { vol: 0.25 });
+      else if (e.kind === 'event') {
+        ui.eventNote(e);
+        if (e.on === 'start') { audio.play({ threat: 'siren-short', critic: 'doorbell', star: 'crowd-cheer', inspector: 'notif-order', van: 'horn-moped' }[e.e.kind], { vol: 0.6 }); buzz(30); }
+        else audio.play(e.res.ok ? 'order-complete' : 'order-late', { vol: 0.6 });
+        save();
+      }
       else if (e.kind === 'built') { audio.play('ui-unlock'); setTimeout(() => audio.play('crowd-cheer', { vol: 0.5 }), 400); buzz(40); ui.built(e.room, e.lv); save(); }
     }
   }

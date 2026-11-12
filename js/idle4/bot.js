@@ -42,7 +42,7 @@ const label = (G, p) => {
 // Plays `minutes` from a new game. → { G, marks: { what: s }, buys, mins: [a row a minute], diag, gone }
 export function play(name, minutes) {
   const G = S.fresh();
-  const marks = {}, buys = [], mins = [], diag = {}, gone = [], quests = [];
+  const marks = {}, buys = [], mins = [], diag = {}, gone = [], quests = [], events = [];
   let lastE = 0, tipT = 0;
   for (let t = 0; t < minutes * 60; t += 0.5) {
     for (let q; (q = Q.claim(G));) quests.push({ t: G.t, text: q.text, cash: q.cash });
@@ -55,7 +55,7 @@ export function play(name, minutes) {
       if (key && !(key in marks)) marks[key] = G.t;
       buys.push({ t: G.t, ...p });
     }
-    S.tick(G, 0.5);
+    for (const e of S.tick(G, 0.5)) if (e.kind === 'event' && e.on === 'end') events.push({ t: G.t, kind: e.e.kind, need: e.e.need, ...e.res });
     const k = S.diagnose(G).kind; diag[k] = (diag[k] || 0) + 1;
     if (Math.abs(G.t % 60) < 0.01 || Math.abs((G.t % 60) - 60) < 0.01) {
       const m = Math.round(G.t / 60);
@@ -65,5 +65,5 @@ export function play(name, minutes) {
       lastE = G.stats.earned;
     }
   }
-  return { name, G, marks, buys, mins, diag, gone, quests };
+  return { name, G, marks, buys, mins, diag, gone, quests, events };
 }

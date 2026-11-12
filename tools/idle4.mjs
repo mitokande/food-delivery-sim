@@ -5,6 +5,8 @@
 // (items at their caps, the office first), save + reload, the restaurant running while the game is closed.
 // Phase 2: the quest bar (progress, claim, the next one), tips by the chairs (a tap picks one up), the mailbox (a
 // letter with a gift; the takings of a long absence), the team's cap and the staff room (lockers), the locked features.
+// Phase 3: the clock and the night, the events button (locked before restaurant level 2), Victor's truck (the banner,
+// the camera to it, paying to move it on), a critic with a tag over his head, nothing new while the game is closed.
 //   node tools/idle4.mjs [outdir=tools/shots]   (phone viewport; screenshots idle4-*.png)
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
@@ -50,6 +52,9 @@ check(await ev('document.querySelectorAll("#markers .mk.rlab").length') === 8, '
 check(await ev('document.querySelector("#markers .rl.ruin") && document.querySelectorAll("#markers .rl.soon").length === 1'), 'ruined rooms show a repair price, the courier bay "coming soon"');
 check(await ev('document.querySelector(".quest .qtext").textContent.includes("Hire a cook (0/1)")'), 'the first quest: hire a cook (0/1)');
 check(await ev('document.querySelector(".teamv").textContent') === '0/5', 'the top bar shows the team: 0/5');
+check(/^0[89]:\d\d$/.test(await ev('document.querySelector(".clk").textContent')), 'the clock: morning');
+await page.click('.slot.events'); await wait(300);
+check(await ev('document.querySelector(".slot.events").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Events: opens at restaurant level 2"))'), 'events: locked before restaurant level 2');
 // you do everything: cook, carry, bring the bill
 check(await until('game.G.staff[0].job && game.G.staff[0].job.kind === "cook"', 60000), 'you cook the first order yourself');
 check(await until('game.G.stats.served > 0', 90000), 'and serve it and bring the bill: the first customer paid');
@@ -153,6 +158,24 @@ await wait(1500);
 check(await ev('game.G.cust.length > 8 && game.world.peek().views > 12'), 'a full house: people and staff on screen');
 await shot('6-busy');
 
+// events: Victor's truck (the banner, the camera to it, paying to move it on), a critic
+await ev('(() => { const g = game.G; if (g.rooms.office.lv < 2) g.rooms.office.lv = 2; g.event = null; g.cash = Math.max(g.cash, 1e6); game.S.startEvent(g, "threat"); })()'); await wait(800);
+check(await ev('!document.querySelector(".evbar").hidden && document.querySelector(".evbar").classList.contains("threat") && !document.querySelector(".slot.events").classList.contains("locked")'), 'Victor\'s truck: the banner, the events button open');
+await page.click('.evbar'); await wait(1800);
+check(await ev('game.world.peek().cars[0].on && game.world.peek().cam.z > 22'), 'a tap on the banner: the camera goes to the truck in the street');
+await shot('8-truck');
+await page.click('.slot.events'); await wait(500);
+check(await ev('!!document.querySelector(".modal.eventscard [data-x=repel]")'), 'the events card offers to move it on');
+await shot('8b-events');
+await page.click('.modal.eventscard [data-x="repel"]'); await wait(500);
+check(await ev('!game.G.event && game.G.evLog[0].kind === "threat" && game.G.evLog[0].paid > 0'), 'paid: the truck moves on');
+await ev('game.S.startEvent(game.G, "critic")');
+check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'a critic walks in with a tag over his head');
+// the night
+await ev('(() => { const g = game.G, h = game.S.hourOf(g); g.t += ((23 - h + 24) % 24) / 24 * game.S.DAY.len; })()'); await wait(800);
+check(await ev('game.world.scene.background.getHSL({}).l < 0.25 && document.querySelector(".clk").textContent.startsWith("23")'), 'at 23:00 it is night');
+await shot('8c-night');
+
 // save + reload
 await ev('game.save()');
 const before = await ev('({ rooms: JSON.stringify(game.G.rooms), cash: game.G.cash, served: game.G.stats.served })');
@@ -162,7 +185,8 @@ const after = await ev('({ rooms: JSON.stringify(game.G.rooms), cash: game.G.cas
 check(after.rooms === before.rooms && after.cash >= before.cash - 0.01 && after.served >= before.served, 'save + reload keep the rooms, the cash and the stats');
 check(await ev('!document.querySelector(".modal.story")'), 'no story the second time');
 
-// closed for two hours
+// closed for two hours (an event is due when it closes: nothing new may start while it is)
+await ev('(() => { const g = game.G; g.event = null; g.evNext = g.t; g.evLog.length = 0; g.cust = g.cust.filter((c) => !c.vip); })()');
 await ev('game.save()');
 await boot('idle4.html?away=7200');
 check(await until('!!document.querySelector(".modal.awaycard.in")', 10000), 'two hours away: the card');
@@ -172,6 +196,7 @@ check(held > 0, 'the takings wait in the mailbox');
 await shot('7-away');
 await page.click('.modal.in [data-x="ok"]'); await wait(400);
 check(await ev('game.G.cash') >= c3 + held - 0.01 && !(await ev('game.G.mail.some((m) => m.kind === "away" && !m.read)')), 'Collect: they are in the cash');
+check(await ev('game.G.evLog.length === 0 && !game.G.event'), 'no new event started while the game was closed');
 
 check(!errors.length, 'no errors' + (errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''));
 await browser.close(); server.close();
