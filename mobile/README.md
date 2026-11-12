@@ -8,8 +8,9 @@ the earlier idle prototypes are on the site only. The game itself stays where it
 - `scripts/build-web.mjs` builds `www/` (not in git): the game's files, with what the site loads from CDNs (three.js
   and its addons, the Draco decoder, es-module-shims, the Google fonts in `fonts/`) taken from `node_modules` instead,
   so the apps start and play offline. It stops if anything would still come from a CDN, if the page names a file
-  that isn't in `www/`, or if the game moved to a three.js version this folder doesn't have. To ship another page,
-  change `PAGE` (and `GAME` / `NOT`) at its top.
+  that isn't in `www/`, or if the game moved to a three.js version this folder doesn't have. `APP_PAGE=idle4.html`
+  ships Ferdi's (`../idle4.html`, the remake) instead; the Xcode Cloud builds do that for now (TestFlight testing, from
+  2026-11-12), everything else ships Idle Restaurant Manager.
 - `../js/native.js` is the game's only app-specific code: haptics through the phone (iOS has no `navigator.vibrate`),
   the Android back button (closes the top card, then the open sheet, then the city map, else sends the game to the
   background), a second copy of the save (`fds_idle3_v2`) in the app's own preferences (put back if the web view's
@@ -95,7 +96,9 @@ git push origin main:build
 What the repo holds for it:
 
 - `ios/App/ci_scripts/ci_post_clone.sh` runs on Apple's machine right after the clone: it installs Node 22, then
-  `npm ci` and `npm run ios` (step 1 above). Without it the Swift packages can't resolve, because they are local paths
+  `npm ci` and `npm run ios` (step 1 above), with `APP_PAGE=idle4.html`: the cloud builds are Ferdi's for now. To send
+  Idle Restaurant Manager through Xcode Cloud again, take that line out (or set `APP_PAGE` to `idle3.html` in the
+  workflow's environment). Without it the Swift packages can't resolve, because they are local paths
   into `node_modules`.
 - `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`: the shared scheme `App` (Xcode Cloud only sees shared
   schemes).

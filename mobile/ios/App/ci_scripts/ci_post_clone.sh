@@ -13,4 +13,7 @@ export PATH="$(brew --prefix node@22)/bin:$PATH"
 node --version
 
 npm ci
+# (the iOS builds from here ship Ferdi's, the remake, for testing on TestFlight; the default, Idle Restaurant Manager, is
+# what a build without APP_PAGE ships: Android, and `npm run ios` on the Mac)
+export APP_PAGE="${APP_PAGE:-idle4.html}"
 npm run ios

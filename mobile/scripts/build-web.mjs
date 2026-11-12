@@ -1,11 +1,13 @@
 // Builds mobile/www: the web game as the store apps ship it. The apps are Idle Restaurant Manager, the idle restaurant manager
-// (idle3.html, which becomes the apps' index.html). The game's own files are copied unchanged; what the
+// (idle3.html, which becomes the apps' index.html), or with APP_PAGE=idle4.html its remake, Ferdi's (the iOS builds
+// from Xcode Cloud ship that one for testing: ios/App/ci_scripts/ci_post_clone.sh). The game's own files are copied unchanged; what the
 // site loads from CDNs (three.js and its addons, the Draco decoder, es-module-shims, the Google fonts) comes from
 // node_modules / mobile/fonts instead, so the apps start and play offline. @capacitor/core and @adapty/capacitor join
 // the import map for js/native.js. Anything that changes shape here (idle3.html, the three version, Adapty's build)
 // stops the build instead of shipping a half-offline app.
 //
 //   node scripts/build-web.mjs        (npm run web; npm run android / ios also sync the native projects)
+//   APP_PAGE=idle4.html npm run ios   (Ferdi's instead)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,16 +16,20 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOBILE = path.resolve(HERE, '..'), ROOT = path.resolve(MOBILE, '..'), WWW = path.join(MOBILE, 'www');
 const NM = path.join(MOBILE, 'node_modules');
 // the game's files the page loads (assets/src holds the raw kits the packed GLBs were made from: only a fallback)
-const PAGE = 'idle3.html'; // the apps' game
+// the apps' game, and what only the other one needs (left out)
+const PAGES = {
+  'idle3.html': ['js/idle3/lab.js', 'js/idle3/lab-worker.js', 'js/idle3/labbar.js', 'js/idle3/bot.js', 'css/idle3-lab.css',
+    'js/idle4', 'css/idle4.css', 'assets/story/rival.webp', 'assets/models/CREDITS-furniture.md',
+    'assets/models/kit-restaurant-bits.glb', 'assets/models/kit-furniture-bits.glb', 'assets/models/kit-furniture.glb'],
+  'idle4.html': ['js/idle3', 'css/idle3.css', 'css/idle3-lab.css', 'js/idle4/bot.js'],
+};
+const PAGE = process.env.APP_PAGE || 'idle3.html';
+if (!PAGES[PAGE]) { console.error(`build-web: APP_PAGE must be one of ${Object.keys(PAGES).join(', ')}`); process.exit(1); }
 const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'assets/story'];
 // the site's other games (the courier game's page, the earlier idle prototypes): not in the apps. The courier game's
-// modules stay, the diner is built on them (the city, the sky, the audio, the bikes)
-// (the balance lab, idle3-lab.html, and its playtest bar are tools for the web: main.js loads the bar only with ?lab,
-// which the apps never have; Ferdi's, idle4.html, the remake, stays on the web until it replaces idle3)
-const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md',
-  'js/idle3/lab.js', 'js/idle3/lab-worker.js', 'js/idle3/labbar.js', 'js/idle3/bot.js', 'css/idle3-lab.css',
-  'js/idle4', 'css/idle4.css', 'assets/story/rival.webp', 'assets/models/CREDITS-furniture.md',
-  'assets/models/kit-restaurant-bits.glb', 'assets/models/kit-furniture-bits.glb', 'assets/models/kit-furniture.glb'];
+// modules stay, both idle games are built on them (the city, the sky, the audio, the bikes)
+// (the balance labs and playtest bars are tools for the web)
+const NOT = ['js/main.js', 'js/idle', 'js/idle2', 'css/idle2.css', 'assets/story/CREDITS.md', ...PAGES[PAGE]];
 const CDN = /cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com/;
 
 const die = (msg) => { console.error('build-web: ' + msg); process.exit(1); };
