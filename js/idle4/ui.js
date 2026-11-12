@@ -1,5 +1,6 @@
-// Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level, income, the team, cash), the buttons
-// down the right side (settings, the mailbox, the features still to come, locked), the quest bar at the bottom (one
+// Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level, income, the team, cash), the clock
+// (the rushes), the event on now in a banner under it, the buttons down the right side (settings, the mailbox, the
+// events card, the features still to come, locked), the quest bar at the bottom (one
 // quest at a time: where it takes you, what holds it up, its reward to claim), the room panel that slides up when a
 // room is tapped (what it holds, what to buy, its renovation), the mailbox and its letters, the story cards, the "while
 // you were away" card, settings, toasts. Numbers that change every frame are patched by live(); renderRoom() rebuilds
@@ -27,7 +28,6 @@ const ITEM_ICON = {
 };
 // the features of the later phases, locked for now (the restaurant level they're planned to open at)
 const FEATURES = [
-  { f: 'events', name: 'Events', icon: 'ui-calendar', lv: 2 },
   { f: 'managers', name: 'Managers', icon: 'ui-xp', lv: 3 },
   { f: 'map', name: 'City map', icon: 'ui-pin', lv: 4 },
   { f: 'shop', name: 'Shop', icon: 'ui-gem', lv: 2 },
@@ -90,9 +90,12 @@ export function createUI(game) {
       <button class="res team" data-act="room" data-room="staff" aria-label="The team">${ICON('ui-people')}<b class="teamv">0/5</b></button>
       <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
     </header>
+    <button class="clock" data-act="events" aria-label="The clock"><span class="cic"></span><b class="clk">08:00</b><small class="rush"></small></button>
+    <button class="evbar" data-act="evfocus" hidden></button>
     <nav class="side">
       <button class="slot gear" data-act="settings" aria-label="Settings">${GEAR}</button>
       <button class="slot mail" data-act="mail" aria-label="Mailbox"><span class="sic">${MAIL_ICON}</span><i class="badge" hidden></i><small>Mail</small></button>
+      <button class="slot events locked" data-act="events" aria-label="Events">${ICON('ui-calendar')}<i class="lock">${ICON('ui-lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
       ${FEATURES.map((f) => `<button class="slot locked" data-act="locked" data-f="${f.f}" aria-label="${f.name} (locked)">${ICON(f.icon)}<i class="lock">${ICON('ui-lock')}</i><small>Lv ${f.lv}</small></button>`).join('')}
     </nav>
     <button class="quest" data-act="quest"><span class="qic"></span><span class="qt"><b class="qtext"></b><small class="qhelp"></small><span class="qbar"><u></u></span></span><span class="qr"></span></button>
@@ -189,6 +192,96 @@ export function createUI(game) {
     live();
   }
 
+  // ---------- the day, the events ----------
+  const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60 / 15) * 15).padStart(2, '0')}`;
+  const RUSH = { lunch: 'Lunch rush', dinner: 'Dinner rush', night: 'Night' };
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  const EV = {
+    threat: { icon: '🚚', title: 'Victor\'s truck is coming', cls: 'threat' },
+    critic: { icon: '★', title: 'A food critic is here', cls: 'critic' },
+    star: { icon: '✦', title: 'A celebrity walked in', cls: 'star' },
+    inspector: { icon: '✚', title: 'Health inspection', cls: 'inspector' },
+    van: { icon: '🚐', title: 'A tour van stopped', cls: 'van' },
+  };
+  const MOD = { truck: 'Victor\'s truck outside', review: 'The review', fans: 'Fans', gossip: 'Bad gossip', grade: 'A on the door' };
+  const pctMod = (x) => `${x >= 1 ? '+' : '−'}${Math.round(Math.abs(x - 1) * 100)}% walk-ins`;
+  // the banner's line under the title, for the event on now
+  function evLine(g, e) {
+    if (e.kind === 'threat') { const n = Math.min(e.need, g.stats.served - e.base); return [`Serve ${e.need} before it gets here: <b>${n}/${e.need}</b>`, n / e.need, Math.max(0, e.t0 + e.dur - g.t)]; }
+    const c = g.cust.find((x) => x.id === e.cust);
+    if (e.kind === 'van') return [`${S.EVENTS.van} tourists, all hungry at once`, Math.min(1, (g.t - e.t0) / e.dur), null];
+    if (e.kind === 'inspector') return [c?.st === 'inspect' ? 'Looking round the kitchen…' : 'On the way to the kitchen', c?.st === 'inspect' ? Math.min(1, (g.t - c.t0) / c.dur) : 0, null];
+    const st = !c ? '' : c.st === 'wait' ? `Waiting for the food: ${Math.round(g.t - c.t0)}s` : c.st === 'eat' ? 'Eating…' : c.st === 'bench' ? 'Waiting for a table!' : c.st === 'go' && !c.seat ? 'At the door' : '';
+    return [`${e.kind === 'critic' ? 'Serve them fast: the stars count the seconds' : `Pays ${S.STAR_PAYS}× and tips big; fans follow`}${st ? ` · ${st}` : ''}`, c?.st === 'wait' ? Math.min(1, (g.t - c.t0) / 45) : 0, null];
+  }
+  let evKey = '';
+  function updateEvents(g) {
+    // the clock
+    const h = S.hourOf(g), rush = S.rushOf(g), night = h < 6 || h >= 20.5;
+    const ck = $('.clk', hud), ct = hhmm(h);
+    if (ck.textContent !== ct) { ck.textContent = ct; $('.rush', hud).textContent = RUSH[rush] || ''; $('.clock', hud).className = `clock ${rush || ''}`; $('.cic', hud).innerHTML = ICON(night ? 'ui-moon' : 'ui-sun'); }
+    // the events button
+    const on = S.restaurantLv(g) >= S.EVENT_LV, eb = $('.slot.events', hud);
+    eb.classList.toggle('locked', !on); $('.lock', eb).hidden = on; $('small', eb).textContent = on ? 'Events' : `Lv ${S.EVENT_LV}`;
+    $('.badge', eb).hidden = !g.event;
+    // the banner: the event on now, else a boost or a slump
+    const bar = $('.evbar', hud), e = g.event, mod = g.mods.find((m) => g.t < m.until);
+    if (e) {
+      const [line, f, left] = evLine(g, e), d = EV[e.kind];
+      const k = `${e.id}|${line}|${left == null ? '' : Math.ceil(left)}`;
+      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls}`; bar.innerHTML = `<span class="ei">${d.icon}</span><span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
+      bar.hidden = !!room;
+    } else if (mod) {
+      const k = `m|${mod.why}|${Math.ceil(mod.until - g.t)}`;
+      if (k !== evKey) { evKey = k; bar.className = `evbar mod ${mod.x >= 1 ? 'up' : 'down'}`; bar.innerHTML = `<span class="ei">${mod.x >= 1 ? '▲' : '▼'}</span><span class="et"><b>${MOD[mod.why] || 'Boost'} <i>${mmss(mod.until - g.t)}</i></b><small>${pctMod(mod.x)}</small></span>`; }
+      bar.hidden = !!room;
+    } else bar.hidden = true;
+  }
+  // the events card: the day, what's on, boosts, what happened
+  function eventsCard() {
+    const g = G();
+    if (S.restaurantLv(g) < S.EVENT_LV) { toast(`${ICON('ui-lock')} Events: opens at restaurant level ${S.EVENT_LV}`); sfx('ui-error', { vol: 0.4 }); return; }
+    const h = S.hourOf(g), e = g.event;
+    const segs = [[12, 14.5, 'lunch'], [19, 21.5, 'dinner'], [0, 6, 'night'], [20.5, 24, 'night']].map(([a, b, k]) => `<i class="${k}" style="left:${pct(a / 24)};width:${pct((b - a) / 24)}"></i>`).join('');
+    let now = '<p class="small">Nothing on right now. Something happens every few minutes.</p>';
+    if (e) {
+      const [line] = evLine(g, e), d = EV[e.kind];
+      now = `<div class="evcard ${d.cls}"><b>${d.icon} ${d.title}</b><small>${line}</small>
+        ${e.kind === 'threat' ? `<button class="btn ${g.cash >= e.cost ? 'gold' : ''}" data-x="repel" ${g.cash >= e.cost ? '' : 'disabled'}>Pay to move it on · ${M(e.cost)}</button>` : ''}</div>`;
+    }
+    const mods = g.mods.filter((m) => g.t < m.until).map((m) => `<li class="${m.x >= 1 ? 'up' : 'down'}">${MOD[m.why] || 'Boost'}: ${pctMod(m.x)} · ${mmss(m.until - g.t)}</li>`).join('');
+    const RES = (r) => r.kind === 'threat' ? (r.paid ? `Victor's truck moved on (paid ${M(r.paid)})` : r.ok ? `Victor's truck turned round${r.cash ? ` · +${M(r.cash)}` : ''}` : 'Victor\'s truck parked outside')
+      : r.kind === 'critic' ? `Critic: ${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}${r.cash ? ` · +${M(r.cash)}` : ''}`
+      : r.kind === 'star' ? (r.ok ? 'A celebrity loved it: fans are coming' : 'A celebrity walked out') : r.kind === 'inspector' ? `Inspection: grade ${r.grade}${r.cash ? ` · +${M(r.cash)}` : ''}` : 'A tour van came by';
+    const m = modal(`<h2>${ICON('ui-calendar')} Day ${S.dayOf(g)} · ${hhmm(h)}</h2>
+      <div class="daybar">${segs}<u style="left:${pct(h / 24)}"></u></div>
+      <p class="small daykey"><i class="lunch"></i>Lunch 12–14:30 <i class="dinner"></i>Dinner 19–21:30: twice the people · <i class="night"></i>quiet nights</p>
+      ${now}
+      ${mods ? `<ul class="mods">${mods}</ul>` : ''}
+      ${g.evLog.length ? `<h3>Lately</h3><ul class="evlog">${g.evLog.map((r) => `<li class="${r.ok ? 'ok' : 'no'}">${RES(r)}</li>`).join('')}</ul>` : ''}
+      <button class="btn big" data-x="close">Close</button>`, { cls: 'eventscard', dismiss: true });
+    m.card.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-x="repel"]')) { m.close(); game.repel(); }
+      else if (ev.target.closest('[data-x="close"]')) m.close();
+    });
+    sfx('ui-open', { vol: 0.5 });
+  }
+  // a note when an event starts or ends
+  function eventNote(x) {
+    const d = EV[x.e.kind];
+    if (x.on === 'start') {
+      const t = { threat: 'Victor\'s food truck is on its way! Serve fast to keep your customers', critic: 'A food critic just walked in!', star: 'A celebrity is here!', inspector: 'The health inspector is here', van: 'A tour van just stopped outside!' }[x.e.kind];
+      toast(`<b class="evi">${d.icon}</b> ${t}`, x.e.kind === 'threat' ? 'bad' : 'warn');
+      return;
+    }
+    const r = x.res;
+    const t = x.e.kind === 'threat' ? (r.paid ? 'The truck moved on' : r.ok ? `Victor's truck turned round! +${M(r.cash)}` : 'Victor\'s truck parked across the street…')
+      : x.e.kind === 'critic' ? `The review: ${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}${r.cash ? ` +${M(r.cash)}` : ''}`
+      : x.e.kind === 'star' ? (r.ok ? 'The celebrity loved it: fans are on their way!' : 'The celebrity walked out…')
+      : x.e.kind === 'inspector' ? `Inspection: grade ${r.grade}${r.cash ? ` +${M(r.cash)}` : ''}` : 'The tourists are back on their van';
+    if (x.e.kind !== 'van') toast(`<b class="evi">${d.icon}</b> ${t}`, r.ok ? 'good' : 'bad');
+  }
+
   // ---------- advice: what holds the restaurant back now → [room, text] ----------
   function advice(g) {
     const d = S.diagnose(g).kind;
@@ -224,10 +317,13 @@ export function createUI(game) {
     if (q.k === 'tips') return g.tips.length ? null : ['dining', 'Tips turn up by the chairs: tap them'];
     if (q.k === 'letters') return S.unread(g) ? ['mail', 'Tap the mailbox by the front door'] : null;
     if (q.k === 'served') return advice(g);
+    if (q.k === 'threats') return S.restaurantLv(g) < S.EVENT_LV ? ['office', `Events start at restaurant level ${S.EVENT_LV}`] : g.event?.kind === 'threat' ? ['events', 'Serve fast: the truck is coming!'] : ['events', 'Victor\'s truck comes now and then: be ready'];
+    if (q.k === 'stars') return g.event?.kind === 'critic' ? ['events', 'The critic is here: serve them fast!'] : ['events', 'Critics come now and then: fast food, more stars'];
     return null;
   }
   const QICON = { item: (q) => (q.id?.startsWith('st:') ? DICON(q.id.slice(3)) : ITEM_ICON[q.id] || ICON('ui-star')), lv: () => ICON('ui-building'), served: () => ICON('ui-people'),
-    tips: () => ICON('ui-coin'), letters: () => `<span class="mic">${MAIL_ICON}</span>`, staff: () => ICON('ui-people'), menu: () => ICON('food-burger') };
+    tips: () => ICON('ui-coin'), letters: () => `<span class="mic">${MAIL_ICON}</span>`, staff: () => ICON('ui-people'), menu: () => ICON('food-burger'),
+    threats: () => '<b class="qemo">🚚</b>', stars: () => ICON('ui-star') };
   let questKey = '';
   function updateQuest() {
     const g = G(), q = Q.current(g), [a, n] = Q.progress(g, q), done = a >= n;
@@ -271,6 +367,7 @@ export function createUI(game) {
       if (bd && u) { u.style.width = pct(Math.min(1, (g.t - bd.t0) / Math.max(0.01, bd.dur))); eta.textContent = `${secs(Math.max(0, bd.t0 + bd.dur - g.t))} left`; }
     }
     updateQuest();
+    updateEvents(g);
   }
   let lastMail = -1;
 
@@ -341,7 +438,7 @@ export function createUI(game) {
       <div class="set"><span>Graphics</span><button class="btn sm blue" data-s="quality">${s.quality}</button></div>
       <button class="btn ghost" data-s="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <button class="btn ghost danger" data-s="reset">Start over</button>
-      <p class="small">Prototype: phase 2 of the remake (quests, the staff room, the mailbox, tips). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
+      <p class="small">Prototype: phase 3 of the remake (the day, events). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
       <button class="btn big" data-x="close">Done</button>`, { cls: 'settings', dismiss: true });
     m.card.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
@@ -364,9 +461,12 @@ export function createUI(game) {
     else if (a === 'quest') {
       if (Q.done(G())) game.claimQuest();
       else if (questGo === 'mail') mailbox();
+      else if (questGo === 'events') eventsCard();
       else if (questGo) game.openRoom(questGo);
     }
     else if (a === 'mail') mailbox();
+    else if (a === 'events') eventsCard();
+    else if (a === 'evfocus') { if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'locked') {
       const f = FEATURES.find((x) => x.f === el.dataset.f);
       toast(`${ICON('ui-lock')} ${f.name}: ${S.restaurantLv(G()) < f.lv ? `opens at restaurant level ${f.lv}` : 'coming in a later update'}`);
@@ -380,7 +480,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, away, mailbox, letter, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, away, mailbox, letter, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${ICON('ui-star')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${ICON(s.role === 'cook' ? 'char-male-d' : s.role === 'waiter' ? 'char-female-b' : 'ui-cash')} ${s.name} joins as a ${s.role}!`, 'good'); },
     youFree() { toast(`${ICON('char-male-c')} Nobody needs you on the floor: off to the office!`, 'warn'); },

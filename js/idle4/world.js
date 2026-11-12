@@ -2,7 +2,9 @@
 // room shows: floors and walls per room and level (in ruins at level 0: planks, crates, dust), the furniture the room
 // has bought, the street in front. Everyone in it follows the rules (sim.js) exactly: customers and staff stand at
 // their spots or walk the routes of the floor plan (plan.js) at the times the sim gives. Rooms carry a label with their
-// name, level badge and a green arrow when something in them is affordable; a tap on a room opens it (ui.js).
+// name, level badge and a green arrow when something in them is affordable; a tap on a room opens it (ui.js). The light
+// follows the clock (dusk, night with the lamps and windows lit, dawn); Victor's food truck and the tour van drive up
+// for their events; guests of note (a critic, a star, the inspector) dress the part.
 import * as THREE from 'three';
 import { makeChar, loadKit, getNode } from '../assets.js';
 import { createMarkers } from '../hub.js';
@@ -222,7 +224,7 @@ function wallSegments() {
 // ---------------------------------------------------------------- the view
 export async function createWorld(game, markerEl) {
   const G = () => game.G;
-  await Promise.all([loadKit('food'), loadKit('suburban'), loadKit('roads'), loadKit('rbits'), loadKit('fbits'), loadKit('furniture')]);
+  await Promise.all([loadKit('food'), loadKit('suburban'), loadKit('roads'), loadKit('rbits'), loadKit('fbits'), loadKit('furniture'), loadKit('cars')]);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#9cc3d3');
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 1, 300);
@@ -233,6 +235,10 @@ export async function createWorld(game, markerEl) {
   Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 100 });
   scene.add(sun, sun.target);
   const markers = createMarkers(markerEl, camera);
+  // night: the lamps' glow (additive: nothing at day), lit windows
+  const lampMat = new THREE.MeshBasicMaterial({ color: '#ffe3a0', transparent: true, opacity: 0 });
+  const poolMat = new THREE.MeshBasicMaterial({ color: '#ffcf7a', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const roomGlowMat = new THREE.MeshBasicMaterial({ color: '#ffb35a', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const outside = new THREE.Group(); scene.add(outside);
   const wallsG = new THREE.Group(); scene.add(wallsG);
   const roomsG = new THREE.Group(); scene.add(roomsG);
@@ -256,7 +262,7 @@ export async function createWorld(game, markerEl) {
     const nb = (x, z, w, d, h, col) => {
       box(w, h, d, M(col), x, 0, z, outside);
       box(w + 0.3, 0.3, d + 0.3, M('#7d6f63'), x, h, z, outside);
-      const win = M('#9fc3d6', { emissive: '#3c5a6a', emissiveIntensity: 0.25, roughness: 0.3 });
+      const win = winMat;
       for (let fy = 1.4; fy < h - 1; fy += 2.6) for (let k = -w / 2 + 1.2; k < w / 2 - 0.8; k += 2.2) { if (z < 0) box(1.1, 1.2, 0.05, win, x + k, fy, z + d / 2 + 0.01, outside, false); }
       for (let fy = 1.4; fy < h - 1; fy += 2.6) for (let k = -d / 2 + 1.2; k < d / 2 - 0.8; k += 2.2) { if (x < 0) box(0.05, 1.2, 1.1, win, x + w / 2 + 0.01, fy, z + k, outside, false); }
     };
@@ -265,7 +271,13 @@ export async function createWorld(game, markerEl) {
     // trees and lamps along the pavement, a low wall and a dumpster in the alley
     const put = (kit, name, x, z, s, ry = 0) => { const src = getNode(kit, name); if (!src) return; const n = src.clone(true); n.position.set(x, 0, z); n.scale.multiplyScalar(s); n.rotation.y = ry; n.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); outside.add(n); };
     for (const x of [-6, 9, 24.5, 36]) put('suburban', 'tree-large', x, P.BUILDING.z1 + 3.4, 6.5);
-    for (const x of [1.5, 17, 31]) put('roads', 'light-square', x, P.BUILDING.z1 + 3.7, 6, Math.PI);
+    for (const x of [1.5, 17, 31]) {
+      put('roads', 'light-square', x, P.BUILDING.z1 + 3.7, 6, Math.PI);
+      // (its light at night: a bulb and a pool of light on the pavement)
+      const b = new THREE.Box3().setFromObject(outside.children[outside.children.length - 1]);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), lampMat); bulb.position.set((b.min.x + b.max.x) / 2, b.max.y - 0.35, (b.min.z + b.max.z) / 2); outside.add(bulb);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(2.6, 24), poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(bulb.position.x, 0.02, bulb.position.z); outside.add(pool);
+    }
     box(0.4, 0.6, 22, M('#b7a58c'), P.BUILDING.x1 + 4.2, 0, 11, outside);
     box(1.6, 1.2, 1.0, M('#3f6b4a', { roughness: 0.6 }), P.BUILDING.x1 + 2.2, 0, 1.4, outside);
   }
@@ -321,7 +333,7 @@ export async function createWorld(game, markerEl) {
       }
     }
     // the shop window either side of the front door
-    const glass = M('#cfe8f5', { roughness: 0.1, transparent: true, opacity: 0.35, emissive: '#9fd0ea', emissiveIntensity: 0.15 });
+    const glass = shopMat;
     const fr = M('#5b4636');
     for (const [x0, x1] of [[0.2, 2.1], [3.9, 10.8]]) {
       box(x1 - x0, 1.45, 0.05, glass, (x0 + x1) / 2, WALL.low + 0.1, P.BUILDING.z1, wallsG, false);
@@ -763,7 +775,7 @@ export async function createWorld(game, markerEl) {
     const g = G(), live = new Set();
     for (const c of g.cust) {
       const key = 'c' + c.id; live.add(key);
-      const v = view(key, CHARS[c.ch % CHARS.length]);
+      const v = c.vip ? view(key, VIP_LOOK[c.vip][0], VIP_LOOK[c.vip][1]) : view(key, CHARS[c.ch % CHARS.length]);
       let x, z, ry, anim = 'idle', y = 0;
       if (c.st === 'go') {
         placeOnRoute(c.a, c.b, c.t0, c.dur, tmp); [x, z, ry] = tmp; anim = 'walk';
@@ -772,9 +784,14 @@ export async function createWorld(game, markerEl) {
         const sp = P.SPOTS[spotId] || P.SPOTS.front;
         x = sp.x; z = sp.z; ry = sp.ry;
         if (sp.sit) { anim = c.st === 'eat' && v.c?.actions['sit-eat'] ? 'sit-eat' : 'sit'; y = (spotId[0] === 'b' ? 0.27 : H.seat) + SIT.y; x -= Math.sin(ry) * SIT.back; z -= Math.cos(ry) * SIT.back; }
-        else if (c.st === 'pay') anim = 'interact-right';
+        else if (c.st === 'pay' || c.st === 'inspect') anim = 'interact-right';
       }
       setPose(v, x, z, ry, anim, y, dt, snap);
+      // a guest of note wears a name tag over their head
+      if (c.vip) {
+        if (!v.tag) { v.tag = markers.add({ x: v.x, y: 2.75, z: v.z, cls: 'mk viptag', html: `<span class="vt ${c.vip}">${VIP_LOOK[c.vip][2]}</span>` }); v.tag.el.style.pointerEvents = 'none'; }
+        v.tag.pos.set(v.x, 2.75, v.z);
+      }
       // the order in a bubble with the patience running out; a coin when they want to pay at the table
       if (c.st === 'wait') {
         const p = Math.min(1, (g.t - c.t0) / S.PATIENCE.food);
@@ -798,9 +815,15 @@ export async function createWorld(game, markerEl) {
         }
       }
     }
-    for (const [key, v] of views) if (key[0] === 'c' && !live.has(key)) { views.delete(key); v.gone = true; freeChar(v.c); unbubble(v); if (v.plate) v.plate.removeFromParent(); }
+    for (const [key, v] of views) if (key[0] === 'c' && !live.has(key)) { views.delete(key); v.gone = true; freeChar(v.c); unbubble(v); if (v.plate) v.plate.removeFromParent(); if (v.tag) dropMk(v.tag); }
   }
 
+  // guests of note: [character, their look, the tag over their head]
+  const VIP_LOOK = {
+    critic: ['male-f', (v, c) => { const b = new THREE.Group(); const top = new THREE.Mesh(cylGeo(0.2, 0.22, 0.07, 16), M('#1d1d24', { roughness: 0.9 })); top.scale.set(1, 1, 0.92); top.rotation.z = -0.18; b.add(top); const st = new THREE.Mesh(cylGeo(0.02, 0.02, 0.05, 6), M('#1d1d24')); st.position.y = 0.05; b.add(st); b.position.set(0.02, 0.38, 0); c.head?.add(b); }, '★ Critic'],
+    star: ['female-e', (v, c) => { const gl = new THREE.Group(); for (const sx of [-1, 1]) { const l = new THREE.Mesh(boxGeo(0.13, 0.08, 0.03), M('#111318', { roughness: 0.2, metalness: 0.5 })); l.position.set(sx * 0.085, 0.2, 0.2); gl.add(l); } const br = new THREE.Mesh(boxGeo(0.06, 0.02, 0.02), M('#d4a640', { metalness: 0.7 })); br.position.set(0, 0.22, 0.2); gl.add(br); c.head?.add(gl); }, '✦ Star'],
+    inspector: ['male-b', (v, c) => { const h = hat('cap', '#f2f2ee'); h.position.set(0, 0.36, 0.02); c.head?.add(h); const cb = new THREE.Mesh(boxGeo(0.2, 0.26, 0.02), M('#8a5a3c')); cb.scale.setScalar(1 / CH); cb.position.set(0.09, 0.28, 0.09); cb.rotation.x = -0.5; c.obj.add(cb); }, '✚ Inspector'],
+  };
   const ROLE_LOOK = {
     you: (v, c) => { const h = hat('chef', '#e2382b'); h.position.set(0, 0.4, 0.02); c.head?.add(h); v.hat = h; },
     cook: (v, c) => { const h = hat('chef'); h.position.set(0, 0.4, 0.02); c.head?.add(h); },
@@ -876,6 +899,75 @@ export async function createWorld(game, markerEl) {
       m.position.set(P.STATION_X(i) - 0.35 + ((k - 1) % 3) * 0.35, H.counter + 0.07, P.PASS.z + (k > 3 ? 0.15 : 0));
     }
     for (const [id, m] of passPlates) if (!live.has(id)) { m.removeFromParent(); passPlates.delete(id); }
+  }
+
+  // ---------- the light: day, dusk, night, dawn (from the clock) ----------
+  const C = (h) => new THREE.Color(h);
+  const SKY = { day: C('#9cc3d3'), dusk: C('#e9a27a'), night: C('#1d2742') };
+  const HEMI = { day: C('#fff6ea'), dusk: C('#ffd2a8'), night: C('#a8b0e0') }, SUN = { day: C('#fff0d8'), dusk: C('#ffae6a'), night: C('#a9b8ff') };
+  const winMat = M('#9fc3d6', { emissive: '#3c5a6a', emissiveIntensity: 0.25, roughness: 0.3 }), shopMat = M('#cfe8f5', { roughness: 0.1, transparent: true, opacity: 0.35, emissive: '#9fd0ea', emissiveIntensity: 0.15 });
+  const roomGlow = new THREE.Group(); scene.add(roomGlow);
+  for (const id of S.ROOM_IDS) {
+    const R = P.ROOMS[id]; if (R.outdoor) continue;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(R.x1 - R.x0 - 0.4, R.z1 - R.z0 - 0.4), roomGlowMat); m.rotation.x = -Math.PI / 2; m.position.set((R.x0 + R.x1) / 2, 0.03, (R.z0 + R.z1) / 2); m.userData.room = id; m.renderOrder = 1; roomGlow.add(m);
+  }
+  const tmpC = new THREE.Color();
+  // → { day: 0..1 (sun up), dusk: 0..1 (the warm hour either end of the day) }
+  function daylight(h) {
+    const up = h < 6 || h > 20.5 ? 0 : h < 8 ? (h - 6) / 2 : h > 18.5 ? (20.5 - h) / 2 : 1;
+    const dusk = Math.max(0, 1 - Math.abs(h - 7) / 1.4, 1 - Math.abs(h - 19.6) / 1.6);
+    return { day: up, dusk: Math.min(1, dusk) };
+  }
+  let lastH = -1;
+  function lightTick() {
+    const h = S.hourOf(G());
+    if (Math.abs(h - lastH) < 0.02) return; lastH = h;
+    const { day, dusk } = daylight(h), night = 1 - day;
+    const mix = (o) => tmpC.copy(o.night).lerp(o.day, day).lerp(o.dusk, dusk * 0.7);
+    scene.background.copy(mix(SKY));
+    hemi.color.copy(mix(HEMI)); hemi.intensity = 1.25 + 0.45 * day;
+    sun.color.copy(mix(SUN)); sun.intensity = 0.6 + 1.8 * day;
+    winMat.emissive.set(night > 0.5 ? '#ffcf7a' : '#3c5a6a'); winMat.emissiveIntensity = 0.25 + night * 0.9;
+    shopMat.emissive.set(night > 0.5 ? '#ffd28a' : '#9fd0ea'); shopMat.emissiveIntensity = 0.15 + night * 0.7;
+    lampMat.opacity = night; poolMat.opacity = night * 0.35;
+    roomGlowMat.opacity = night * 0.32;
+    for (const m of roomGlow.children) m.visible = lvNow(m.userData.room) > 0;
+  }
+
+  // ---------- Victor's food truck (a threat: on its way; failed: parked across the street), the tour van ----------
+  function vehicle(name, len, tint, sign) {
+    const src = getNode('cars', name), g = new THREE.Group();
+    if (!src) return g;
+    const n = src.clone(true), b = new THREE.Box3().setFromObject(src), k = len / (b.max.z - b.min.z);
+    n.scale.setScalar(k);
+    n.traverse((o) => { if (o.isMesh) { o.castShadow = true; if (tint) { o.material = o.material.clone(); o.material.color.set(tint); } } });
+    g.add(n); g.visible = false; scene.add(g);
+    if (sign) {
+      const tex = canvasTex(256, 64, (c, W, Hh) => { c.fillStyle = '#ffcf3f'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#b3201a'; c.font = 'bold 38px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(sign, W / 2, Hh / 2 + 2); });
+      for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(len * 0.62, len * 0.17), new THREE.MeshBasicMaterial({ map: tex })); p.position.set(sx * (b.max.x * k + 0.03), b.max.y * k * 0.6, -len * 0.12); p.rotation.y = sx * Math.PI / 2; g.add(p); }
+    }
+    return g;
+  }
+  const truck = vehicle('delivery', 5.6, null, 'GRISTLE BURGER');
+  { const bg = food('burger', 1.3); bg.position.set(0, 2.9, -0.5); truck.add(bg); }
+  const van = vehicle('van', 4.6, null, null);
+  const LANE = { near: P.BUILDING.z1 + 6.3, far: P.BUILDING.z1 + 11.0 };
+  const cars = [{ g: truck, x: -40, tx: -40 }, { g: van, x: 50, tx: 50 }];
+  function vehiclesTick(dt) {
+    const g = G(), e = g.event;
+    // the truck: coming closer while the clock runs; parked across the street while it takes people away; gone else
+    const tm = g.mods.find((m) => m.why === 'truck' && g.t < m.until);
+    if (e?.kind === 'threat') { const f = Math.min(1, (g.t - e.t0) / e.dur); cars[0].tx = 30 - f * 20; cars[0].z = LANE.far; }
+    else if (tm) { cars[0].tx = 8; cars[0].z = LANE.far; }
+    else cars[0].tx = -40;
+    cars[1].tx = e?.kind === 'van' ? 13.5 : -40; cars[1].z = LANE.near;
+    for (const c of cars) {
+      const d = c.tx - c.x, v = Math.abs(d) > 30 ? 40 : 14;
+      if (!c.g.visible && c.tx > -39) { c.x = 50; c.g.visible = true; }
+      c.x += Math.sign(d) * Math.min(Math.abs(d), v * dt);
+      if (c.g.visible && c.tx <= -39 && c.x <= -39) c.g.visible = false;
+      c.g.position.set(c.x, 0, c.z ?? LANE.near); c.g.rotation.y = -Math.PI / 2;
+    }
   }
 
   // ---------- tips by the chairs (a tap picks one up) ----------
@@ -1047,6 +1139,17 @@ export async function createWorld(game, markerEl) {
     cam.shift += (cam.tshift - cam.shift) * (1 - Math.exp(-dt * 8));
     applyCam();
   }
+  // the camera to what an event is about: the truck or the van in the street, the guest of note → true if there's one
+  function focusEvent() {
+    const g = G(), e = g.event;
+    let at = null;
+    if (e?.kind === 'threat' || (!e && g.mods.some((m) => m.why === 'truck' && g.t < m.until))) at = [Math.max(2, Math.min(28, cars[0].tx)), 27];
+    else if (e?.kind === 'van') at = [cars[1].tx, 26];
+    else if (e?.cust) { const v = views.get('c' + e.cust); if (v) at = [v.x, v.z]; }
+    if (!at) return false;
+    cam.aim = at; cam.tvh = Math.min(cam.tvh, 24); cam.vx = cam.vz = 0;
+    return true;
+  }
   function focus(room, zoom) {
     const R = P.ROOMS[room];
     cam.aim = [(R.x0 + R.x1) / 2, (R.z0 + R.z1) / 2];
@@ -1065,6 +1168,8 @@ export async function createWorld(game, markerEl) {
     syncPass();
     syncTips();
     syncMailbox(dt);
+    lightTick();
+    vehiclesTick(dt);
     syncLabels();
     fullT -= dt;
     popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt); tipsTick(dt);
@@ -1079,11 +1184,11 @@ export async function createWorld(game, markerEl) {
   cam.vh = cam.tvh = defaultVh();
   applyCam();
   return {
-    scene, camera, update, event, focus, snap, markers,
+    scene, camera, update, event, focus, focusEvent, snap, markers,
     setShift(px) { cam.tshift = px; },
     resize(w, h) { W = w; Hh = h; applyCam(); },
     rebuildWalls: buildWalls,
-    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size }),
+    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size, cars: cars.map((c) => ({ x: +c.x.toFixed(1), tx: c.tx, z: c.z, on: c.g.visible, kids: c.g.children.length })) }),
     // where a thing is on screen (px), for the tests: a tip, the mailbox
     screenOf(what) { const p = what === 'mailbox' ? [MAILBOX.x, 1.2, MAILBOX.z] : (() => { const v = tipViews.get(what); return v ? [v.x, 0.1, v.z] : null; })(); if (!p) return null; const v = new THREE.Vector3(...p).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * Hh]; },
   };

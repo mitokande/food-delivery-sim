@@ -8,6 +8,8 @@
 // level is the restaurant's level: no other room can be more than one level above it. The staff room's lockers set how
 // many people can work here. Customers sometimes leave a tip by their chair, to be picked up (a tap). What the place
 // earns while the game is closed waits in the mailbox, with the letters people send. A chain of quests leads the way.
+// The day goes round (a lunch and a dinner rush, quiet nights), and from restaurant level 2 things happen: Victor's food
+// truck threatens to park outside, a food critic, a celebrity or the health inspector walks in, a tour van stops.
 // Pure: no DOM, no three.js. G is plain JSON (the save). Every walk is timed on the floor plan's routes (plan.js), the
 // same ones the view walks the characters along.
 import * as P from './plan.js';
@@ -111,7 +113,7 @@ export const STAFF_BASE = 5;
 const HIRE = { cooks: 'cook', waiters: 'waiter', registers: 'cashier' };
 // tips: the chance a paying customer leaves one by their chair (× uniforms), its share of the bill; at most this many
 // lie about at a time
-export const TIPS = { chance: 0.12, share: 0.4, max: 8 };
+export const TIPS = { chance: 0.12, share: 0.4, max: 6 };
 
 // ---------------------------------------------------------------- people
 export const WALK = { rate: 8, variety: 0.12, appeal: 0.03 }; // walk-ins a minute (× sign, flyers, dishes, room levels)
@@ -133,12 +135,13 @@ export function fresh(keep = {}) {
     seats: {}, benches: {}, // seat / bench id → customer id
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
     acc: { walk: 0.7 },
-    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0 },
+    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0 },
     sold: {},
     tips: [], // { id, seat, amount }
     mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
     quest: { i: 0 }, sent: {}, // (the quest you're on; the letters already sent)
-    ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0 },
+    event: null, evNext: null, evLog: [], mods: [], quiet: false, // (the event on now, when the next comes, the last few; boosts and slumps)
+    ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0, srv: 0 }, // (srv: customers paid a second)
     settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
     seen: {},
     ...keep,
@@ -182,7 +185,25 @@ export const stPrice = (L) => Math.pow(1 + STEP.stPrice, Math.max(0, L - 1));
 export const stTime = (dish, L) => DISH[dish].time * Math.pow(STEP.stSpeed, Math.max(0, L - 1));
 export const variety = (G) => 1 + WALK.variety * (menu(G).length - 1);
 export const appeal = (G) => { let s = 0; for (const id of ROOM_IDS) if (id !== 'staff') s += G.rooms[id].lv; return 1 + WALK.appeal * Math.max(0, s - 2); }; // (the rooms customers see)
-export const walkRate = (G) => WALK.rate * step(G, 'entrance', 'sign') * step(G, 'office', 'ads') * variety(G) * appeal(G); // a minute
+export const walkRate = (G) => WALK.rate * step(G, 'entrance', 'sign') * step(G, 'office', 'ads') * variety(G) * appeal(G) * dayK(G) * modK(G, 'walk'); // a minute
+
+// ---------------------------------------------------------------- the day
+// A day is DAY.len seconds of game time; the clock starts at 08:00. People come in waves: a lunch and a dinner rush,
+// a quiet night (the curve averages out at 1 over the day).
+export const DAY = { len: 720, start: 8 };
+const CURVE = [[0, 0.5], [5, 0.45], [8, 0.8], [11, 0.85], [12, 1.8], [14, 1.5], [15, 0.95], [18, 1.05], [19, 1.9], [21, 1.5], [22.5, 0.8], [24, 0.5]];
+function curveAt(h) {
+  for (let i = 1; i < CURVE.length; i++) if (h <= CURVE[i][0]) { const [h0, a] = CURVE[i - 1], [h1, b] = CURVE[i]; return a + (b - a) * (h - h0) / (h1 - h0); }
+  return CURVE[0][1];
+}
+const CURVE_AVG = (() => { let a = 0; for (let i = 0; i < 480; i++) a += curveAt(i / 20); return a / 480; })();
+export const hourOf = (G, t = G.t) => (DAY.start + t / DAY.len * 24) % 24;
+export const dayOf = (G) => 1 + Math.floor((DAY.start + G.t / DAY.len * 24) / 24);
+export const dayK = (G, t = G.t) => curveAt(hourOf(G, t)) / CURVE_AVG;
+export function rushOf(G) { const h = hourOf(G); return h >= 12 && h < 14.5 ? 'lunch' : h >= 19 && h < 21.5 ? 'dinner' : h < 6 ? 'night' : null; }
+// boosts and slumps for a while (a good review, the food truck outside): { k: 'walk', x, until, why }
+export const modK = (G, k) => { let x = 1; for (const m of G.mods) if (m.k === k && G.t < m.until) x *= m.x; return x; };
+export const avgBill = (G) => (G.stats.served > 10 ? G.stats.earned / G.stats.served : 10);
 export const trainK = (G) => step(G, 'office', 'training');
 export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * step(G, 'staff', 'coffee') * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') : 1);
 export const staffCount = (G) => G.staff.length - 1; // (not you)
@@ -334,7 +355,7 @@ function happen(G, s, j, on, ev) {
   if (on === 'plate') { // (on the pass in front of the station, if the customer is still there)
     s.carry = null;
     const c = custBy(G, j.cust);
-    if (c && c.st === 'wait') G.pass.push({ id: G.seq++, dish: j.dish, cust: c.id, t0: G.t, w: null });
+    if (c && c.st === 'wait') G.pass.push({ id: G.seq++, dish: j.dish, cust: c.id, t0: G.t, w: null, vip: !!c.vip });
     else ev.push({ kind: 'wasted', dish: j.dish });
     return;
   }
@@ -343,6 +364,7 @@ function happen(G, s, j, on, ev) {
     s.carry = null;
     const c = custBy(G, j.cust);
     if (!c || c.st !== 'wait') { ev.push({ kind: 'wasted', dish: j.dish }); return; }
+    if (c.vip) c.stars = starsFor(G.t - c.t0);
     c.st = 'eat'; c.t0 = G.t; c.dur = EAT;
     ev.push({ kind: 'served', cust: c.id, dish: j.dish, seat: c.seat, by: s.id });
     return;
@@ -351,6 +373,14 @@ function happen(G, s, j, on, ev) {
 }
 
 // ---------------------------------------------------------------- customers
+// someone walks in off the street (from the left, or the right); vip: 'critic' | 'star' | 'inspector' (events)
+function spawn(G, left, vip = null, at = null) {
+  const c = { id: G.seq++, ch: Math.floor(rnd(G) * 1000), at: at || (left ? 'spawnL' : 'spawnR'), exit: rnd(G) < 0.6 ? 'spawnR' : 'spawnL', st: 'go', seat: null, bench: null, dish: null, reg: null, mood: null, vip };
+  if (!left && c.exit === 'spawnR') c.exit = 'spawnL';
+  G.cust.push(c); G.stats.walkins++;
+  walk(G, c, vip === 'inspector' ? 'inspect' : 'front', vip === 'inspector' ? 'inspect' : 'door');
+  return c;
+}
 function walk(G, c, b, then) { c.a = c.at; c.b = b; c.st = 'go'; c.then = then; c.t0 = G.t; c.dur = P.dist(c.at, b) / SPEED.customer; }
 function seatFree(G) {
   // an empty table first (dining hall, then terrace), else the other chair of a table
@@ -376,16 +406,19 @@ function leaveSeat(G, c, lost) {
 function lose(G, c, ev, why) {
   G.stats.lost++;
   ev.push({ kind: 'lost', cust: c.id, why, at: c.at });
+  if (c.vip) guestLeft(G, c, 1, ev);
 }
 function paid(G, c, atRegister, ev) {
-  const amount = Math.round(priceOf(G, c.dish, seatRoom(c.seat), atRegister) * 10) / 10;
+  const amount = Math.round(priceOf(G, c.dish, seatRoom(c.seat), atRegister) * (c.vip === 'star' ? STAR_PAYS : 1) * 10) / 10;
   G.cash += amount; G.stats.earned += amount; G.stats.served++; G.sold[c.dish] = (G.sold[c.dish] || 0) + 1;
   ev.push({ kind: 'paid', cust: c.id, amount, at: c.at, dish: c.dish });
-  // a tip by the chair, now and then
-  if (c.seat && G.tips.length < TIPS.max && rnd(G) < tipChance(G)) {
-    const t = { id: G.seq++, seat: c.seat, amount: Math.max(1, Math.round(amount * TIPS.share)) };
+  G.acc.srv = (G.acc.srv || 0) + 1;
+  // a tip by the chair, now and then (a star always leaves one, as big as the bill)
+  if (c.seat && (c.vip === 'star' || (G.tips.length < TIPS.max && rnd(G) < tipChance(G)))) {
+    const t = { id: G.seq++, seat: c.seat, amount: Math.max(1, Math.round(amount * (c.vip === 'star' ? 1 : TIPS.share))) };
     G.tips.push(t); ev.push({ kind: 'tip', tip: t.id });
   }
+  if (c.vip) guestLeft(G, c, c.stars || 3, ev);
 }
 // picking a tip up → its amount (0 if it's gone)
 export function collectTip(G, id) {
@@ -410,11 +443,12 @@ function arrive(G, c, ev) {
   if (then === 'sit') {
     const m = menu(G), dish = m[Math.floor(rnd(G) * m.length)];
     c.st = 'wait'; c.t0 = G.t; c.dish = dish;
-    G.tickets.push({ id: G.seq++, dish, cust: c.id, t0: G.t });
+    G.tickets.push({ id: G.seq++, dish, cust: c.id, t0: G.t, vip: !!c.vip });
     ev.push({ kind: 'order', cust: c.id, dish });
     return;
   }
   if (then === 'queue') { c.st = 'queue'; c.t0 = G.t; return; }
+  if (then === 'inspect') { c.st = 'inspect'; c.t0 = G.t; c.dur = INSPECT; return; }
   if (then === 'pay') { c.st = 'pay'; c.t0 = G.t; c.dur = checkoutTime(G); const s = G.staff.find((x) => x.role === 'cashier' && x.k === c.reg); if (s) { s.st = 'work'; s.t0 = G.t; s.dur = c.dur; s.anim = 'work'; } return; }
   if (then === 'gone') c.st = 'gone';
 }
@@ -434,14 +468,7 @@ function stepSim(G, dt, ev) {
   settleBuild(G, ev);
   // 1. people walk in off the street (from the left mostly) and decide at the door
   G.acc.walk += walkRate(G) / 60 * dt * (0.5 + rnd(G));
-  while (G.acc.walk >= 1) {
-    G.acc.walk -= 1;
-    const left = rnd(G) < 0.7;
-    const c = { id: G.seq++, ch: Math.floor(rnd(G) * 1000), at: left ? 'spawnL' : 'spawnR', exit: rnd(G) < 0.6 ? 'spawnR' : 'spawnL', st: 'go', seat: null, bench: null, dish: null, reg: null, mood: null };
-    if (!left && c.exit === 'spawnR') c.exit = 'spawnL';
-    G.cust.push(c); G.stats.walkins++;
-    walk(G, c, 'front', 'door');
-  }
+  while (G.acc.walk >= 1) { G.acc.walk -= 1; spawn(G, rnd(G) < 0.7); }
   // 2. customers: arrive where they walked to; give up waiting; finish eating
   for (const c of G.cust) {
     if (c.st === 'go') { if (G.t >= c.t0 + c.dur) arrive(G, c, ev); continue; }
@@ -452,6 +479,7 @@ function stepSim(G, dt, ev) {
       const k = G.pass.findIndex((p) => p.cust === c.id); if (k >= 0) G.pass.splice(k, 1);
       lose(G, c, ev, 'food'); leaveSeat(G, c, true);
     } else if (c.st === 'eat' && G.t >= c.t0 + c.dur) { c.st = 'bill'; c.t0 = G.t; }
+    else if (c.st === 'inspect' && G.t >= c.t0 + c.dur) { inspected(G, c, ev); c.mood = 'happy'; walk(G, c, c.exit, 'gone'); }
     else if (c.st === 'pay' && G.t >= c.t0 + c.dur) {
       paid(G, c, true, ev); G.regs[c.reg] = null;
       const s = G.staff.find((x) => x.role === 'cashier' && x.k === c.reg); if (s && s.st === 'work') { s.st = 'idle'; s.t0 = G.t; }
@@ -459,7 +487,7 @@ function stepSim(G, dt, ev) {
     }
   }
   // waiting on a bench → the first free seat (longest waiting first)
-  const benchers = G.cust.filter((c) => c.st === 'bench').sort((a, b) => a.t0 - b.t0);
+  const benchers = G.cust.filter((c) => c.st === 'bench').sort((a, b) => (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || a.t0 - b.t0);
   for (const c of benchers) { const seat = seatFree(G); if (!seat) break; delete G.benches[c.bench]; c.bench = null; sitDown(G, c, seat); }
   // done eating: to the line at the cashier (if there's room in it), else wait for the bill at the table
   if (cashierOpen(G)) {
@@ -484,9 +512,11 @@ function stepSim(G, dt, ev) {
     if (s.job && (s.st === 'go' || s.st === 'work') && G.t >= s.t0 + s.dur) stepDone(G, s, ev);
   }
   dispatch(G, ev);
-  // 4. renovation done? the post?
+  // 4. renovation done? the post? an event?
   settleBuild(G, ev);
   post(G);
+  events(G, ev);
+  if (G.mods.length && G.mods.some((m) => G.t >= m.until)) G.mods = G.mods.filter((m) => G.t < m.until);
   // 5. running measures (what holds the place back)
   const k = Math.min(1, dt / 12);
   const waiting = G.cust.filter((c) => c.st === 'wait').length;
@@ -496,6 +526,7 @@ function stepSim(G, dt, ev) {
   em('seats', G.cust.some((c) => c.st === 'bench') || ev.some((e) => e.kind === 'lost' && e.why === 'full'));
   em('pay', G.cust.filter((c) => c.st === 'bill').length >= 2 || G.queue.length >= QMAX - 1);
   em('quiet', !waiting && !G.tickets.length && Object.keys(G.seats).length < 2 * (nTables(G, 'dining') + nTables(G, 'terrace')) - 1);
+  G.ema.srv += ((G.acc.srv || 0) / dt - G.ema.srv) * Math.min(1, dt / 90); G.acc.srv = 0;
 }
 
 function dispatch(G, ev) {
@@ -503,7 +534,7 @@ function dispatch(G, ev) {
   for (const s of free) {
     // waiters first carry plates, then bring bills; cooks take the oldest ticket whose station is free
     if (canServe(G, s)) {
-      const p = G.pass.find((x) => !x.w);
+      const p = G.pass.find((x) => !x.w && x.vip) || G.pass.find((x) => !x.w); // (a guest of note first)
       if (p) {
         const c = custBy(G, p.cust);
         p.w = s.id;
@@ -516,7 +547,8 @@ function dispatch(G, ev) {
       }
     }
     if (canCook(G, s)) {
-      const i = G.tickets.findIndex((t) => !G.stBusy[t.dish]);
+      let i = G.tickets.findIndex((t) => t.vip && !G.stBusy[t.dish]);
+      if (i < 0) i = G.tickets.findIndex((t) => !G.stBusy[t.dish]);
       if (i >= 0) {
         const t = G.tickets.splice(i, 1)[0], c = custBy(G, t.cust);
         G.stBusy[t.dish] = s.id;
@@ -536,9 +568,106 @@ function dispatch(G, ev) {
 // 'food' (tables wait for their food: the kitchen), 'plates' (plates wait on the pass: waiters), 'seats' (people wait
 // for a table or walk past), 'pay' (people wait to pay), 'quiet' (empty tables: bring people in), 'ok'
 export function diagnose(G) {
-  const c = Object.entries(G.ema).map(([k, v]) => [k, k === 'quiet' ? v * 0.8 : v]).filter((x) => x[1] > 0.45);
+  const c = Object.entries(G.ema).filter(([k]) => k !== 'srv').map(([k, v]) => [k, k === 'quiet' ? v * 0.8 : v]).filter((x) => x[1] > 0.45);
   c.sort((a, b) => b[1] - a[1]);
   return { kind: c.length ? c[0][0] : 'ok' };
+}
+
+// ---------------------------------------------------------------- events (from restaurant level EVENT_LV)
+// Every few minutes something happens, one thing at a time:
+// - threat: Victor's food truck is on its way; serve `need` customers before it gets here (`dur`) and it turns round
+//   (a reward), else it parks across the street and takes people away for a while. Or pay to have it moved on.
+// - critic: a food critic walks in; how fast the food comes decides the stars, and the review brings people in (or
+//   keeps them away).
+// - star: a celebrity; pays STAR_PAYS times the price, always tips the whole bill, and fans follow.
+// - inspector: the health inspector looks round the kitchen (how far it's upgraded, whether orders pile up): a grade.
+// - van: a tour van stops at the door and a group of tourists comes in at once.
+export const EVENT_LV = 2;
+export const EVENTS = { first: 45, gap: [240, 420], threat: 180, van: 8 };
+export const STAR_PAYS = 5, INSPECT = 14;
+const WEIGHT = { threat: 3, critic: 2, van: 2, star: 1.5, inspector: 1.5 };
+export const starsFor = (waited) => (waited <= 20 ? 5 : waited <= 30 ? 4 : waited <= 45 ? 3 : 2); // (s from the order to the plate)
+function events(G, ev) {
+  if (officeLv(G) < EVENT_LV) return;
+  if (G.event) { eventTick(G, G.event, ev); return; }
+  if (G.evNext == null) G.evNext = G.t + EVENTS.first;
+  if (G.t >= G.evNext && !G.quiet) startEvent(G, pickEvent(G), ev);
+}
+function pickEvent(G) {
+  // the first one is Victor's truck, the second a critic; then at random (not the same twice in a row; more
+  // trucks until one is driven off, more critics until a 4-star review)
+  const n = G.evLog.length + (G.evDone || 0);
+  if (!n) return 'threat';
+  if (n === 1) return 'critic';
+  const last = G.evLog[0]?.kind, w = { ...WEIGHT };
+  if (!G.stats.threats) w.threat *= 3;
+  if (G.stats.stars < 4) w.critic *= 2;
+  if (last) w[last] = 0;
+  const sum = Object.values(w).reduce((a, b) => a + b, 0);
+  let r = rnd(G) * sum;
+  for (const k in w) { r -= w[k]; if (r <= 0) return k; }
+  return 'van';
+}
+export function startEvent(G, kind, ev = []) {
+  const e = { id: G.seq++, kind, t0: G.t, dur: 0 };
+  if (kind === 'threat') {
+    // the target: the customers the place serves at this rate in the time, a little more, with the rushes to come
+    e.dur = EVENTS.threat;
+    let k = 0; for (let i = 0; i < 12; i++) k += dayK(G, G.t + (i + 0.5) * e.dur / 12);
+    e.need = Math.max(8, Math.round(G.ema.srv * e.dur * 1.05 * (k / 12) / Math.max(0.3, dayK(G))));
+    e.base = G.stats.served;
+    e.cost = Math.round(avgBill(G) * e.need * 0.5);
+  } else if (kind === 'van') { e.dur = 45; e.left = EVENTS.van; e.next = G.t + 3; }
+  else e.cust = spawn(G, rnd(G) < 0.6, kind).id;
+  G.event = e;
+  ev.push({ kind: 'event', on: 'start', e });
+  return e;
+}
+function eventTick(G, e, ev) {
+  if (e.kind === 'threat') {
+    if (G.stats.served - e.base >= e.need) { G.stats.threats++; endEvent(G, e, { ok: true, cash: Math.round(avgBill(G) * e.need * 0.6) }, ev); }
+    else if (G.t >= e.t0 + e.dur) endEvent(G, e, { ok: false, mod: { k: 'walk', x: 0.65, dur: 180, why: 'truck' } }, ev);
+  } else if (e.kind === 'van') {
+    if (e.left > 0 && G.t >= e.next) { spawn(G, false, null, 'van'); e.left--; e.next = G.t + 1.6; }
+    if (G.t >= e.t0 + e.dur) endEvent(G, e, { ok: true }, ev);
+  } else if (!G.cust.some((c) => c.id === e.cust)) endEvent(G, e, { ok: false }, ev); // (gone without a word: never mind)
+}
+function endEvent(G, e, res, ev) {
+  if (res.cash) G.cash += res.cash;
+  if (res.mod) G.mods.push({ k: res.mod.k, x: res.mod.x, until: G.t + res.mod.dur, why: res.mod.why });
+  G.evLog.unshift({ kind: e.kind, t: G.t, ...res }); G.evLog.length = Math.min(G.evLog.length, 6);
+  G.evDone = (G.evDone || 0) + 1;
+  G.event = null;
+  G.evNext = G.t + EVENTS.gap[0] + rnd(G) * (EVENTS.gap[1] - EVENTS.gap[0]);
+  ev.push({ kind: 'event', on: 'end', e, res });
+}
+// a critic or a star leaves (stars: 1 if they walked out)
+function guestLeft(G, c, stars, ev) {
+  const e = G.event;
+  if (!e || e.cust !== c.id) return;
+  if (e.kind === 'critic') {
+    G.stats.stars = Math.max(G.stats.stars, stars);
+    const R = { 5: [1.5, 240, 15], 4: [1.3, 180, 8], 3: [1.1, 120, 0], 2: [1, 0, 0], 1: [0.8, 150, 0] }[stars];
+    endEvent(G, e, { ok: stars >= 3, stars, cash: Math.round(avgBill(G) * R[2]), mod: R[1] ? { k: 'walk', x: R[0], dur: R[1], why: 'review' } : null }, ev);
+  } else if (e.kind === 'star') {
+    endEvent(G, e, stars > 1 ? { ok: true, stars, mod: { k: 'walk', x: 1.4, dur: 180, why: 'fans' } } : { ok: false, stars, mod: { k: 'walk', x: 0.85, dur: 120, why: 'gossip' } }, ev);
+  }
+}
+// the inspector is done looking round the kitchen: A, B or C
+function inspected(G, c, ev) {
+  const e = G.event;
+  if (!e || e.cust !== c.id) return;
+  const [a, o] = readiness(G, 'kitchen');
+  const score = 0.6 * (o ? a / o : 0) + 0.4 * (1 - Math.min(1, G.ema.food * 1.5));
+  const grade = score >= 0.7 ? 'A' : score >= 0.45 ? 'B' : 'C';
+  endEvent(G, e, { ok: grade !== 'C', grade, cash: Math.round(avgBill(G) * { A: 12, B: 5, C: 0 }[grade]), mod: grade === 'A' ? { k: 'walk', x: 1.2, dur: 180, why: 'grade' } : null }, ev);
+}
+// have Victor's truck moved on (it costs) → true
+export function repel(G, ev = []) {
+  const e = G.event;
+  if (!e || e.kind !== 'threat' || !pay(G, e.cost)) return false;
+  endEvent(G, e, { ok: true, paid: e.cost }, ev);
+  return true;
 }
 
 // ---------------------------------------------------------------- the mailbox: letters (some with a gift) and what was earned while away
@@ -583,10 +712,13 @@ export function away(G, secs) {
   const ran = Math.max(0, Math.min(AWAY.max, secs || 0));
   const s0 = { ...G.stats };
   const built = [];
+  G.quiet = true; // (nothing new happens while nobody's looking; what's on plays out)
   for (let left = ran; left > 1e-6;) {
     const d = Math.min(30, left); left -= d;
     for (const e of tick(G, d, d)) if (e.kind === 'built') built.push(e);
   }
+  G.quiet = false;
+  if (G.evNext != null) G.evNext = Math.max(G.evNext, G.t + 30);
   const d = (k) => G.stats[k] - s0[k];
   const r = { secs, ran, capped: secs > AWAY.max + 1, earned: d('earned'), served: d('served'), lost: d('lost'), built, mail: null };
   if (secs >= AWAY.card && r.earned > 0) {

@@ -4,8 +4,9 @@
 import * as S from './sim.js';
 
 // k: what is counted. 'item' (room, id: how many / its level), 'lv' (a room's level), 'served' (customers, all
-// together), 'tips' (picked up), 'letters' (read), 'staff' (the team), 'menu' (dishes on it). room: where the bar takes
-// you ('mail': the mailbox). cash: the reward.
+// together), 'tips' (picked up), 'letters' (read), 'staff' (the team), 'menu' (dishes on it), 'threats' (Victor's
+// truck driven off by serving fast enough), 'stars' (the best review). room: where the bar takes you ('mail': the
+// mailbox, 'events': the events card). cash: the reward.
 const Q = (k, n, cash, room, text, o = {}) => ({ k, n, cash, room, text, ...o });
 const st = (dish, cash, text) => Q('item', 1, cash, 'kitchen', text, { id: `st:${dish}` });
 export const CHAIN = [
@@ -29,6 +30,7 @@ export const CHAIN = [
   st('doner', 300, 'Put Döner on the menu'),
   Q('lv', 2, 500, 'office', 'Upgrade Ferdi\'s Office to Lv 2'),
   Q('lv', 1, 600, 'terrace', 'Open the Terrace'),
+  Q('threats', 1, 700, 'events', 'Drive off Victor\'s food truck'),
   Q('item', 3, 800, 'terrace', 'Have 3 tables on the Terrace', { id: 'tables' }),
   Q('lv', 2, 1000, 'staff', 'Renovate the Staff Room to Lv 2'),
   Q('lv', 2, 1000, 'cashier', 'Renovate the Cashier to Lv 2'),
@@ -36,6 +38,7 @@ export const CHAIN = [
   st('pizza', 2000, 'Build a pizza oven'),
   Q('lv', 3, 2500, 'dining', 'Renovate the Dining Hall to Lv 3'),
   Q('lv', 3, 5000, 'office', 'Upgrade Ferdi\'s Office to Lv 3'),
+  Q('stars', 4, 5000, 'events', 'Get a 4-star review from a critic'),
   Q('staff', 10, 5000, 'staff', 'Have a team of 10'),
   st('noodle', 6000, 'Put Noodles on the menu'),
   Q('tips', 50, 6000, 'dining', 'Pick up 50 tips'),
@@ -68,6 +71,8 @@ export function progress(G, q = current(G)) {
     case 'letters': have = G.stats.letters; break;
     case 'staff': have = S.staffCount(G); break;
     case 'menu': have = S.menu(G).length; break;
+    case 'threats': have = G.stats.threats; break;
+    case 'stars': have = G.stats.stars; break;
     default: break;
   }
   return [Math.min(have, q.n), q.n];

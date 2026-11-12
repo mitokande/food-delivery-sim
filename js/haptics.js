@@ -8,5 +8,6 @@ export function buzz(pattern) {
   if (now - last < 60) return; // don't stack buzzes every frame
   last = now;
   if (app) return vibrate(pattern);
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; // (the browser blocks it before the first tap, with an error)
   try { navigator.vibrate(pattern); } catch { /* not allowed before a user gesture */ }
 }

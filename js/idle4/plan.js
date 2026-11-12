@@ -53,6 +53,7 @@ const FACE = { n: Math.PI, s: 0, e: Math.PI / 2, w: -Math.PI / 2 }; // (n: facin
 spot('spawnL', 'street', -9, SIDEWALK_Z, { ry: FACE.e });
 spot('spawnR', 'street', 36, SIDEWALK_Z, { ry: FACE.w });
 spot('front', 'street', 3, SIDEWALK_Z, { ry: FACE.n });
+spot('van', 'street', 12.5, SIDEWALK_Z, { ry: FACE.w }); // (where a tour van lets its passengers out)
 
 // the entrance: waiting benches along the left wall and the back wall
 export const BENCH_SEATS = [];
@@ -100,6 +101,7 @@ QUEUE.forEach(([x, z], k) => spot(`q:${k}`, 'cashier', x, z, { ry: FACE.n }));
 // the office: the desk
 spot('office', 'office', 3.2, 2.15, { ry: FACE.s, sit: true, via: [[4.6, 2.4]] });
 spot('desk', 'office', 3.2, 3.2);
+spot('inspect', 'kitchen', 12.6, 4.4, { ry: FACE.s, via: [[16.0, 4.4]] }); // (the health inspector, looking round)
 
 // the staff room: lockers along its left wall (then along the back), where a new hire changes before going to work
 export const LOCKER_SLOTS = [];

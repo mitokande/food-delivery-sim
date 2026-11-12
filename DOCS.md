@@ -1123,7 +1123,8 @@ Kullanıcı 1. fazı birleştirdi ("pr merged continue phase"). Dal `idle-phase2
   sandalyeler, kahve köşesi, askılık, Lv 2'den kanepe ve halı, Lv 3'ten televizyon. Kurye rampasının kapıları kapalı
   (rotalar oradan geçmez; 4. faz).
 - **Bahşişler:** ödeyen müşterinin %12'si (× üniformalar) hesabın %40'ını sandalyesinin yanına bırakır (yerde
-  bozuk para + para; üstünde sallanan altın "$X" balonu). Dokununca toplanır. Aynı anda en çok 8 bahşiş; kapalıyken
+  bozuk para + para; üstünde sallanan altın "$X" balonu). Dokununca toplanır. Aynı anda en çok 6 bahşiş (3. fazda 8'den
+  indi: kalabalık salonda balonlar çok kalabalıktı); kapalıyken
   toplanmaz.
 - **Posta kutusu:** kapının solunda kaldırımda kırmızı kutu (mektup varken bayrak kalkar, üstünde zarf ve sayı).
   Mektuplar olaylarla gelir: sağlık müdürlüğü (ofis Lv 1, $40), Mrs. Okafor (150 müşteri, $150), Victor Gristle (teras açılınca),
@@ -1139,3 +1140,44 @@ hızlandırdı). Gelir: 5. dk $104/dk, 10. dk $297, 20. dk $2,9K, 30. dk $9K, 60
 Tarayıcı testi 59 kontrol (yeni: ilk görev ve Claim, ekip 0/5, mektup ve Collect, bahşişe dokunma, kilitli düğme,
 5/5'te altıncı işe alım yok, "Team full" düğmesi, personel odası tamiri, dolap, dolaba giden yeni aşçı, kapalıyken
 kazancın posta kutusundan alınması).
+
+### 14.2 3. faz: gün ve olaylar (12 Kasım 2026)
+
+Kullanıcı 2. fazı birleştirdi ("merged pr now go to phase 3"). Dal `idle-phase3`.
+
+- **Gün (`sim.js` `DAY`):** bir gün 720 sn oyun zamanı (12 dakika), saat 08:00'de başlar. Gelen müşteri saatle değişir:
+  öğle yoğunluğu 12:00–14:30 ve akşam yoğunluğu 19:00–21:30 neredeyse iki katı, gece (yaklaşık 22:30–06:00) yarısı;
+  eğri gün boyunca ortalama 1 (`dayK`). Üst çubukta saat (güneş / ay, "Lunch rush", "Dinner rush", "Night").
+- **Işık (`world.js`):** gökyüzü, ortam ve güneş ışığı saate göre gündüz → gün batımı → gece → şafak; gece komşu
+  pencereleri ve vitrin yanar, sokak lambalarının ampulü ve kaldırımda ışık havuzu belirir, açık odaların zemininde sıcak
+  bir ışık (eklemeli düzlem; gerçek ışık kaynağı yok, telefonda ucuz).
+- **Olaylar (restoran Lv 2'den, `EVENT_LV`):** birkaç dakikada bir (240–420 sn) tek bir olay, ilki hep Victor'ın
+  kamyonu, ikincisi bir eleştirmen; sonra rastgele (aynısı üst üste gelmez; kamyon püskürtülene kadar kamyon, 4 yıldız
+  alınana kadar eleştirmen daha sık):
+  - **Victor'ın yemek kamyonu (tehdit):** 3 dakikada N müşteri ağırla (N = son 1,5 dakikanın hızı × süre × 1,05,
+    gelecek yoğunluğa göre); başarırsan kamyon döner (ödül: ortalama hesap × N × 0,6), başaramazsan karşıya park eder ve
+    3 dakika boyunca müşteri %35 az gelir. Ya da olaylar kartından parayla gönderilir. Kamyon (Kenney Car Kit
+    `delivery`, üstünde dev burger, yanında "GRISTLE BURGER") sokakta yaklaşır.
+  - **Eleştirmen:** bereli bir müşteri; siparişi ve tabağı öncelikli. Siparişten tabağa geçen süre yıldızları belirler
+    (≤20 sn 5★, ≤30 4★, ≤45 3★, sonrası 2★; kızıp giderse 1★). 5★ 4 dakika +%50 müşteri ve para, 4★ +%30, 3★ +%10,
+    1★ −%20.
+  - **Ünlü:** güneş gözlüklü; 5 kat öder, hesabın tamamı kadar bahşiş bırakır; memnunsa hayranları gelir (+%40, 3 dk).
+  - **Sağlık denetçisi:** mutfağa gider, 14 sn bakar; not mutfağın ne kadar yükseltildiğine ve sipariş birikmesine
+    göre A / B / C (A: para + %20 müşteri, B: biraz para).
+  - **Tur minibüsü:** kapının önüne durur, 8 turist art arda iner.
+  Önemli konukların başında etiket var (★ Critic, ✦ Star, ✚ Inspector). Olay sürerken üstte bir şerit (başlık,
+  kalan süre, hedef ve çubuk); dokununca kamera olaya gider (kamyon, minibüs, konuk). Olay yoksa geçici artış ya da
+  düşüş gösterilir ("The review: +30% walk-ins 2:41"). Sağdaki **Events** düğmesi (Lv 2'de açılır) olaylar kartını açar:
+  gün ve saat, günün yoğunluk çubuğu, şu anki olay (kamyonu parayla gönderme), artışlar, son olayların sonuçları.
+  Kapalıyken yeni olay başlamaz (`G.quiet`), sürmekte olan biter.
+- **Görevler:** iki yeni: "Drive off Victor's food truck" (teras açılınca), "Get a 4-star review from a critic"
+  (ofis Lv 3'ten sonra).
+- **Kayıt:** `G.event`, `G.evNext`, `G.evLog`, `G.mods`; `stats.threats`, `stats.stars`.
+- Ortak `js/haptics.js`: tarayıcı ilk dokunuştan önce titreşimi engelleyip konsola hata yazıyordu; artık ilk dokunuşa
+  kadar titreşim denenmiyor.
+
+Denge (bot "plan", 90 dk): restoran Lv 2 18:53, Lv 3 33:08, Lv 4 48:57, Lv 5 72:29 (2. fazda 68:06; gece yavaşlatıyor).
+Olaylar: 22:57 kamyon (45) başarılı, 28:54 eleştirmen 5★, 33:58 minibüs, 40:41 ünlü, 54:22 kamyon (144) başarısız,
+61:08 denetçi A, 67:47 kamyon başarılı, 75:44 eleştirmen 5★, 84:25 kamyon başarısız. Tarayıcı testi 70 kontrol
+(yeni: saat, kilitli Events, kamyon şeridi, kameranın kamyona gitmesi, olaylar kartı ve parayla gönderme, etiketli
+eleştirmen, 23:00'te gece, kapalıyken yeni olay yok).
