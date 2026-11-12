@@ -2,8 +2,8 @@
 // (the rushes), the event on now in a banner under it, the buttons down the right side (settings, the mailbox, the
 // events card, the managers card, the features still to come, locked), the quest bar at the bottom (one
 // quest at a time: where it takes you, what holds it up, its reward to claim), the room panel that slides up when a
-// room is tapped (what it holds, what to buy, its renovation), the mailbox and its letters, the story cards, the "while
-// you were away" card, settings, toasts. Numbers that change every frame are patched by live(); renderRoom() rebuilds
+// room is tapped (what it holds, what to buy, its renovation), the card when a renovation is done, the mailbox and its
+// letters, the story cards, the "while you were away" card, settings, toasts. Numbers that change every frame are patched by live(); renderRoom() rebuilds
 // the panel.
 import * as S from './sim.js';
 import * as Q from './quests.js';
@@ -175,13 +175,13 @@ export function createUI(game) {
     else if (lv === 0) {
       const cost = S.upCost(g, room);
       html = `<div class="repair"><p>${R.blurb}</p>
-        ${b ? `<div class="prog"><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>`
+        ${b ? `<div class="prog"><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div><small class="hint">Tap the timer over the room to lend a hand</small>`
           : block ? `<button class="btn big" disabled>${BLOCK_TEXT[block](g, room)}</button>`
           : `<button class="btn gold big" data-act="up" data-room="${room}" data-cost="${cost}">Repair · ${M(cost)}<small>${secs(S.upTime(g, room))}</small></button>`}</div>`;
     } else {
       html += `<p class="blurb">${R.blurb}</p>`;
       if (S.MANAGERS[room]) html += mgrRow(g, room);
-      if (b) html += `<div class="prog"><b>Renovating to Lv ${b.to}</b><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>`;
+      if (b) html += `<div class="prog"><b>Renovating to Lv ${b.to}</b><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div><small class="hint">Tap the timer over the room to lend a hand</small>`;
       html += `<div class="items">${Object.keys(R.items).map((id) => itemRow(g, room, id)).join('')}</div>`;
       if (!b && lv < S.MAXLV && R.up[lv]?.[0]) {
         const cost = S.upCost(g, room);
@@ -408,6 +408,7 @@ export function createUI(game) {
     }
     updateQuest();
     updateEvents(g);
+    if (upQ.length) nextUp();
   }
   let lastMail = -1;
 
@@ -422,12 +423,61 @@ export function createUI(game) {
       else { G().seen.intro = true; game.save(); onDone?.(); }
     });
   }
-  function built(r, lv) {
-    const R = S.ROOMS[r];
-    if (lv === 1 && BUILT_TEXT[r]) toast(`${ICON('ui-wrench')} ${R.name} repaired!`, 'good');
-    else toast(`${ICON('ui-building')} ${R.name} is now Lv ${lv}!`, 'good');
-    if (r === 'office') toast(`${ICON('ui-star')} Restaurant level ${lv}: every room can go to Lv ${lv + 1}`, 'warn');
-    if (room === r) renderRoom();
+  function built(r) { if (room === r) renderRoom(); }
+  // ---------- the card when a renovation is done ----------
+  // A picture of the room as it is now (world.snapRoom), its new level, what the level brings (the caps before → after)
+  // and, for the office, the restaurant level and what it opens. A tap anywhere goes on. One at a time: a card waits
+  // while anything else is open.
+  const upQ = [];
+  function upgraded(r, lv) { upQ.push([r, lv]); nextUp(); }
+  function nextUp() { if (upQ.length && !modals.children.length) upCard(...upQ.shift()); }
+  const plural = (n) => (n.endsWith('ch') ? `${n}es` : `${n}s`);
+  // what a room's new level brings: [icon, what, before, after] (before: '' when it's new)
+  function gains(g, r, lv) {
+    const R = S.ROOMS[r], out = [];
+    if (r === 'office') {
+      out.push([ICON('ui-star'), 'Restaurant level', lv - 1, lv]);
+      if (lv < S.MAXLV) out.push([ICON('ui-building'), 'Rooms can go to', `Lv ${lv}`, `Lv ${lv + 1}`]);
+    }
+    let cap = 0;
+    for (const id in R.items) {
+      const it = R.items[id], a = S.capOf(g, r, id, lv - 1), b = S.capOf(g, r, id, lv);
+      if (a === b) continue;
+      if (it.kind === 'n') out.push([ITEM_ICON[id] || ICON('ui-star'), plural(it.name), a, b]);
+      else if (it.kind === 'st' && !a) out.push([DICON(it.dish), `New: ${it.name}`, '', S.DISH[it.dish].name]);
+      else cap = b;
+    }
+    if (cap) out.push([ICON('ui-xp'), 'Upgrades up to', lv > 1 ? `Lv ${cap - S.LV_CAP}` : '', `Lv ${cap}`]);
+    return out;
+  }
+  // what a new restaurant level opens: rooms to repair, features
+  function opens(lv) {
+    const out = S.ROOM_IDS.filter((x) => S.ROOMS[x].gate === lv && lv > 0).map((x) => ({ room: x, name: S.ROOMS[x].name }));
+    if (lv === S.EVENT_LV) out.push({ icon: 'ui-calendar', name: 'Events' });
+    if (lv === S.MGR_LV) out.push({ icon: 'char-male-f', name: 'Managers' });
+    return out;
+  }
+  function upCard(r, lv) {
+    const g = G(), R = S.ROOMS[r], office = r === 'office', fresh = lv === 1;
+    const rows = gains(g, r, lv), news = office ? opens(lv) : [];
+    const m = modal(`<div class="rays"></div>
+      <p class="uphead">${R.name} ${fresh ? 'repaired' : 'renovated'}</p>
+      <div class="uppic"><span class="rbadge huge"><b>${office ? S.restaurantLv(g) : lv}</b></span></div>
+      <div class="upribbon"><b>${office ? `Restaurant Lv ${lv}!` : fresh ? 'Open again!' : 'Upgrade complete!'}</b></div>
+      <div class="upbody">
+        ${fresh && BUILT_TEXT[r] ? `<p class="small">${BUILT_TEXT[r]}</p>` : ''}
+        ${rows.length ? `<div class="gains">${rows.map(([ic, what, a, b]) => `<div class="gl"><span class="gi">${ic}</span><span class="gn">${what}</span><span class="gv">${a !== '' && !(fresh && !office) ? `${a}<i class="garr"></i>` : ''}<b>${b}</b></span></div>`).join('')}</div>` : ''}
+        ${news.length ? `<h3 class="unl">Unlocked</h3><div class="tiles">${news.map((x) => `<span class="tile" ${x.room ? `data-room="${x.room}"` : ''}><span class="tp">${x.icon ? ICON(x.icon) : ''}</span><b>${x.name}</b></span>`).join('')}</div>` : ''}
+      </div>
+      <p class="tapc">Tap to continue</p>`, { cls: 'upcard' });
+    // the pictures (the new room; the rooms it opens, still in ruins)
+    const pic = game.world?.snapRoom(r, 480, 300);
+    if (pic) $('.uppic', m.card).prepend(pic); else $('.uppic', m.card).classList.add('nopic');
+    for (const t of m.card.querySelectorAll('.tile[data-room]')) { const c = game.world?.snapRoom(t.dataset.room, 168, 112); if (c) $('.tp', t).append(c); else $('.tp', t).innerHTML = ICON('ui-building'); }
+    sfx('ui-levelup', { vol: 0.7 });
+    const t0 = performance.now();
+    // (not in the first moments: a tap still going on the timer would close it unseen)
+    m.el.addEventListener('click', () => { if (performance.now() - t0 < 700) return; m.close(); sfx('ui-tap', { vol: 0.4 }); setTimeout(nextUp, 300); });
   }
   // what the restaurant earned while you were away (from the catch-up, or later from the mailbox): Collect takes it
   function away(r) {
@@ -478,7 +528,7 @@ export function createUI(game) {
       <div class="set"><span>Graphics</span><button class="btn sm blue" data-s="quality">${s.quality}</button></div>
       <button class="btn ghost" data-s="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <button class="btn ghost danger" data-s="reset">Start over</button>
-      <p class="small">Prototype: phase 4 of the remake (the courier bay, managers, clearing tables). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
+      <p class="small">Prototype: phase 5 of the remake (the building work: scaffolding, a timer to help along, the card when it's done). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
       <button class="btn big" data-x="close">Done</button>`, { cls: 'settings', dismiss: true });
     m.card.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
@@ -523,7 +573,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, away, mailbox, letter, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, upgraded, away, mailbox, letter, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${ICON('ui-star')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${ICON(s.role === 'cook' ? 'char-male-d' : s.role === 'waiter' ? 'char-female-b' : s.role === 'courier' ? 'helmet' : 'ui-cash')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },

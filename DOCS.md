@@ -1226,3 +1226,33 @@ paketinin sayfası artık seçilebilir: `mobile/scripts/build-web.mjs` `APP_PAGE
 ile derler: `build` dalından TestFlight'a giden iOS sürümleri Ferdi's'tir (ana ekran adı ve ikon yine Idle Restaurant
 Manager). Android ve Mac'te elle `npm run ios` Idle Restaurant Manager'ı paketlemeye devam eder. Geri almak için
 `ci_post_clone.sh`'taki satır çıkarılır. Paket sunucuda çevrimdışı denendi (dışarıya istek yok, hata yok).
+
+### 14.5 5. faz: inşaat hissi (12 Kasım 2026)
+
+Kullanıcı rakip oyundan beş ekran görüntüsü daha gönderdi (iskeleli inşaat ve sayaç, posta ve halk memnuniyeti,
+günlük memnuniyet grafiği, "yükseltme tamamlandı" ekranı, rehber karakter). Yol haritası buna göre değişti: 5. inşaat
+hissi, 6. itibar (yorumlar, memnuniyet, günlük ödüller), 7. kabuk ve karakterler (alt menü, portre, rehber), 8. ekip ve
+işler, 9. şehir haritası ve şubeler, 10. elmas, mağaza, reklam, Adapty, analitik. Kullanıcı "faz 5 e başla" dedi. Dal
+`idle-phase5`.
+
+- **İskele:** tadilat (ve tamir) süresince odanın üstünde turuncu borulardan iskele durur: kenarlarda direkler, yarı
+  yükseklikte korkuluk, üstte kiriş ızgarası, çevresinde sarı-siyah şerit. İşe başlarken yerden yükselir, iş bitince
+  düşer, ardından konfeti ve oda yeni haliyle belirir (`world.js` `scaffold`, `syncScaffold`).
+- **Sayaç:** odanın ortasında çekiçli büyük yeşil sayaç (`mm:ss`). Ona dokunmak ustaya yardım eder: her dokunuş 1 sn
+  düşer, en çok işin üçte biri kadar (`sim.js` `HURRY`, `hurry`, `canHurry`); kalanı ileride elmas ya da reklamla
+  kısaltılacak. Sınıra gelince "Tap to help!" yazısı kaybolur. Oda etiketindeki süre kalktı (halka ve hedef seviye
+  duruyor).
+- **"Yükseltme tamamlandı" kartı:** iş bittikten 0,9 sn sonra çıkar, her yere dokununca kapanır (ilk 0,7 sn
+  dokunuşları saymaz: sayaca basılı kalan parmak kapatmasın). Üstte odanın o anki canlı fotoğrafı (kamera bir kare
+  için odaya gider, `world.snapRoom`; gece ise gece), köşede yeni seviye rozeti, kurdele ("Open again!" /
+  "Upgrade complete!" / ofiste "Restaurant Lv N!"), altında seviyenin getirdikleri: sınırlar önce → sonra (masalar 4 → 6,
+  garsonlar 2 → 3, yeni ocak, yükseltmeler Lv 5 → Lv 10). Ofiste ayrıca restoran seviyesi, odaların çıkabileceği
+  seviye ve "Unlocked": o seviyede açılan odalar (fotoğraflarıyla, harabe halde) ve özellikler (Lv 2 Events, Lv 3
+  Managers). Başka bir pencere açıksa kart sırada bekler. Eski bildirimler (tamir edildi, Lv N oldu) kalktı.
+- **Rozetler:** tadilatı hemen yapılabilecek odanın etiketinde yeşil ok yerine altın "Lv N" oku zıplar. Etiketteki
+  oturan/koltuk sayacı artık okun üstüne binmiyor.
+- **Kayıt:** `G.build.help` (dokunuşlarla düşülen saniye). Bot dokunmaz, denge değişmedi.
+
+Tarayıcı testi 95 kontrol (yeni: iskele, sayaç, iki dokunuş 2 sn, üçte bir sınırı, giriş kartı, kartın fotoğrafı,
+iskelenin kalkması, dokununca kapanma, ofis kartı ve açılan personel odası, altın ok, salon kartı, ofis Lv 2 kartı:
+teras, kurye rampası, olaylar).

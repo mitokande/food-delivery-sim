@@ -163,7 +163,7 @@ export function fresh(keep = {}) {
   for (const id of ROOM_IDS) rooms[id] = { lv: ROOMS[id].start, it: Object.fromEntries(Object.keys(ROOMS[id].items).map((k) => [k, ITEM_START(id, k)])) };
   const G = {
     v: 1, t: 0, cash: 15, seed: 20261112, seq: 1,
-    rooms, build: null, // { room, to, t0, dur }
+    rooms, build: null, // { room, to, t0, dur, help } (help: s the taps took off)
     staff: [], cust: [],
     seats: {}, benches: {}, // seat / bench id → customer id
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
@@ -259,8 +259,9 @@ export function priceOf(G, dish, room, atRegister) {
 }
 
 // ---------------------------------------------------------------- caps, prices, renovations
-export function capOf(G, room, id) {
-  const R = lvOf(G, room), it = ROOMS[room].items[id];
+// (R: at another level of the room than the one it's at, for the "upgrade complete" card)
+export function capOf(G, room, id, R = lvOf(G, room)) {
+  const it = ROOMS[room].items[id];
   if (it.kind === 'n') return it.caps[R] ?? 0;
   if (it.kind === 'st') return DISHES.findIndex((d) => d.id === it.dish) < STATIONS_AT[R] ? LV_CAP * R : 0;
   return LV_CAP * R;
@@ -349,6 +350,19 @@ export function act(G, a, room, id) {
   }
   return false;
 }
+// lending the builder a hand: a tap on the timer over the room takes HURRY.tap s off, up to HURRY.max of the whole
+// renovation (the rest is for later: gems or an ad) → the seconds taken off (0: nothing being built, or no more help)
+export const HURRY = { tap: 1, max: 1 / 3 };
+export function hurry(G) {
+  const b = G.build;
+  if (!b) return 0;
+  b.help ||= 0;
+  const x = Math.min(HURRY.tap, (b.dur + b.help) * HURRY.max - b.help, b.t0 + b.dur - G.t);
+  if (x <= 1e-6) return 0;
+  b.dur -= x; b.help += x;
+  return x;
+}
+export const canHurry = (G) => !!G.build && G.build.t0 + G.build.dur - G.t > 1e-6 && (G.build.help || 0) < (G.build.dur + (G.build.help || 0)) * HURRY.max - 1e-6;
 // hurry a renovation along (the playtest bar; later: gems or an ad)
 export function finishBuild(G, ev = []) { if (G.build) { G.build.dur = 0; settleBuild(G, ev); } return ev; }
 function settleBuild(G, ev) {

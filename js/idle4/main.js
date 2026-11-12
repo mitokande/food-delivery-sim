@@ -94,6 +94,12 @@ const game = {
     save(); ui.live(); ui.renderRoom();
   },
   openMailbox() { ui.mailbox(); },
+  // a tap on the timer over a room being worked on: lend the builder a hand
+  hurry() {
+    const x = S.hurry(G);
+    world.hurried(x);
+    if (x) { audio.play('bump', { vol: 0.45 }); buzz(8); } else audio.play('ui-tap', { vol: 0.3 });
+  },
   // pay to have Victor's truck moved on
   repel() {
     const ev = [];
@@ -160,7 +166,11 @@ function frame() {
         else audio.play(e.res.ok ? 'order-complete' : 'order-late', { vol: 0.6 });
         save();
       }
-      else if (e.kind === 'built') { audio.play('ui-unlock'); setTimeout(() => audio.play('crowd-cheer', { vol: 0.5 }), 400); buzz(40); ui.built(e.room, e.lv); save(); }
+      else if (e.kind === 'built') {
+        // (the scaffolding drops, the room pops up new; then the card, with a picture of it)
+        audio.play('ui-unlock'); buzz(40); ui.built(e.room, e.lv); save();
+        setTimeout(() => { audio.play('crowd-cheer', { vol: 0.5 }); ui.upgraded(e.room, e.lv); }, 900);
+      }
     }
   }
   world.update(Math.min(0.25, raw) * (game.paused ? 0 : Math.min(SPEED, 3)) || dt * 0.0001, innerWidth, innerHeight);

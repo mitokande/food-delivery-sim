@@ -10,6 +10,9 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 5: the building work: scaffolding over the room, the timer over it (a tap lends a hand, up to a third of the
+// time), the card when it's done (a picture of the room, what the level brings, what the office opens), the gold
+// arrow on a room whose renovation is within reach.
 //   node tools/idle4.mjs [outdir=tools/shots]   (phone viewport; screenshots idle4-*.png)
 import { createRequire } from 'node:module';
 import { serve } from './serve.mjs';
@@ -34,6 +37,9 @@ const boot = async (url) => { await page.goto(`${base}/${url}`, { waitUntil: 'ne
 const until = (js, ms = 30000) => page.waitForFunction(js, { timeout: ms, polling: 100 }).then(() => true, () => false);
 const buy = (a, room, id) => ev(`game.act('${a}', '${room}', ${id ? `'${id}'` : 'undefined'})`).then((r) => !!r);
 const cash = (n) => ev(`game.G.cash = ${n}`);
+// the card when a renovation is done: wait for it (→ its text), then a tap closes it
+const upCard = async () => { if (!(await until('!!document.querySelector(".modal.upcard.in")', 6000))) return ''; await wait(800); return ev('document.querySelector(".modal.upcard").innerText'); };
+const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
 await boot('idle4.html?fresh&speed=4');
 await page.waitForSelector('.modal.story .btn', { timeout: 10000 });
@@ -91,11 +97,33 @@ await cash(100);
 check(await buy('up', 'entrance'), 'repairing the entrance');
 check(await until('game.G.build?.room === "entrance" && !!document.querySelector("#markers .rl.busy")', 3000), 'the label shows the work going on');
 check(!(await buy('up', 'office')), 'one room at a time');
+// (held still while the timer is looked at)
+await ev('game.paused = true');
+check(await until('game.world.peek().scaffold === "entrance"', 3000), 'scaffolding goes up over the entrance');
+check(await until('/^\\d\\d:\\d\\d$/.test(document.querySelector("#markers .mk.bmk .bt")?.textContent || "")', 3000), 'a timer over it (mm:ss)');
+const dur0 = await ev('game.G.build.dur');
+for (let i = 0; i < 2; i++) await ev('document.querySelector("#markers .mk.bmk").click()');
+const [dur1, help1] = await ev('[game.G.build.dur, game.G.build.help]');
+check(Math.abs(dur0 - dur1 - 2) < 0.01 && Math.abs(help1 - 2) < 0.01, 'two taps on the timer: 2 s off');
+await ev('game.G.build.help = game.G.build.dur / 2'); // (a third of the whole work done by tapping)
+await ev('document.querySelector("#markers .mk.bmk").click()');
+check(Math.abs(await ev('game.G.build.dur') - dur1) < 0.01 && await until('!!document.querySelector("#markers .mk.bmk.maxed")', 2000), 'no more than a third of it: the timer stops taking taps');
+await ev('game.paused = false');
 await wait(800); await shot('4-repairing');
 check(await until('game.S.lvOf(game.G, "entrance") === 1', 30000), 'the entrance is repaired when the timer runs out');
+const card1 = await upCard();
+check(card1.includes('Entrance repaired') && card1.includes('Open again!') && card1.includes('Waiting benches'), 'the card: Entrance repaired, what it holds now' + (card1 ? '' : ' (no card)'));
+check(await ev(`(() => { const c = document.querySelector(".modal.upcard .uppic canvas"); if (!c) return false; const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let lo = 255, hi = 0; for (let i = 0; i < d.length; i += 4 * 97) { const v = d[i] + d[i + 1] + d[i + 2]; lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo > 120; })()`), 'with a picture of the room');
+check(await ev('game.world.peek().scaffold === null && !document.querySelector("#markers .mk.bmk")'), 'the scaffolding and the timer are gone');
+await shot('4c-upcard');
+await closeCard();
+check(await ev('!document.querySelector(".modal.upcard")'), 'a tap closes the card');
 await cash(100); check(await buy('item', 'entrance', 'benches'), 'a bench in the entrance');
 await cash(200); check(await buy('up', 'office'), 'fixing up the office');
 check(await until('game.S.officeLv(game.G) === 1', 40000), 'the office is fixed up: restaurant level 1');
+const card2 = await upCard();
+check(card2.includes('Restaurant Lv 1!') && card2.includes('Unlocked') && await ev('!!document.querySelector(".modal.upcard .tile[data-room=staff] canvas")'), 'its card: restaurant level 1, the staff room unlocked (with a picture)');
+await closeCard();
 check(await until('game.G.staff[0].at === "office"', 40000), 'and you sit down in it');
 // the post: the health office writes when the office is fixed up (with a gift)
 check(await until('game.S.unread(game.G) > 0 && !document.querySelector(".slot.mail .badge").hidden', 5000), 'a letter: the mailbox shows it');
@@ -121,6 +149,7 @@ check(await ev('document.querySelector(".lvb b").textContent') === '1', 'the top
 // a station brings a dish; the cashier and a register
 await cash(100); check(await buy('item', 'kitchen', 'st:hotdog') && await ev('game.S.menu(game.G).join()') === 'burger,hotdog', 'a sausage grill brings Hot Dog to the menu');
 await cash(300); check(await buy('up', 'cashier') && await until('game.S.lvOf(game.G, "cashier") === 1', 30000), 'the cashier is repaired');
+await upCard(); await closeCard();
 await cash(100); check(await buy('item', 'cashier', 'registers'), 'a register (and a cashier)');
 const paidBefore = await ev('game.G.stats.served');
 check(await until('game.G.cust.some((c) => c.st === "queue" || c.st === "pay")', 90000), 'people line up to pay on their way out');
@@ -130,11 +159,17 @@ check(await until(`game.G.stats.served > ${paidBefore}`, 60000), 'and pay at the
 check(await ev('game.S.upBlock(game.G, "dining")') === 'items', 'the dining hall waits for everything in it to be maxed');
 await ev(`(() => { const g = game.G; g.cash = 1e6; for (const id of Object.keys(game.S.ROOMS.dining.items)) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === null, 'maxed: it can be renovated');
+check(await until('/Lv 2/.test(document.querySelector("#markers .rl .lvup")?.textContent || "")', 2000), 'its label: a gold arrow, Lv 2');
 await ev('game.openRoom("dining")'); await wait(500);
 check(await ev('!!document.querySelector("#sheet .reno.ready [data-act=up]")'), 'the panel offers the renovation');
 await shot('5-dining-ready');
 await page.click('#sheet .reno [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "dining") === 2', 60000), 'the dining hall goes to level 2');
+const card3 = await upCard();
+check(card3.includes('Upgrade complete!') && /Tables\s*4\s*6/.test(card3) && /Upgrades up to\s*Lv 5\s*Lv 10/.test(card3), 'its card: tables 4 → 6, upgrades up to Lv 10');
+await closeCard();
+// (from here on the cards would only be in the way)
+await ev('game.ui.upCard = game.ui.upgraded; game.ui.upgraded = () => {}');
 await ev(`(() => { const g = game.G; for (const id of Object.keys(game.S.ROOMS.dining.items)) while (game.S.itemCost(g, 'dining', id) != null && game.S.act(g, 'item', 'dining', id)); })()`);
 check(await ev('game.S.upBlock(game.G, "dining")') === 'office', 'level 3 waits for the office to go up first');
 check(await ev('document.querySelectorAll("#sheet .irow").length >= 4 && document.querySelector("#sheet .reno .why").textContent.includes("Office")'), 'the panel says so');
@@ -162,6 +197,13 @@ await ev(`(() => { const g = game.G, S = game.S; for (let t = 0; t < 900; t += 0
 await wait(1500);
 check(await ev('game.G.cust.length > 8 && game.world.peek().views > 12'), 'a full house: people and staff on screen');
 await shot('6-busy');
+
+// the office at level 2: the terrace, the courier bay and the events open
+await ev('(() => { const g = game.G; if (g.rooms.office.lv < 2) g.rooms.office.lv = 2; game.ui.upCard("office", 2); })()');
+const card4 = await upCard();
+check(card4.includes('Restaurant Lv 2!') && ['Terrace', 'Courier Bay', 'Events'].every((x) => card4.includes(x)) && await ev('document.querySelectorAll(".modal.upcard .tile").length') === 3, 'the office\'s card at level 2: Terrace, Courier Bay and Events unlocked');
+await shot('6b-office2');
+await closeCard();
 
 // events: Victor's truck (the banner, the camera to it, paying to move it on), a critic
 await ev('(() => { const g = game.G; if (g.rooms.office.lv < 2) g.rooms.office.lv = 2; g.event = null; g.cash = Math.max(g.cash, 1e6); game.S.startEvent(g, "threat"); })()'); await wait(800);

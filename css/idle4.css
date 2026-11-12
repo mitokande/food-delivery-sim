@@ -285,3 +285,60 @@
   .rsheet[data-state="closed"] { transform: translateY(calc(100% + 40px)); }
   .quest { left: 24px; transform: none; } .quest.pop { animation: none; }
 }
+
+/* ---------- the building work: the timer over the room, the renovation within reach, the card when it's done ---------- */
+.mk.bmk { padding: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 3; }
+.bchip { display: inline-flex; align-items: center; filter: drop-shadow(0 3px 0 rgba(0,0,0,.3)); }
+.bchip.whack { animation: whack .16s ease-out; }
+@keyframes whack { 40% { transform: scale(.9) rotate(-3deg); } }
+.bham { display: grid; place-items: center; width: 40px; height: 40px; margin-right: -8px; z-index: 1; border-radius: 12px; background: linear-gradient(#3a4e7a, #24324f); box-shadow: inset 0 0 0 2.5px #1b2238, inset 0 2px 0 rgba(255,255,255,.2); }
+.bham svg { width: 30px; height: 30px; transform-origin: 30% 80%; animation: hammer .7s ease-in-out infinite; }
+@keyframes hammer { 0%, 100% { transform: rotate(18deg); } 45% { transform: rotate(-28deg); } 55% { transform: rotate(-30deg); } }
+.bchip .bt { display: block; padding: 4px 12px 5px 16px; border-radius: 10px; background: linear-gradient(#78e05a, #3fb42a); box-shadow: inset 0 0 0 2.5px #1b2238, inset 0 2px 0 rgba(255,255,255,.35);
+  font: 400 24px/1 var(--display); color: #fff; -webkit-text-stroke: 4px #1b2238; paint-order: stroke fill; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.bhelp { font: 400 13px/1 var(--display); color: #fff; padding: 3px 8px; border-radius: 9px; background: rgba(20, 28, 48, .6); -webkit-text-stroke: 3px #1b2238; paint-order: stroke fill; animation: bob 1s ease-in-out infinite; }
+.mk.bmk.maxed .bhelp { visibility: hidden; }
+.mk.paypop.hurry b { color: #fff; -webkit-text-stroke-color: #1b2238; font-size: 20px; }
+.rsheet .hint { display: block; margin: -2px 0 8px; font-size: 12px; font-weight: 700; color: var(--ink-2); text-align: center; }
+.lvup { display: inline-flex; align-items: center; gap: 1px; margin-left: 3px; padding: 3px 8px 3px 5px; border-radius: 10px; font-style: normal; background: linear-gradient(#ffe27a, #f2b531); border-bottom: 3px solid #b97818; animation: bob .9s ease-in-out infinite; }
+.lvup::before { content: ''; width: 14px; height: 15px; background: #2f8a1a; clip-path: polygon(50% 0, 100% 55%, 68% 55%, 68% 100%, 32% 100%, 32% 55%, 0 55%); }
+.lvup b { font: 400 13px/1 var(--display); color: #fff; -webkit-text-stroke: 3px #7a4a00; paint-order: stroke fill; }
+
+.modal.upcard { background: rgba(8, 12, 24, .72); }
+.modal.upcard .card { position: relative; overflow: visible; background: none; box-shadow: none; padding: 0; width: min(100%, 360px); }
+.upcard .rays { position: absolute; left: 50%; top: 120px; width: 560px; height: 560px; margin: -280px 0 0 -280px; pointer-events: none; border-radius: 50%; opacity: .55;
+  background: repeating-conic-gradient(rgba(255, 220, 120, .55) 0 9deg, transparent 9deg 22deg); -webkit-mask: radial-gradient(closest-side, #000 30%, transparent); mask: radial-gradient(closest-side, #000 30%, transparent); animation: spin 14s linear infinite; }
+.upcard .uphead { position: relative; margin: 0 -16px 8px !important; padding: 7px 10px; background: linear-gradient(90deg, transparent, rgba(30, 44, 74, .92) 15% 85%, transparent); border-block: 2px solid rgba(255,255,255,.35);
+  font: 400 19px/1.1 var(--display) !important; color: #fff !important; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.upcard .uppic { position: relative; margin: 0 auto; width: 92%; aspect-ratio: 480 / 300; border-radius: 18px; overflow: hidden; background: #2b3a5c; box-shadow: 0 0 0 4px #fff, 0 0 0 7px #f2c14e, 0 10px 0 4px rgba(0,0,0,.3); }
+.upcard .uppic canvas { display: block; width: 100%; height: 100%; }
+.upcard .uppic.nopic { background: linear-gradient(#5b7bb8, #2b3a5c); }
+.upcard .rbadge.huge { position: absolute; right: 8px; bottom: 8px; width: 64px; height: 64px; animation: badgein .5s .25s cubic-bezier(.3,1.6,.5,1) both; }
+.upcard .rbadge.huge b { font-size: 34px; -webkit-text-stroke-width: 6px; }
+@keyframes badgein { from { transform: scale(0) rotate(-30deg); } }
+.upcard .upribbon { position: relative; z-index: 1; margin: -16px -8px 0; padding: 9px 12px 11px; background: linear-gradient(#ff8a4c, #e8572f 60%, #c23d1d); border-radius: 8px; box-shadow: inset 0 0 0 3px #ffd56b, 0 4px 0 #8f2a12;
+  animation: ribpop .45s .1s cubic-bezier(.3,1.5,.5,1) both; }
+.upcard .upribbon b { font: 400 30px/1 var(--display); color: #fff; -webkit-text-stroke: 6px #7a1e08; paint-order: stroke fill; letter-spacing: .01em; }
+.upcard .upbody { margin: -6px 6px 0; padding: 18px 14px 12px; border-radius: 0 0 22px 22px; background: linear-gradient(#e8f0fb, #d3e0f3); box-shadow: inset 0 0 0 4px #3d5a92, 0 6px 0 rgba(0,0,0,.25); }
+.upcard .upbody > p { margin: 0 0 8px !important; }
+.upcard .gains { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 12px; background: rgba(61, 90, 146, .14); }
+.upcard .gl { display: flex; align-items: center; gap: 8px; min-height: 34px; text-align: left; }
+.upcard .gl + .gl { border-top: 1.5px solid rgba(61, 90, 146, .18); }
+.upcard .gi .ic { width: 26px; height: 26px; display: block; }
+.upcard .gn { flex: 1; font: 400 15px/1.1 var(--display); color: #3d4a66; }
+.upcard .gv { display: inline-flex; align-items: center; gap: 6px; font: 400 16px/1 var(--display); color: #3d4a66; white-space: nowrap; }
+.upcard .gv b { font-weight: 400; color: #2f9a1f; font-size: 18px; }
+.upcard .garr { width: 20px; height: 14px; background: #4fbe2f; clip-path: polygon(0 30%, 55% 30%, 55% 0, 100% 50%, 55% 100%, 55% 70%, 0 70%); }
+.upcard h3.unl { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; font-size: 18px; color: #3d4a66; }
+.upcard h3.unl::before, .upcard h3.unl::after { content: ''; flex: 1; height: 2px; background: linear-gradient(90deg, transparent, #7f95c4); }
+.upcard h3.unl::after { transform: scaleX(-1); }
+.upcard .tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.upcard .tile { display: flex; flex-direction: column; width: 96px; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 0 0 2.5px #fff, 0 4px 0 rgba(0,0,0,.2); animation: popin .4s cubic-bezier(.3,1.5,.5,1) both; }
+.upcard .tile:nth-child(2) { animation-delay: .08s; } .upcard .tile:nth-child(3) { animation-delay: .16s; }
+.upcard .tile .tp { display: grid; place-items: center; height: 64px; background: linear-gradient(#e7b57e, #c98c55); }
+.upcard .tile .tp canvas { width: 100%; height: 100%; display: block; }
+.upcard .tile .tp .ic { width: 46px; height: 46px; }
+.upcard .tile b { padding: 5px 4px 6px; font: 400 13px/1.1 var(--display); color: #3d4a66; }
+.upcard .tapc { margin: 14px 0 0 !important; font: 400 17px/1 var(--display) !important; color: #e8eefb !important; text-shadow: 0 2px 0 rgba(0,0,0,.5); animation: bob 1.4s ease-in-out infinite; }
+@media (max-height: 700px) { .upcard .uppic { width: 72%; } .upcard .rays { top: 90px; } .upcard .upribbon b { font-size: 26px; } .upcard .tile .tp { height: 52px; } }
+.rl .cnt { position: static; height: auto; min-width: 0; border: 0; display: inline-block; padding: 3px 7px; }
