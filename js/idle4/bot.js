@@ -18,7 +18,7 @@ const BUY = {
     // staff and new stations first (they take work off you and the cooks), then a renovation as soon as it can (the
     // office first: it gates the rest), tables, else the cheapest thing; while a renovation within reach waits for
     // cash (under three minutes of income), only small things
-    const hire = cheapest(ok.filter((p) => ['cooks', 'waiters', 'registers', 'lockers'].includes(p.id) || ((p.id || '').startsWith('st:') && S.itemOf(G, p.room, p.id) === 0)));
+    const hire = cheapest(ok.filter((p) => ['cooks', 'waiters', 'registers', 'lockers', 'couriers'].includes(p.id) || ((p.id || '').startsWith('st:') && S.itemOf(G, p.room, p.id) === 0)));
     if (hire) return hire;
     const ups = all.filter((p) => p.a === 'up').sort((a, b) => (a.room === 'office' ? -1 : 0) - (b.room === 'office' ? -1 : 0) || a.cost - b.cost);
     const u = ups[0];
@@ -34,8 +34,9 @@ export const PLAYERS = { cheap: 'cheap', plan: 'plan' };
 
 const label = (G, p) => {
   if (p.a === 'up') return `${p.room}→${S.lvOf(G, p.room) + 1}`;
+  if (p.a === 'mgr') return `MGR:${p.room}`;
   const n = S.itemOf(G, p.room, p.id);
-  if (p.id === 'cooks' || p.id === 'waiters' || p.id === 'registers') return `${p.id}${n + 1}`;
+  if (p.id === 'cooks' || p.id === 'waiters' || p.id === 'registers' || p.id === 'couriers') return `${p.id}${n + 1}`;
   if (p.id.startsWith('st:') && n === 0) return `DISH:${p.id.slice(3)}`;
   return null;
 };

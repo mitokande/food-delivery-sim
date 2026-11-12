@@ -4,10 +4,13 @@
 // their spots or walk the routes of the floor plan (plan.js) at the times the sim gives. Rooms carry a label with their
 // name, level badge and a green arrow when something in them is affordable; a tap on a room opens it (ui.js). The light
 // follows the clock (dusk, night with the lamps and windows lit, dawn); Victor's food truck and the tour van drive up
-// for their events; guests of note (a critic, a star, the inspector) dress the part.
+// for their events; guests of note (a critic, a star, the inspector) dress the part. Couriers ride out of the bay's
+// garage door on their motors (the courier game's scooters); tables left dirty carry the plates until cleared; managers
+// stand in their rooms.
 import * as THREE from 'three';
 import { makeChar, loadKit, getNode } from '../assets.js';
 import { createMarkers } from '../hub.js';
+import { makeBike } from '../ride/vehicle.js';
 import * as S from './sim.js';
 import * as P from './plan.js';
 
@@ -43,7 +46,8 @@ const STYLE = {
     { floor: 'deck:#b07f52', wall: ['#f1e2c4', '#2f6f5b', '#d4a640'] }, { floor: 'deck:#9a6a42', wall: ['#f6e8cc', '#6a2e1f', '#d4a640'] }, { floor: 'deck:#9a6a42', wall: ['#f8ecd2', '#5a1f2c', '#e8bd4f'] }],
   staff: [RUIN, { floor: 'tiles:#cfd6dc:#b4bcc4', wall: ['#e6e9ec', '#8a96a3', '#5f6b78'] }, { floor: 'planks:#b58f68', wall: ['#eef0f2', '#5f8fb0', '#3f6680'] },
     { floor: 'checker:#eef0f2:#2f9a8c', wall: ['#f4f1e8', '#2f9a8c', '#1f6e64'] }, { floor: 'carpet:#4a5a7a', wall: ['#f6efe2', '#c4482f', '#7a2a00'] }, { floor: 'marble:#eef0ea', wall: ['#fbf6e8', '#3a4e7a', '#d4a640'] }],
-  bay: [{ floor: 'dust', wall: RUIN.wall }],
+  bay: [RUIN, { floor: 'pavers:#bdb8ac', wall: ['#e4e1da', '#8d8a84', '#5f5c57'] }, { floor: 'tiles:#c9ccd1:#aab0b8', wall: ['#eef0f2', '#e2382b', '#8a1f16'] },
+    { floor: 'checker:#e9e9e4:#2f3a4a', wall: ['#f2f2ee', '#2f6fd6', '#1f4a8f'] }, { floor: 'tiles:#d6efe9:#9fd2c6', wall: ['#f2efe2', '#f2a541', '#a3600f'] }, { floor: 'marble:#eef0ea', wall: ['#fbf6e8', '#3a4e7a', '#d4a640'] }],
 };
 const styleOf = (room, lv) => { const s = STYLE[room]; return s[Math.min(lv, s.length - 1)]; };
 const FACADE = ['#c98c63', '#a76445', '#6e3b28']; // (brick: the outside of the building)
@@ -593,7 +597,23 @@ export async function createWorld(game, markerEl) {
       plant(g, 27.4, 16.5, 0.9);
       if (lv >= 2) at('fbits', 'pictureframe_large_A', KK, 25.55, 8.16, 0, 0.95);
     },
-    bay(g) { soonRoom(g, 'bay'); },
+    // the courier bay: the shelf for the bags, the app on a stand, a sign; tyres, a tool cabinet with the level (the
+    // motors are dynamic: syncBikes)
+    bay(g, lv) {
+      if (!lv) return;
+      const at = (kit, name, sc, x, z, ry = 0, y = 0) => { const p = piece(kit, name, sc, ry); p.position.set(x, y, z); g.add(p); return p; };
+      at('rbits', 'kitchencounter_straight_B', KST, 22.7, 0.15 + KST);
+      at('rbits', 'shelf_papertowel', KST, 22.7, 0.16, 0, 1.75);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: canvasTex(256, 64, (c, W, Hh) => { c.fillStyle = '#e2382b'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#fff'; c.font = 'bold 40px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('DELIVERY', W / 2, Hh / 2 + 2); }) }));
+      sign.position.set(25.6, 2.1, 0.17); g.add(sign);
+      at('fbits', 'table_small', [KK, KK * 1.3, KK], 21.8, 7.2); at('furniture', 'computerScreen', KN * 0.8, 21.8, 7.25, Math.PI / 2 + 0.4, KK * 1.3);
+      for (let k = 0; k < 3; k++) { const t = cyl(0.32, 0.32, 0.18, M('#2b2d33', { roughness: 0.9 }), 27.4, k * 0.19, 7.4, g, 14); t.castShadow = true; }
+      if (lv >= 2) at('fbits', 'cabinet_medium', KK, 27.3, 0.15 + KK * 0.5, 0);
+      if (lv >= 3) at('furniture', 'coatRackStanding', KN, 21.6, 1.0);
+      // the garage door: a hazard stripe on the floor
+      const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 2.4), new THREE.MeshStandardMaterial({ map: canvasTex(16, 64, (c) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#1f2329' : '#f2c230'; c.fillRect(0, i * 8, 16, 8); } }) }));
+      stripe.rotation.x = -Math.PI / 2; stripe.position.set(27.7, 0.012, 4.4); g.add(stripe);
+    },
   };
   // a locker (front: +z); a little nicer every level
   const LOCKER_LOOK = [null, ['#7d8a96', '#5c6772'], ['#5f8fb0', '#466e8a'], ['#2f9a8c', '#227265'], ['#c4482f', '#933221'], ['#3a4e7a', '#2a3a5c']];
@@ -650,6 +670,7 @@ export async function createWorld(game, markerEl) {
   }
   // the little counters on a label: people seated / seats, waiting / bench seats, in line to pay
   function count(g, room) {
+    if (room === 'bay') { const out = g.staff.filter((s) => s.role === 'courier' && s.anim === 'ride' && s.st === 'work').length; return S.nCouriers(g) ? `${g.online.length} order${g.online.length === 1 ? '' : 's'}${out ? ` · ${out} out` : ''}` : ''; }
     if (room === 'dining' || room === 'terrace') { const n = S.nTables(g, room) * 2; if (!n) return ''; let k = 0; for (const s in g.seats) if ((s[0] === 'd') === (room === 'dining')) k++; return `${k}/${n}`; }
     if (room === 'entrance') { const n = S.nBenchSeats(g); return n ? `${Object.keys(g.benches).length}/${n}` : ''; }
     if (room === 'cashier') return S.cashierOpen(g) ? `${g.queue.length}/${S.QMAX}` : '';
@@ -767,7 +788,7 @@ export async function createWorld(game, markerEl) {
     if (v.carry) { v.carry.removeFromParent(); v.carry = null; }
     v.carryKey = key;
     if (!dish || !v.c) return;
-    const p = plated(dish); p.scale.setScalar(1 / CH); p.position.set(0, 0.5, 0.2); v.c.obj.add(p); v.carry = p;
+    const p = dish === 'bag' ? food('bag', 0.42) : plated(dish); p.scale.multiplyScalar(1 / CH); p.position.set(0, 0.5, 0.2); v.c.obj.add(p); v.carry = p;
   }
   const DICON = (id) => `<img class="ic" src="${ART('dish-' + id)}" alt="">`;
 
@@ -848,6 +869,7 @@ export async function createWorld(game, markerEl) {
       }
       setPose(v, x, z, ry, anim, y, dt, snap);
       if (v.hat) v.hat.visible = S.youCook(g);
+      if (v.c) v.c.obj.visible = !(s.role === 'courier' && s.st === 'work' && s.anim === 'ride'); // (out on the motor: see syncBikes)
       carry(v, s.carry);
       // a ring over a cook at work
       if (s.st === 'work' && s.job?.kind === 'cook' && s.job.steps[s.job.i]?.on === 'cooked') {
@@ -864,7 +886,7 @@ export async function createWorld(game, markerEl) {
       setPose(v, (R.x0 + R.x1) / 2 + Math.sin(t) * 1.2, (R.z0 + R.z1) / 2 + 0.6, Math.PI * 0.25, 'attack-melee-right', 0, dt, !v.placed);
       dust(dt, R);
     }
-    for (const [key, v] of views) if (key[0] !== 'c' && !live.has(key)) { views.delete(key); v.gone = true; freeChar(v.c); unbubble(v); }
+    for (const [key, v] of views) if (key[0] !== 'c' && key[0] !== 'm' && !live.has(key)) { views.delete(key); v.gone = true; freeChar(v.c); unbubble(v); }
   }
   // dust puffs while a room is worked on
   const puffs = [];
@@ -970,6 +992,90 @@ export async function createWorld(game, markerEl) {
     }
   }
 
+  // ---------- the couriers' motors: parked in the bay, riding out of the garage door and back ----------
+  const TIERS = ['rustbucket', 'zippy', 'vespetta', 'volt', 'viper'];
+  const HELMETS = ['#e8432f', '#2f6fd6', '#f2a541', '#2f9a8c', '#9b5de5'];
+  const bikes = new Map(); // staff id → { b, tier, k, path, len }
+  const tierOf = (g) => TIERS[Math.min(4, Math.floor(S.itemOf(g, 'bay', 'motors') / 5))];
+  function ridePath(k) {
+    const m = P.MOTOR_AT(k), pts = [[m.x, m.z], ...P.RIDE], cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { pts, cum, len: cum[cum.length - 1] };
+  }
+  function syncBikes(dt) {
+    const g = G(), live = new Set(), tier = tierOf(g);
+    for (const s of g.staff) {
+      if (s.role !== 'courier') continue;
+      live.add(s.id);
+      let w = bikes.get(s.id);
+      if (w && w.tier !== tier && !(s.st === 'work' && s.anim === 'ride')) { w.b?.root.removeFromParent(); bikes.delete(s.id); w = null; }
+      if (!w) {
+        const k = s.k % P.MOTORS;
+        w = { b: null, tier, k, path: ridePath(k) }; bikes.set(s.id, w);
+        makeBike(tier, { char: CHARS[(s.id * 5 + 2) % CHARS.length], helmet: HELMETS[k], rider: true }).then((b) => {
+          if (bikes.get(s.id) !== w) return;
+          b.root.scale.setScalar(0.9); scene.add(b.root); w.b = b;
+        }).catch(() => {});
+      }
+      const b = w.b; if (!b) continue;
+      const riding = s.st === 'work' && s.anim === 'ride', m = P.MOTOR_AT(w.k);
+      let x = m.x, z = m.z, ry = Math.PI / 2, speed = 0, show = true;
+      if (riding) {
+        const T = Math.max(0.1, s.dur), e = g.t - s.t0, L = Math.min(5, T * 0.35);
+        const out = e < L, back = e > T - L;
+        if (out || back) {
+          const f = out ? e / L : (T - e) / L, d = (f * f * (3 - 2 * f)) * w.path.len, r = w.path;
+          let i = 1; while (i < r.cum.length - 1 && r.cum[i] < d) i++;
+          const a = r.pts[i - 1], c = r.pts[i], seg = r.cum[i] - r.cum[i - 1], u = seg > 0 ? (d - r.cum[i - 1]) / seg : 0;
+          x = a[0] + (c[0] - a[0]) * u; z = a[1] + (c[1] - a[1]) * u;
+          ry = Math.atan2(c[0] - a[0], c[1] - a[1]) + (back ? Math.PI : 0);
+          speed = 7;
+        } else show = false;
+      }
+      b.root.visible = show; b.root.position.set(x, 0, z); b.root.rotation.y = ry;
+      if (b.rider) b.rider.obj.visible = riding;
+      if (show) b.update(dt, speed, 0);
+    }
+    for (const [id, w] of bikes) if (!live.has(id)) { w.b?.root.removeFromParent(); bikes.delete(id); }
+  }
+  // bags waiting on the shelf in the bay
+  const bagViews = [];
+  function syncBags() {
+    const n = Math.min(6, G().bags.length);
+    while (bagViews.length < n) { const b = food('bag', 0.36); b.position.set(22.1 + (bagViews.length % 3) * 0.42, KST + 0.01, 0.65 + Math.floor(bagViews.length / 3) * 0.32); dyn.add(b); bagViews.push(b); }
+    while (bagViews.length > n) bagViews.pop().removeFromParent();
+  }
+  // plates left on a table until a waiter clears it
+  const dirtyViews = new Map(); // seat → mesh
+  function syncDirty() {
+    const g = G();
+    for (const seat in g.dirty) {
+      if (dirtyViews.has(seat)) continue;
+      const sp = P.SPOTS[seat], [pre, i] = seat.split(':'), t = (pre === 'd' ? P.TABLES.dining : P.TABLES.terrace)[+i];
+      const p = new THREE.Group(); p.add(food('plate', 0.3));
+      for (let k = 0; k < 3; k++) ball(0.025, M('#8a5a2e'), (k - 1) * 0.05, 0.03, (k % 2) * 0.04, p);
+      const cup = food('cup', 0.1); cup.position.set(0.1, 0, -0.1); p.add(cup);
+      p.position.set(t.x + (sp.x < t.x ? -0.24 : 0.24), H.table + 0.005, t.z); dyn.add(p); dirtyViews.set(seat, p);
+    }
+    for (const [seat, p] of dirtyViews) if (!g.dirty[seat]) { p.removeFromParent(); dirtyViews.delete(seat); }
+  }
+  // the managers, standing in their rooms with a name tag
+  const mgrViews = new Map(); // room → view
+  function syncManagers(dt) {
+    const g = G();
+    for (const room in g.mgr) {
+      const M_ = S.MANAGERS[room], sp = P.MGR_SPOT[room];
+      let v = mgrViews.get(room);
+      if (!v) {
+        v = view('m' + room, M_.char, (vv, c) => { const tie = new THREE.Mesh(boxGeo(0.07, 0.2, 0.03), M('#c4302b')); tie.scale.setScalar(1 / CH); tie.position.set(0, 0.3, 0.115); c.obj.add(tie); });
+        v.tag = markers.add({ x: sp.x, y: 2.75, z: sp.z, cls: 'mk viptag', html: `<span class="vt mgr">${M_.name}</span>` }); v.tag.el.style.pointerEvents = 'none';
+        mgrViews.set(room, v);
+      }
+      setPose(v, sp.x, sp.z, sp.ry + Math.sin(g.t * 0.3 + sp.x) * 0.5, 'idle', 0, dt, false);
+    }
+    for (const [room, v] of mgrViews) if (!g.mgr[room]) { views.delete('m' + room); v.gone = true; freeChar(v.c); if (v.tag) dropMk(v.tag); mgrViews.delete(room); }
+  }
+
   // ---------- tips by the chairs (a tap picks one up) ----------
   const tipViews = new Map(); // tip id → { g, mk }
   const coinMat = M('#f2c230', { metalness: 0.55, roughness: 0.3 }), billMat = M('#7cc46a', { roughness: 0.8 });
@@ -1029,6 +1135,7 @@ export async function createWorld(game, markerEl) {
   let fullT = 0;
   function event(e) {
     if (e.kind === 'paid') { const v = views.get('c' + e.cust); if (v) pop(v.x, v.z, `+${S.money(e.amount)}`, 'cash'); }
+    else if (e.kind === 'delivered') pop(27.6, 4.4, `+${S.money(e.amount)}`, 'cash', 1.6);
     else if (e.kind === 'tipped') { const v = tipViews.get(e.tip); if (v) pop(v.x, v.z, `+${S.money(e.amount)}`, 'cash tip', 1.0); }
     else if (e.kind === 'lost' && e.why === 'full') { if (fullT <= 0) { pop(P.SPOTS.front.x + 1.2, P.SPOTS.front.z, 'Full!', 'lost', 1.8); fullT = 1.2; } }
     else if (e.kind === 'built') { rebuildRoom(e.room, true); buildWalls(); burst(e.room); }
@@ -1166,6 +1273,7 @@ export async function createWorld(game, markerEl) {
     syncCustomers(dt, false);
     syncStaff(dt, false);
     syncPass();
+    syncBikes(dt); syncBags(); syncDirty(); syncManagers(dt);
     syncTips();
     syncMailbox(dt);
     lightTick();
@@ -1185,10 +1293,11 @@ export async function createWorld(game, markerEl) {
   applyCam();
   return {
     scene, camera, update, event, focus, focusEvent, snap, markers,
+    lookAt(x, z, zoom) { cam.aim = [x, z]; if (zoom) cam.tvh = zoom; cam.vx = cam.vz = 0; },
     setShift(px) { cam.tshift = px; },
     resize(w, h) { W = w; Hh = h; applyCam(); },
     rebuildWalls: buildWalls,
-    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size, cars: cars.map((c) => ({ x: +c.x.toFixed(1), tx: c.tx, z: c.z, on: c.g.visible, kids: c.g.children.length })) }),
+    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size, bikes: [...bikes.values()].map((w) => ({ on: !!w.b?.root.visible, x: +(w.b?.root.position.x || 0).toFixed(1), z: +(w.b?.root.position.z || 0).toFixed(1), tier: w.tier })), dirty: dirtyViews.size, managers: mgrViews.size, cars: cars.map((c) => ({ x: +c.x.toFixed(1), tx: c.tx, z: c.z, on: c.g.visible, kids: c.g.children.length })) }),
     // where a thing is on screen (px), for the tests: a tip, the mailbox
     screenOf(what) { const p = what === 'mailbox' ? [MAILBOX.x, 1.2, MAILBOX.z] : (() => { const v = tipViews.get(what); return v ? [v.x, 0.1, v.z] : null; })(); if (!p) return null; const v = new THREE.Vector3(...p).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * Hh]; },
   };

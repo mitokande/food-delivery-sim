@@ -68,6 +68,8 @@ const game = {
     if (!r) { audio.play('ui-error'); ui.toast(G.build && a === 'up' ? 'Another room is being worked on' : 'Not enough cash', 'bad'); return false; }
     if (r.hire) { buzz(25); audio.play('ui-levelup', { vol: 0.8 }); ui.hired(r.hire); if (hadYou && !S.youCook(G) && !S.youServe(G)) setTimeout(() => ui.youFree(), 900); }
     else if (r.up) { buzz(30); audio.play('ui-purchase'); setTimeout(() => audio.play('hop', { vol: 0.4 }), 150); }
+    else if (r.mgr) { buzz(30); audio.play('ui-levelup'); ui.managerJoined(r.mgr); }
+    else if (r.auto) audio.play('ui-tap', { vol: 0.5 });
     else { buzz(12); audio.play('ui-purchase', { vol: 0.7 }); }
     save(); ui.renderRoom();
     return true;
@@ -134,7 +136,7 @@ let lastWall = Date.now();
 
 // ---------------------------------------------------------------- loop
 const timer = new THREE.Timer();
-let liveT = 0, saveT = 0, coinT = 0, bellT = 0;
+let liveT = 0, saveT = 0, coinT = 0, bellT = 0, appT = 0;
 function frame() {
   timer.update();
   const raw = timer.getDelta(), dt = Math.min(0.05, raw);
@@ -142,13 +144,16 @@ function frame() {
   if (gap > 3) catchUp(gap);
   else if (!game.paused) {
     const ev = S.tick(G, Math.min(1, raw) * SPEED, SPEED);
-    coinT -= raw; bellT -= raw;
+    coinT -= raw; bellT -= raw; appT -= raw;
     for (const e of ev) {
       world.event(e);
       if (e.kind === 'paid') { if (coinT <= 0) { audio.play('ui-coins', { vol: 0.3 }); coinT = 0.4; } }
       else if (e.kind === 'order') { if (bellT <= 0) { audio.play('doorbell', { vol: 0.15 }); bellT = 3; } }
       else if (e.kind === 'lost' && e.why !== 'full') audio.play('order-late', { vol: 0.2 });
       else if (e.kind === 'tip') audio.play('pickup-bonus', { vol: 0.25 });
+      else if (e.kind === 'delivered') { if (coinT <= 0) { audio.play('ui-coins', { vol: 0.35 }); coinT = 0.4; } }
+      else if (e.kind === 'online') { if (appT <= 0) { audio.play('notif-order', { vol: 0.12 }); appT = 6; } }
+      else if (e.kind === 'mgrbuy' && e.hire) ui.hired(e.hire);
       else if (e.kind === 'event') {
         ui.eventNote(e);
         if (e.on === 'start') { audio.play({ threat: 'siren-short', critic: 'doorbell', star: 'crowd-cheer', inspector: 'notif-order', van: 'horn-moped' }[e.e.kind], { vol: 0.6 }); buzz(30); }

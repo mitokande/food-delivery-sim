@@ -1,6 +1,6 @@
 // Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level, income, the team, cash), the clock
 // (the rushes), the event on now in a banner under it, the buttons down the right side (settings, the mailbox, the
-// events card, the features still to come, locked), the quest bar at the bottom (one
+// events card, the managers card, the features still to come, locked), the quest bar at the bottom (one
 // quest at a time: where it takes you, what holds it up, its reward to claim), the room panel that slides up when a
 // room is tapped (what it holds, what to buy, its renovation), the mailbox and its letters, the story cards, the "while
 // you were away" card, settings, toasts. Numbers that change every frame are patched by live(); renderRoom() rebuilds
@@ -25,15 +25,15 @@ const ITEM_ICON = {
   benches: ICON('ui-clock'), sign: ICON('ui-star'), decor: ICON('ui-heart'), tables: ICON('ui-people'), waiters: ICON('char-female-b'), comfort: ICON('ui-heart'),
   service: ICON('ui-speed'), cooks: ICON('char-male-d'), registers: ICON('ui-cash'), speed: ICON('ui-bolt'), upsell: ICON('food-cake'), ledger: ICON('ui-coin'),
   ads: ICON('ui-pin'), training: ICON('ui-xp'), parasols: ICON('ui-sun'), lockers: ICON('ui-people'), coffee: ICON('food-coffee'), uniforms: ICON('ui-gift'),
+  couriers: ICON('helmet'), motors: ICON('veh-zippy'), app: ICON('ui-route'), bags: ICON('ui-package'), tubs: ICON('ui-wrench'),
 };
 // the features of the later phases, locked for now (the restaurant level they're planned to open at)
 const FEATURES = [
-  { f: 'managers', name: 'Managers', icon: 'ui-xp', lv: 3 },
   { f: 'map', name: 'City map', icon: 'ui-pin', lv: 4 },
   { f: 'shop', name: 'Shop', icon: 'ui-gem', lv: 2 },
 ];
 const MAIL_ICON = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5zm2.2-.3 6.8 5.3 6.8-5.3zM19 8.3l-7 5.4-7-5.4v9.2c0 .3.2.5.5.5h13c.3 0 .5-.2.5-.5z"/></svg>';
-const STAFF = { cooks: 1, waiters: 1, registers: 1 };
+const STAFF = { cooks: 1, waiters: 1, registers: 1, couriers: 1 };
 function effect(G, room, id) {
   const it = S.ROOMS[room].items[id], n = S.itemOf(G, room, id), st = S.STEP[id];
   const plus = (k) => `+${Math.round(st * k * 100)}%`;
@@ -41,6 +41,9 @@ function effect(G, room, id) {
     case 'benches': return [`${n * 2} waiting seats`, `${n * 2 + 2}`];
     case 'tables': return [`${n * 2} seats`, `${n * 2 + 2}`];
     case 'waiters': case 'cooks': case 'registers': return [`${n} at work`, `${n + 1}`];
+    case 'couriers': return [`${n} riding`, `${n + 1}`];
+    case 'motors': { const t = (L) => secs(S.DELIVERY.ride * Math.pow(1 - st, L)); return [`a ride takes ${t(n)}`, t(n + 1)]; }
+    case 'tubs': { const t = (L) => secs(S.CLEAR * Math.pow(1 - st, L)); return [`clearing a table: ${t(n)}`, t(n + 1)]; }
     case 'speed': { const t = (L) => S.CHECKOUT * Math.pow(1 - S.STEP.speed, L); return [`paying takes ${secs(t(n))}`, secs(t(n + 1))]; }
     case 'decor': return [`wait ${Math.round(S.PATIENCE.bench * (1 + st * n))}s on a bench`, `${Math.round(S.PATIENCE.bench * (1 + st * (n + 1)))}s`];
     case 'lockers': return [`room for ${S.STAFF_BASE + n} on the team`, `${S.STAFF_BASE + n + 1}`];
@@ -53,7 +56,7 @@ function effect(G, room, id) {
     const p = (L) => M(d.price * S.stPrice(L)), t = (L) => secs(S.stTime(it.dish, L));
     return [`${p(n)} a plate · ${t(n)}`, `${p(n + 1)} · ${t(n + 1)}`];
   }
-  return [`${plus(n)} ${{ sign: 'walk-ins', ads: 'walk-ins', comfort: 'price', service: 'waiter speed', ledger: 'all prices', training: 'staff speed', upsell: 'at the register', parasols: 'price outside', coffee: 'walking speed' }[id] || ''}`, plus(n + 1)];
+  return [`${plus(n)} ${{ sign: 'walk-ins', ads: 'walk-ins', comfort: 'price', service: 'waiter speed', ledger: 'all prices', training: 'staff speed', upsell: 'at the register', parasols: 'price outside', coffee: 'walking speed', app: 'delivery orders', bags: 'a delivery' }[id] || ''}`, plus(n + 1)];
 }
 
 // the story: shown on the first visit (and from the office)
@@ -96,6 +99,7 @@ export function createUI(game) {
       <button class="slot gear" data-act="settings" aria-label="Settings">${GEAR}</button>
       <button class="slot mail" data-act="mail" aria-label="Mailbox"><span class="sic">${MAIL_ICON}</span><i class="badge" hidden></i><small>Mail</small></button>
       <button class="slot events locked" data-act="events" aria-label="Events">${ICON('ui-calendar')}<i class="lock">${ICON('ui-lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
+      <button class="slot managers locked" data-act="managers" aria-label="Managers">${ICON('char-male-f')}<i class="lock">${ICON('ui-lock')}</i><i class="badge" hidden></i><small>Lv ${S.MGR_LV}</small></button>
       ${FEATURES.map((f) => `<button class="slot locked" data-act="locked" data-f="${f.f}" aria-label="${f.name} (locked)">${ICON(f.icon)}<i class="lock">${ICON('ui-lock')}</i><small>Lv ${f.lv}</small></button>`).join('')}
     </nav>
     <button class="quest" data-act="quest"><span class="qic"></span><span class="qt"><b class="qtext"></b><small class="qhelp"></small><span class="qbar"><u></u></span></span><span class="qr"></span></button>
@@ -176,6 +180,7 @@ export function createUI(game) {
           : `<button class="btn gold big" data-act="up" data-room="${room}" data-cost="${cost}">Repair · ${M(cost)}<small>${secs(S.upTime(g, room))}</small></button>`}</div>`;
     } else {
       html += `<p class="blurb">${R.blurb}</p>`;
+      if (S.MANAGERS[room]) html += mgrRow(g, room);
       if (b) html += `<div class="prog"><b>Renovating to Lv ${b.to}</b><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>`;
       html += `<div class="items">${Object.keys(R.items).map((id) => itemRow(g, room, id)).join('')}</div>`;
       if (!b && lv < S.MAXLV && R.up[lv]?.[0]) {
@@ -190,6 +195,36 @@ export function createUI(game) {
     }
     body.innerHTML = html;
     live();
+  }
+
+  // ---------- managers ----------
+  const MGR_IC = (room) => ICON('char-' + S.MANAGERS[room].char);
+  // the manager's line in a room's panel: hire, or what they do and their switch
+  function mgrRow(g, room) {
+    const m = S.MANAGERS[room], on = S.hasMgr(g, room);
+    if (on) return `<div class="mgrrow on"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b><small>${m.what}${g.mgr[room].auto ? '. Buys things here for you' : ''}</small></span>
+      <button class="btn sm ${g.mgr[room].auto ? 'green' : 'ghost'} auto" data-act="mgrauto" data-room="${room}"><small>Buys for you</small><b>${g.mgr[room].auto ? 'ON' : 'OFF'}</b></button></div>`;
+    if (S.restaurantLv(g) < S.MGR_LV) return `<div class="mgrrow locked"><span class="mi">${ICON('ui-lock')}</span><span class="mt"><b>A manager</b><small>Managers come at restaurant level ${S.MGR_LV}</small></span></div>`;
+    return `<div class="mgrrow"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>Hire ${m.name}, ${m.title.toLowerCase()}</b><small>${m.what}, and buys things here for you</small></span>
+      <button class="btn gold sm buy" data-act="mgr" data-room="${room}" data-cost="${m.cost}"><small>Hire</small><b>${M(m.cost)}</b></button></div>`;
+  }
+  function managersCard() {
+    const g = G();
+    if (S.restaurantLv(g) < S.MGR_LV) { toast(`${ICON('ui-lock')} Managers: opens at restaurant level ${S.MGR_LV}`); sfx('ui-error', { vol: 0.4 }); return; }
+    const rows = Object.keys(S.MANAGERS).map((room) => {
+      const m = S.MANAGERS[room], R = S.ROOMS[room], on = S.hasMgr(g, room), open = S.lvOf(g, room) > 0;
+      const act = on ? `<button class="btn sm ${g.mgr[room].auto ? 'green' : 'ghost'} auto" data-act="mgrauto" data-room="${room}"><small>Buys for you</small><b>${g.mgr[room].auto ? 'ON' : 'OFF'}</b></button>`
+        : open ? `<button class="btn gold sm buy" data-act="mgr" data-room="${room}" data-cost="${m.cost}" ${g.cash >= m.cost ? '' : 'disabled'}><small>Hire</small><b>${M(m.cost)}</b></button>`
+        : `<span class="why">Repair the ${R.name} first</span>`;
+      return `<div class="mgrrow ${on ? 'on' : ''}"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b><small>${R.name}: ${m.what}</small></span>${act}</div>`;
+    }).join('');
+    const mm = modal(`<h2>${ICON('char-male-f')} Managers</h2><p class="small">One for each room. Each one helps the room, and buys its things for you when they cost at most half your cash (switch it off to save up).</p>
+      <div class="mgrlist">${rows}</div><button class="btn big" data-x="close">Close</button>`, { cls: 'managerscard', dismiss: true });
+    mm.card.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]');
+      if (b && (b.dataset.act === 'mgr' || b.dataset.act === 'mgrauto')) { e.stopPropagation(); if (game.act(b.dataset.act === 'mgr' ? 'mgr' : 'auto', b.dataset.room)) { mm.close(); managersCard(); } return; }
+      if (e.target.closest('[data-x="close"]')) mm.close();
+    });
   }
 
   // ---------- the day, the events ----------
@@ -220,10 +255,13 @@ export function createUI(game) {
     const h = S.hourOf(g), rush = S.rushOf(g), night = h < 6 || h >= 20.5;
     const ck = $('.clk', hud), ct = hhmm(h);
     if (ck.textContent !== ct) { ck.textContent = ct; $('.rush', hud).textContent = RUSH[rush] || ''; $('.clock', hud).className = `clock ${rush || ''}`; $('.cic', hud).innerHTML = ICON(night ? 'ui-moon' : 'ui-sun'); }
-    // the events button
+    // the events and managers buttons
     const on = S.restaurantLv(g) >= S.EVENT_LV, eb = $('.slot.events', hud);
     eb.classList.toggle('locked', !on); $('.lock', eb).hidden = on; $('small', eb).textContent = on ? 'Events' : `Lv ${S.EVENT_LV}`;
     $('.badge', eb).hidden = !g.event;
+    const mon = S.restaurantLv(g) >= S.MGR_LV, mb = $('.slot.managers', hud), canHire = mon && Object.keys(S.MANAGERS).some((r) => S.mgrOpen(g, r) && g.cash >= S.MANAGERS[r].cost);
+    mb.classList.toggle('locked', !mon); $('.lock', mb).hidden = mon; $('small', mb).textContent = mon ? 'Managers' : `Lv ${S.MGR_LV}`;
+    $('.badge', mb).hidden = !canHire; $('.badge', mb).textContent = canHire ? '!' : '';
     // the banner: the event on now, else a boost or a slump
     const bar = $('.evbar', hud), e = g.event, mod = g.mods.find((m) => g.t < m.until);
     if (e) {
@@ -318,12 +356,14 @@ export function createUI(game) {
     if (q.k === 'letters') return S.unread(g) ? ['mail', 'Tap the mailbox by the front door'] : null;
     if (q.k === 'served') return advice(g);
     if (q.k === 'threats') return S.restaurantLv(g) < S.EVENT_LV ? ['office', `Events start at restaurant level ${S.EVENT_LV}`] : g.event?.kind === 'threat' ? ['events', 'Serve fast: the truck is coming!'] : ['events', 'Victor\'s truck comes now and then: be ready'];
+    if (q.k === 'managers') return S.restaurantLv(g) < S.MGR_LV ? ['office', `Managers come at restaurant level ${S.MGR_LV}`] : ['managers', 'Hire them in the Managers card'];
+    if (q.k === 'delivered') return !S.lvOf(g, 'bay') ? ['bay', 'Open the Courier Bay first'] : !S.nCouriers(g) ? ['bay', 'Hire a courier'] : null;
     if (q.k === 'stars') return g.event?.kind === 'critic' ? ['events', 'The critic is here: serve them fast!'] : ['events', 'Critics come now and then: fast food, more stars'];
     return null;
   }
   const QICON = { item: (q) => (q.id?.startsWith('st:') ? DICON(q.id.slice(3)) : ITEM_ICON[q.id] || ICON('ui-star')), lv: () => ICON('ui-building'), served: () => ICON('ui-people'),
     tips: () => ICON('ui-coin'), letters: () => `<span class="mic">${MAIL_ICON}</span>`, staff: () => ICON('ui-people'), menu: () => ICON('food-burger'),
-    threats: () => '<b class="qemo">🚚</b>', stars: () => ICON('ui-star') };
+    threats: () => '<b class="qemo">🚚</b>', stars: () => ICON('ui-star'), delivered: () => ICON('helmet'), managers: () => ICON('char-male-f') };
   let questKey = '';
   function updateQuest() {
     const g = G(), q = Q.current(g), [a, n] = Q.progress(g, q), done = a >= n;
@@ -438,7 +478,7 @@ export function createUI(game) {
       <div class="set"><span>Graphics</span><button class="btn sm blue" data-s="quality">${s.quality}</button></div>
       <button class="btn ghost" data-s="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <button class="btn ghost danger" data-s="reset">Start over</button>
-      <p class="small">Prototype: phase 3 of the remake (the day, events). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
+      <p class="small">Prototype: phase 4 of the remake (the courier bay, managers, clearing tables). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
       <button class="btn big" data-x="close">Done</button>`, { cls: 'settings', dismiss: true });
     m.card.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
@@ -462,10 +502,13 @@ export function createUI(game) {
       if (Q.done(G())) game.claimQuest();
       else if (questGo === 'mail') mailbox();
       else if (questGo === 'events') eventsCard();
+      else if (questGo === 'managers') managersCard();
       else if (questGo) game.openRoom(questGo);
     }
     else if (a === 'mail') mailbox();
     else if (a === 'events') eventsCard();
+    else if (a === 'managers') managersCard();
+    else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
     else if (a === 'evfocus') { if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'locked') {
       const f = FEATURES.find((x) => x.f === el.dataset.f);
@@ -482,7 +525,9 @@ export function createUI(game) {
   Object.assign(api, {
     toast, modal, story, built, away, mailbox, letter, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${ICON('ui-star')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
-    hired(s) { toast(`${ICON(s.role === 'cook' ? 'char-male-d' : s.role === 'waiter' ? 'char-female-b' : 'ui-cash')} ${s.name} joins as a ${s.role}!`, 'good'); },
+    hired(s) { toast(`${ICON(s.role === 'cook' ? 'char-male-d' : s.role === 'waiter' ? 'char-female-b' : s.role === 'courier' ? 'helmet' : 'ui-cash')} ${s.name} joins as a ${s.role}!`, 'good'); },
+    managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },
+    managersCard,
     youFree() { toast(`${ICON('char-male-c')} Nobody needs you on the floor: off to the office!`, 'warn'); },
   });
   return api;

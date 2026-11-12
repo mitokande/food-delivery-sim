@@ -9,7 +9,7 @@
 //   z 17   | entrance     | terrace        |
 //   z 23   ----------- sidewalk ------------
 //                          street
-//   (* the courier bay comes in phase 4: nobody walks through it until then)
+//   (* the courier bay: its motors ride out through a garage door into the side alley)
 
 export const ROOMS = {
   office: { x0: 0, x1: 7, z0: 0, z1: 8 },
@@ -35,7 +35,8 @@ export const DOORS = [
   { a: 'dining', b: 'terrace', x: 16, z: 17, axis: 'z', w: 1.5 },
   { a: 'kitchen', b: 'office', x: 7, z: 5, axis: 'x', w: 1.2 },
   { a: 'office', b: 'cashier', x: 3.5, z: 8, axis: 'z', w: 1.2 },
-  { a: 'kitchen', b: 'bay', x: 21, z: 4, axis: 'x', w: 1.2, shut: true },
+  { a: 'kitchen', b: 'bay', x: 21, z: 4, axis: 'x', w: 1.2 },
+  { a: 'bay', b: 'street', x: 28, z: 4.4, axis: 'x', w: 2.4, shut: true, garage: true }, // (motors only: see RIDE)
   { a: 'bay', b: 'staff', x: 24.5, z: 8, axis: 'z', w: 1.2, shut: true },
   { a: 'dining', b: 'staff', x: 21, z: 11, axis: 'x', w: 1.2 },
 ];
@@ -109,6 +110,22 @@ for (let k = 0; k < 9; k++) LOCKER_SLOTS.push({ x: 21.55, z: 12.25 + k * 0.52, r
 for (let k = 0; k < 5; k++) LOCKER_SLOTS.push({ x: 23.55 - k * 0.52, z: 8.55, ry: FACE.s });
 export const LOCKERS = 6; // (spots in front of the first lockers)
 for (let k = 0; k < LOCKERS; k++) spot(`locker:${k}`, 'staff', 22.25, 12.25 + k * 0.52, { ry: FACE.w, via: [[23.2, 11.0]] });
+
+// the courier bay: a shelf where the cooks leave the bagged orders, the couriers' motors facing the garage door, where
+// they wait
+spot('bagshelf', 'bay', 22.7, 1.75, { ry: FACE.n, via: [[22.3, 4.0]] });
+export const MOTORS = 5;
+export const MOTOR_AT = (k) => ({ x: 26.3, z: 1.5 + k * 1.45 });
+for (let k = 0; k < MOTORS; k++) spot(`motor:${k}`, 'bay', 25.35, MOTOR_AT(k).z, { ry: FACE.e });
+for (let k = 0; k < MOTORS; k++) spot(`cidle:${k}`, 'bay', 23.4, 3.2 + k * 0.95, { ry: FACE.e });
+// a ride out (the view only: the sim times the whole trip): from the motor out of the garage door, down the side alley
+// to the street and off to the right
+export const RIDE = [[27.5, 4.4], [29.2, 4.6], [30.3, 6.0], [30.3, 24.2], [31.5, 25.6], [48, 25.6]];
+// where the room managers stand
+export const MGR_SPOT = {
+  entrance: { x: 8.4, z: 21.7, ry: FACE.s }, dining: { x: 20.3, z: 16.3, ry: FACE.w }, kitchen: { x: 20.3, z: 2.9, ry: FACE.w },
+  cashier: { x: 6.4, z: 9.8, ry: FACE.w }, terrace: { x: 27.2, z: 17.9, ry: FACE.w }, staff: { x: 27.3, z: 11.0, ry: FACE.w }, bay: { x: 22.4, z: 6.9, ry: FACE.e },
+};
 
 // ---------------------------------------------------------------- routes
 // rooms → doors (breadth first; a handful of rooms, so no weights)

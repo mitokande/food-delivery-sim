@@ -21,6 +21,7 @@ function run(name) {
   console.log(`   closed for ${S.AWAY.max / 3600} h at: ${gone.map((g) => `${g.m}m +$${Math.round(g.earned)}`).join(' | ')}`);
   console.log('   holding back: ' + Object.entries(diag).map(([k, v]) => `${k} ${Math.round(v / n * 100)}%`).join(', '));
   console.log(`   quests: ${quests.length} done, $${quests.reduce((a, q) => a + q.cash, 0)} in rewards · tips ${st.tips} ($${Math.round(st.tipCash)}) · letters ${st.letters}`);
+  console.log(`   deliveries ${st.delivered} (cancelled ${st.lostOnline}) · tables cleared ${st.cleared} · managers ${Object.keys(G.mgr).join(', ') || '-'}`);
   if (LOG) for (const q of quests) console.log(`   ${fmt(q.t)} quest: ${q.text} +$${q.cash}`);
   console.log('   events: ' + events.map((e) => `${fmt(e.t)} ${e.kind}${e.kind === 'threat' ? `(${e.need})` : ''}:${e.grade || (e.stars ? e.stars + '*' : e.ok ? 'ok' : 'no')}${e.cash ? ' +$' + e.cash : ''}`).join('  '));
 }
