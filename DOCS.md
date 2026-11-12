@@ -1062,6 +1062,18 @@ rozet şekli alınmadı. Analitik yok.
   harap odada "Repair $X" (yetiyorsa yeşil, kilitliyse gri), çalışılırken ilerleme halkası ve kalan süre. Müşteri
   balonları: sipariş ve sabır halkası, "$" (hesap bekliyor), bankta uzun bekleyince "…"; ödeyince "+$". Etraf: kaldırım,
   yol, ağaçlar, lambalar, arkada ve solda komşu binalar. Ofiste Ferdi Amca'nın portresi duvarda.
+- **Eşyalar (12 Kasım, kullanıcının "internetten istediğin asset'i indir" izniyle):** KayKit Restaurant Bits ve
+  Furniture Bits (Kay Lousberg, CC0) ile Kenney Furniture Kit (CC0); kaynaklar `assets/src/kaykit/` ve
+  `assets/src/kenney/kenney_furniture-kit/` (yalnızca kullanılan parçalar), paketler `tools/pack-kits.mjs` ile
+  `assets/models/kit-restaurant-bits.glb`, `kit-furniture-bits.glb`, `kit-furniture.glb` (Draco, toplam ~585 KB;
+  Kenney'nin ışıksız düz renkleri ışıklı malzemeye çevrilir). `world.js` `piece(kit, ad, ölçek, dönüş)`: KayKit 1 birim
+  ≈ oturak yüksekliği (`KK` 0,55; mutfak aletleri `KST` 0,63), Kenney `KN` 2,3. Salon: seviye 1 kare ahşap masa, 2 yuvarlak
+  ahşap, 3+ yuvarlak diner masası (4+ beyaz örtü ve mum); sandalye rahatlık yükseltmesiyle değişir (ahşap → minderli →
+  turuncu → mavi döşemeli). Giriş: banklar kanepe (3+ yastıklı), halı, menü standı. Mutfak: her yemeğin ocağı ayrı model
+  (burger çok gözlü ocak, pizza fırın, noodle tek göz, suşi çelik masa, diğerleri tezgâh; önü aşçıya dönük), yemeğin
+  resmi ocağın arkasında bir direkte; arka duvarda buzdolapları, evyeli tezgâhlar, raf, dolaplar, sebze kasaları, hazırlık
+  masası (seviyeyle çoğalır). Kasa: dört tezgâh yan yana. Ofis: Kenney masası, bilgisayar, döner sandalye, kitaplık,
+  lamba, halı, 3+ koltuk, 4+ televizyon. Harabelerde koli ve kasalar. Tezgâh yüksekliği 0,7 (karakter boyuna göre).
 - **Arayüz (`ui.js`):** üst çubuk (sen + restoran seviyesi rozeti, Ferdi's ve dakikalık kazanç, nakit, ayarlar), altta
   ipucu (önce yol gösterir: aşçı → garson → giriş → ofis → sosis ızgarası → kasa → yazar kasa; sonra hazır renovasyon ya
   da tamir, sonra darboğaz: mutfak / tezgâhta bekleyen tabaklar / masa / ödeme sırası / boş masalar); dokununca ilgili
@@ -1086,5 +1098,5 @@ Hızlı görüntü: `node tools/idle4shot.mjs <klasör> [sorgu] [js] [ms] [adet]
 `?speed=N`, `?away=<sn>`.
 
 Açık konular: denge (özellikle geç oyunda gelir patlaması ve kaybedilen müşteri; idle3 gibi bir denge laboratuvarı
-2. fazda eklenebilir), müşteriler masaların arasından düz yürüyor (yol bulma yok), Kenney Furniture Kit indirilemedi
-(izin sistemi; eşyalar kutu ve silindirlerden), telefonda gerçek performans ölçülmedi.
+2. fazda eklenebilir), müşteriler masaların arasından düz yürüyor (yol bulma yok), telefonda gerçek performans
+ölçülmedi.

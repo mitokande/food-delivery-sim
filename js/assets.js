@@ -12,6 +12,8 @@ const PACKED = {
   roads: 'assets/models/kit-roads.glb', commercial: 'assets/models/kit-commercial.glb', suburban: 'assets/models/kit-suburban.glb',
   industrial: 'assets/models/kit-industrial.glb', cars: 'assets/models/kit-cars.glb', food: 'assets/models/kit-food.glb',
   restaurants: 'assets/models/restaurants.glb', vehicles: 'assets/models/vehicles.glb', props: 'assets/models/props.glb', toycars: 'assets/models/cars.glb',
+  // (Ferdi's, idle4.html: KayKit's Restaurant Bits and Furniture Bits, Kenney's Furniture Kit)
+  rbits: 'assets/models/kit-restaurant-bits.glb', fbits: 'assets/models/kit-furniture-bits.glb', furniture: 'assets/models/kit-furniture.glb',
 };
 const RAW = {
   roads: 'kenney_city-kit-roads', commercial: 'kenney_city-kit-commercial_2.1', suburban: 'kenney_city-kit-suburban_20',

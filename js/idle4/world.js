@@ -12,7 +12,10 @@ import * as P from './plan.js';
 const YAW = Math.PI / 4, ELEV = 0.76; // (looking from the front right, 44° down)
 const CH = 2.0; // character scale (Kenney mini characters, 0.8 tall → 1.6 m)
 const WALL = { in: 1.5, back: 2.7, low: 0.55, t: 0.3 };
-const H = { counter: 0.95, table: 0.5, seat: 0.27 };
+const H = { counter: 0.7, table: 0.55, seat: 0.27 };
+// furniture kits → metres here: KayKit's (1 unit = a seat's height, about half a metre for these characters), the
+// kitchen's appliances a size up (KST), Kenney's Furniture Kit (small units, its origin in a corner)
+const KK = 0.55, KST = 0.63, KN = 2.3;
 const SIT = { y: 0.06, back: 0.06 };
 const CHARS = ['female-a', 'male-b', 'female-c', 'male-d', 'female-e', 'male-f', 'female-b', 'male-a', 'female-d', 'male-e', 'female-f', 'male-c'];
 const YOU_CHAR = 'male-c';
@@ -84,6 +87,21 @@ function food(name, size) {
   n.position.set(0, 0, 0); n.rotation.set(0, 0, 0); n.scale.multiplyScalar(size / foodBox.get(name));
   n.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.keep = true; } });
   const g = new THREE.Group(); g.add(n); return g;
+}
+// a piece of a furniture kit ('rbits', 'fbits': KayKit; 'furniture': Kenney), centred on its footprint, scaled (a
+// number or [x, y, z]) and turned (ry; KayKit pieces face +z)
+const pieceMid = new Map();
+function piece(kit, name, s, ry = 0) {
+  const g = new THREE.Group(), src = getNode(kit, name);
+  if (!src) return g;
+  if (!pieceMid.has(kit + name)) { src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src); pieceMid.set(kit + name, [-(b.min.x + b.max.x) / 2, -(b.min.z + b.max.z) / 2]); }
+  const n = src.clone(true);
+  if (kit === 'furniture') { const [ox, oz] = pieceMid.get(kit + name); n.position.set(ox, 0, oz); }
+  n.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.add(n);
+  if (Array.isArray(s)) g.scale.set(s[0], s[1], s[2]); else g.scale.setScalar(s);
+  g.rotation.y = ry;
+  return g;
 }
 function plated(dish) {
   const g = new THREE.Group();
@@ -202,7 +220,7 @@ function wallSegments() {
 // ---------------------------------------------------------------- the view
 export async function createWorld(game, markerEl) {
   const G = () => game.G;
-  await Promise.all([loadKit('food'), loadKit('suburban'), loadKit('roads')]);
+  await Promise.all([loadKit('food'), loadKit('suburban'), loadKit('roads'), loadKit('rbits'), loadKit('fbits'), loadKit('furniture')]);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#9cc3d3');
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 1, 300);
@@ -342,13 +360,17 @@ export async function createWorld(game, markerEl) {
   }
 
   // furniture pieces
+  // a table for two: a small square one at first, round wooden ones, then the diner's round tables (a white cloth
+  // on them indoors from level 4, a candle)
   function table(lv, outdoor) {
     const g = new THREE.Group();
-    const tm = M(lv <= 1 ? '#8a6d4f' : lv >= 4 ? '#5a3424' : '#a0703f'), top = M(lv <= 1 ? '#b9a98e' : '#fbf6ec');
-    cyl(0.06, 0.09, H.table, tm, 0, 0, 0, g, 8);
-    if (lv >= 3 && !outdoor) cyl(0.5, 0.5, 0.04, M('#ffffff'), 0, H.table - 0.03, 0, g, 22), cyl(0.52, 0.55, 0.16, M('#ffffff', { roughness: 0.95 }), 0, H.table - 0.17, 0, g, 22);
-    else cyl(0.5, 0.5, 0.05, top, 0, H.table - 0.03, 0, g, 22);
-    if (lv >= 4) { cyl(0.04, 0.05, 0.16, M('#d4a640', { metalness: 0.6, roughness: 0.3 }), 0, H.table, 0, g, 8); ball(0.07, M('#e2382b'), 0, H.table + 0.2, 0, g); }
+    if (lv <= 1) g.add(piece('fbits', 'table_small', [0.9, KK, 0.9]));
+    else if (lv === 2 || (outdoor && lv === 3)) g.add(piece('rbits', 'table_round_B', [0.33, KK, 0.33]));
+    else g.add(piece('rbits', 'table_round_A_small', [0.64, KK, 0.64]));
+    if (lv >= 4 && !outdoor) {
+      cyl(0.5, 0.5, 0.03, M('#ffffff'), 0, H.table - 0.005, 0, g, 22); cyl(0.51, 0.53, 0.15, M('#ffffff', { roughness: 0.95 }), 0, H.table - 0.15, 0, g, 22);
+      cyl(0.04, 0.05, 0.16, M('#d4a640', { metalness: 0.6, roughness: 0.3 }), 0, H.table, 0, g, 8); ball(0.07, M('#e2382b'), 0, H.table + 0.2, 0, g);
+    }
     if (outdoor) {
       cyl(0.025, 0.025, 2.3, M('#e8e2d4'), 0, 0, 0, g, 6);
       const pm = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.4, 10, 1, true), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.8,
@@ -357,23 +379,32 @@ export async function createWorld(game, markerEl) {
     }
     return g;
   }
+  // a chair at a table, facing it (side: -1 left of the table, 1 right); better chairs with the comfort upgrades
+  const CHAIRS = [['fbits', 'chair_A_wood'], ['rbits', 'chair_B'], ['rbits', 'chair_A'], ['fbits', 'chair_C']];
   function chair(lv, side, comfy) {
-    const g = new THREE.Group();
-    const cm = M(comfy >= 10 ? '#c4482f' : comfy >= 5 ? '#2f6f5b' : lv <= 1 ? '#6b5442' : '#8a5a3c');
-    box(0.42, 0.06, 0.42, cm, 0, H.seat - 0.06, 0, g);
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(0.05, H.seat - 0.06, 0.05, M('#4a3a2c'), a * 0.17, 0, b * 0.17, g);
-    box(0.06, comfy >= 5 ? 0.5 : 0.4, 0.42, cm, side * 0.2, H.seat, 0, g);
-    if (comfy >= 15) box(0.36, 0.06, 0.36, M('#f2c86a'), 0, H.seat, 0, g);
-    return g;
+    const [kit, name] = CHAIRS[Math.min(3, Math.floor(comfy / 5))];
+    return piece(kit, name, KK, -side * Math.PI / 2);
   }
+  // a potted plant; with flowers, a flowering bush in a pot
   function plant(g, x, z, s = 1, flowers = null) {
-    const p = new THREE.Group(); p.position.set(x, 0, z); g.add(p);
-    cyl(0.2 * s, 0.16 * s, 0.4 * s, M('#c46a3f'), 0, 0, 0, p, 10);
-    ball(0.36 * s, M('#3f8a3a'), 0, 0.72 * s, 0, p, 1, 1.25, 1);
-    if (flowers) for (let i = 0; i < 5; i++) ball(0.07 * s, M(flowers), Math.cos(i * 1.3) * 0.22 * s, 0.85 * s + (i % 2) * 0.12 * s, Math.sin(i * 1.3) * 0.22 * s, p);
+    let p;
+    if (flowers) {
+      p = new THREE.Group();
+      cyl(0.2 * s, 0.16 * s, 0.4 * s, M('#c46a3f'), 0, 0, 0, p, 10);
+      ball(0.36 * s, M('#3f8a3a'), 0, 0.72 * s, 0, p, 1, 1.25, 1);
+      for (let i = 0; i < 5; i++) ball(0.07 * s, M(flowers), Math.cos(i * 1.3) * 0.22 * s, 0.85 * s + (i % 2) * 0.12 * s, Math.sin(i * 1.3) * 0.22 * s, p);
+    } else p = piece('furniture', 'pottedPlant', KN * s, x * 0.7);
+    p.position.set(x, 0, z); g.add(p);
     return p;
   }
-  function crate(g, x, z, s = 0.6, ry = 0, y = 0) { const c = box(s, s, s, M('#a5855f'), x, y, z, g); c.rotation.y = ry; box(s + 0.02, 0.06, s * 0.3, M('#7d6040'), x, y + s * 0.45, z, g).rotation.y = ry; return c; }
+  // a box left lying about: a cardboard box (open or shut) or a crate with its lid
+  function crate(g, x, z, s = 0.6, ry = 0, y = 0) {
+    const k = Math.round(x * 3 + z * 7) % 3;
+    const c = k === 2 ? piece('rbits', 'crate', s / 2, ry) : piece('furniture', k ? 'cardboardBoxOpen' : 'cardboardBoxClosed', s / 0.28, ry);
+    if (k === 2) { const lid = piece('rbits', 'crate_lid', 1); lid.position.y = 0.8; c.add(lid); }
+    c.position.set(x, y, z); g.add(c);
+    return c;
+  }
   function plank(g, x, z, len, ry, tilt = 0.1, y = 0.05) { const p = box(len, 0.06, 0.22, M('#9c7a52'), x, y, z, g); p.rotation.set(0, ry, tilt); return p; }
   function ruins(g, room) {
     const R = P.ROOMS[room], w = R.x1 - R.x0, d = R.z1 - R.z0, cx = (R.x0 + R.x1) / 2, cz = (R.z0 + R.z1) / 2;
@@ -400,14 +431,15 @@ export async function createWorld(game, markerEl) {
         const bg = tag(new THREE.Group(), `bench:${b}`); g.add(bg);
         const x = (s0.x + s1.x) / 2, z = (s0.z + s1.z) / 2, along = b < 3;
         bg.position.set(x, 0, z);
-        const wood = M(lv >= 3 ? '#7a2232' : '#a0703f');
-        if (along) { box(0.46, 0.08, 1.5, wood, 0.05, 0.27, 0, bg); box(0.1, 0.5, 1.5, wood, -0.2, 0.33, 0, bg); for (const k of [-0.6, 0.6]) box(0.4, 0.27, 0.08, M('#4a3a2c'), 0.05, 0, k, bg); }
-        else { box(1.5, 0.08, 0.46, wood, 0, 0.27, -0.05, bg); box(1.5, 0.5, 0.1, wood, 0, 0.33, -0.2, bg); for (const k of [-0.6, 0.6]) box(0.08, 0.27, 0.4, M('#4a3a2c'), k, 0, -0.05, bg); }
+        // (a sofa for two against the wall: plain, then with cushions)
+        const sofa = piece('fbits', lv >= 3 ? 'couch_pillows' : 'couch', [0.9 * KK, KK, KK], along ? Math.PI / 2 : 0);
+        sofa.position.set(along ? 0.05 : 0, 0, along ? 0 : 0.05); bg.add(sofa);
       }
       if (!lv) return;
-      // the host stand, a rug, plants (flowers with the decor level), a menu board
-      box(0.7, 1.05, 0.45, M(lv >= 3 ? '#5a3424' : '#8a6d4f'), 7.2, 0, 21.4, g); box(0.8, 0.05, 0.55, M('#3a2a20'), 7.2, 1.05, 21.4, g);
-      const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 3.6), M(lv >= 2 ? '#a3262e' : '#7d6a55')); rug.rotation.x = -Math.PI / 2; rug.position.set(3, 0.012, 20.6); rug.receiveShadow = true; g.add(rug);
+      // the host stand, a rug, plants (flowers with the decor level), a menu board and a menu stand by the door
+      box(0.7, 0.8, 0.45, M(lv >= 3 ? '#5a3424' : '#8a6d4f'), 7.2, 0, 21.4, g); box(0.8, 0.05, 0.55, M('#3a2a20'), 7.2, 0.8, 21.4, g);
+      const rug = piece('fbits', lv >= 2 ? 'rug_rectangle_stripes_A' : 'rug_rectangle_B', [1.2, 0.3, 1.3], Math.PI / 2); rug.position.set(3, 0.004, 20.4); g.add(rug);
+      const stand = piece('rbits', 'menu', KK * 1.8, -0.5); stand.position.set(4.5, 0, 22.3); g.add(stand);
       const dec = it.decor;
       const spots = [[0.6, 22.5], [10.3, 17.6], [10.3, 22.4], [4.6, 17.6], [8.8, 22.4]];
       spots.slice(0, 1 + Math.min(4, Math.floor(dec / 3))).forEach(([x, z], i) => tag(plant(g, x, z, 1, dec >= 2 ? ['#ff6fae', '#ffcf3f', '#ffffff', '#e2382b', '#9b5de5'][i] : null), `plant:${i}`));
@@ -424,8 +456,10 @@ export async function createWorld(game, markerEl) {
       // plants and pictures by level; the waiters' station by the pass
       if (lv >= 2) for (const [x, z] of [[7.6, 16.4], [20.4, 16.4]]) plant(g, x, z, 1);
       if (lv >= 3) for (const [x, z] of [[7.6, 12.0], [20.4, 12.6]]) plant(g, x, z, 0.8, '#ffcf3f');
-      const pics = lv >= 2 ? [[10.5, 8.2], [16.5, 8.2]] : [];
-      void pics;
+      // pictures on the side walls
+      if (lv >= 2) for (const [x, z, ry, name] of [[7.16, 10.6, Math.PI / 2, 'pictureframe_large_A'], [7.16, 14.4, Math.PI / 2, 'pictureframe_medium'], [20.84, 14.2, -Math.PI / 2, 'pictureframe_large_A'], [20.84, 15.6, -Math.PI / 2, 'pictureframe_small_A']]) {
+        const pic = piece('fbits', name, KK * 1.1, ry); pic.position.set(x, 0.95, z); g.add(pic);
+      }
       if (lv >= 4) { const ch = new THREE.Group(); ch.position.set(14, 2.9, 12.5); g.add(ch); for (const x of [-3.5, 0, 3.5]) { cyl(0.01, 0.01, 0.9, M('#333'), x, -0.9, 0, ch, 4); ball(0.22, M('#ffe7a8', { emissive: '#ffcf6b', emissiveIntensity: 0.8 }), x, -0.95, 0, ch, 1, 0.7, 1); } }
     },
     kitchen(g, lv, it, tag) {
@@ -435,35 +469,45 @@ export async function createWorld(game, markerEl) {
         const L = it[`st:${d.id}`];
         if (!L) {
           if (i === menu.length && S.capOf(G(), 'kitchen', `st:${d.id}`) > 0) {
-            const gh = new THREE.Mesh(boxGeo(1.36, H.counter, 0.8), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false }));
-            gh.position.set(P.STATION_X(i), H.counter / 2, P.STATION_Z); g.add(gh);
+            const gh = new THREE.Mesh(boxGeo(2 * KST, KST, 2 * KST), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false }));
+            gh.position.set(P.STATION_X(i), KST / 2, P.STATION_Z - 0.07); g.add(gh);
           }
           return;
         }
         const s = tag(stationModel(d.id, lv, L), `st:${d.id}`); s.position.set(P.STATION_X(i), 0, P.STATION_Z); g.add(s);
       });
-      // the back of the kitchen: fridges, shelves with pots, a sink, a prep table
-      const steel = M(lv <= 1 ? '#a8a49a' : '#c9d0d6', { metalness: lv <= 1 ? 0.1 : 0.5, roughness: 0.4 });
-      box(1.1, 2.1, 0.75, steel, 20.2, 0, 0.5, g); box(0.05, 1.2, 0.05, M('#555'), 19.75, 0.6, 0.9, g);
-      if (lv >= 2) box(1.1, 2.1, 0.75, steel, 19.0, 0, 0.5, g);
-      box(2.6, 0.9, 0.7, steel, 15.8, 0, 0.45, g);
-      const sink = box(1.2, 0.08, 0.5, M('#7f8a93', { metalness: 0.6, roughness: 0.25 }), 15.2, 0.9, 0.45, g); sink.castShadow = false;
-      box(2.4, 0.06, 0.45, M('#8a6d4f'), 12.0, 1.6, 0.3, g); box(2.4, 0.06, 0.45, M('#8a6d4f'), 12.0, 2.2, 0.3, g);
-      for (let k = 0; k < 4; k++) { const p = food(k % 2 ? 'pot' : 'pan', 0.32); p.position.set(11.0 + k * 0.65, 1.66, 0.3); g.add(p); }
-      box(2.2, 0.9, 0.9, M(lv <= 1 ? '#8d7f6d' : '#d9d4c8'), 9.2, 0, 3.2, g);
-      const cb = food('cutting-board', 0.5); cb.position.set(9.0, 0.92, 3.2); g.add(cb);
-      if (lv >= 3) { const kb = food('knife-block', 0.25); kb.position.set(9.9, 0.92, 3.0); g.add(kb); }
+      // the back of the kitchen (against the wall, facing the room): fridges, counters with a sink, a shelf, crates of
+      // vegetables, a prep table; a little more of everything with the level
+      const back = (name, x, ry = 0, z = 0.15 + KST, s = KST) => { const p = piece('rbits', name, s, ry); p.position.set(x, 0, z); g.add(p); return p; };
+      back(lv >= 3 ? 'fridge_A_decorated' : lv >= 2 ? 'fridge_A' : 'fridge_B', 20.15);
+      if (lv >= 2) back(lv >= 4 ? 'fridge_A_decorated' : 'fridge_B', 18.85);
+      back(lv >= 3 ? 'kitchencounter_straight_A_decorated' : 'kitchencounter_straight_A', 17.55);
+      back(lv >= 2 ? 'kitchencounter_sink_backsplash' : 'kitchencounter_sink', 16.29);
+      back(lv >= 2 ? 'kitchencounter_straight_decorated' : 'kitchencounter_straight_B', 15.03);
+      if (lv >= 2) { back('kitchencounter_straight_B', 13.77); back('dishrack_plates', 13.77, 0, 0.75, KST * 0.8).position.y = KST; }
+      const shelf = back(lv >= 3 ? 'shelf_papertowel_decorated' : 'shelf_papertowel', 15.6, 0, 0.16); shelf.position.y = 1.75;
+      for (const [k, name] of ['crate_tomatoes', 'crate_lettuce', 'crate_onions', 'crate_potatoes'].entries()) {
+        if (k >= 1 + lv) break;
+        back(name, 7.75 + (k % 2) * 0.72, 0, 0.55 + Math.floor(k / 2) * 0.72, 0.34).position.y = 0;
+      }
+      back(lv >= 2 ? 'kitchentable_A_large_decorated' : 'kitchentable_A_large', 9.6, 0, 3.15);
+      if (lv >= 3) { back('kitchencounter_straight_A', 12.51); back('pot_large', 12.51, 0.3, 0.75, KST * 0.55).position.y = KST; back('kitchencabinet', 12.51, 0, 0.16); back('kitchencabinet', 13.77, 0, 0.16); }
     },
     cashier(g, lv, it, tag) {
       if (!lv) return;
-      const body = M(lv >= 2 ? '#167f75' : '#8a6d4f'), top = M(lv >= 2 ? '#f2efe2' : '#c9b79a');
-      box(0.75, 1.0, 5.4, body, 1.6, 0, 11.8, g); box(0.95, 0.06, 5.5, top, 1.6, 1.0, 11.8, g);
+      // the counter: four kitchen counters in a row, facing the cashiers behind it
+      const ctop = 1.0 * 0.62;
+      for (let k = 0; k < 4; k++) {
+        const c = piece('rbits', k === 1 && lv >= 3 ? 'kitchencounter_straight_A' : 'kitchencounter_straight_B', [0.675, 0.62, 0.44], -Math.PI / 2);
+        c.position.set(1.6, 0, 9.775 + k * 1.35); g.add(c);
+      }
       for (let r = 0; r < Math.min(it.registers, P.REGISTERS.length); r++) {
-        const rg = tag(new THREE.Group(), `reg:${r}`); rg.position.set(1.55, 1.06, P.REGISTERS[r]); g.add(rg);
+        const rg = tag(new THREE.Group(), `reg:${r}`); rg.position.set(1.55, ctop, P.REGISTERS[r]); g.add(rg);
         box(0.42, 0.22, 0.4, M('#3a3f4a'), 0, 0, 0, rg); box(0.36, 0.2, 0.06, M('#9fe3a0', { emissive: '#2f8a3a', emissiveIntensity: 0.5 }), 0, 0.22, -0.1, rg).rotation.x = -0.4;
       }
+      if (lv >= 2) { const k = piece('rbits', 'ketchup', KK * 0.7); k.position.set(1.75, ctop, 9.25); g.add(k); const m = piece('rbits', 'mustard', KK * 0.7); m.position.set(1.55, ctop, 9.3); g.add(m); }
       if (it.upsell > 0) {
-        const cd = tag(new THREE.Group(), 'cakes'); cd.position.set(1.6, 1.06, 14.9); g.add(cd);
+        const cd = tag(new THREE.Group(), 'cakes'); cd.position.set(1.6, ctop, 14.9); g.add(cd);
         box(0.7, 0.45, 0.6, M('#e8f6ff', { transparent: true, opacity: 0.45, roughness: 0.1 }), 0, 0, 0, cd, false);
         const c = food(it.upsell >= 5 ? 'cake-birthday' : 'cake', 0.3); c.position.set(0, 0.02, 0); cd.add(c);
       }
@@ -476,20 +520,25 @@ export async function createWorld(game, markerEl) {
         box(1.9, 0.85, 0.95, M('#d8d2c4', { roughness: 1 }), 3.2, 0, 3.2, g);
         return;
       }
-      box(1.9, 0.08, 0.95, M(lv >= 3 ? '#4e3424' : '#7a5a40'), 3.2, 0.78, 3.2, g);
-      for (const [a, b] of [[-0.85, -0.38], [0.85, -0.38], [-0.85, 0.38], [0.85, 0.38]]) box(0.08, 0.78, 0.08, M('#3a2a20'), 3.2 + a, 0, 3.2 + b, g);
-      const ch = new THREE.Group(); ch.position.set(3.2, 0, 2.15); g.add(ch);
-      box(0.5, 0.08, 0.5, M('#2b2a2a'), 0, 0.4, 0, ch); box(0.5, 0.6, 0.08, M('#2b2a2a'), 0, 0.45, -0.24, ch); cyl(0.03, 0.03, 0.4, M('#555'), 0, 0, 0, ch, 6);
-      const lamp = food('cup-coffee', 0.12); lamp.position.set(3.8, 0.86, 3.0); g.add(lamp);
-      // bookshelf on the back wall, Uncle Ferdi's portrait above the desk, a safe, a plant
-      box(2.0, 2.0, 0.4, M('#6e4b2e'), 5.6, 0, 0.35, g);
-      for (let k = 0; k < 3; k++) for (let b = 0; b < 6; b++) box(0.16, 0.36, 0.26, M(['#c4482f', '#2f6fd6', '#f2a541', '#2f6f5b', '#9b5de5', '#e8e2d4'][(b + k) % 6]), 4.9 + b * 0.25, 0.25 + k * 0.62, 0.35, g, false);
+      const at = (kit, name, s, x, z, ry = 0, y = 0) => { const p = piece(kit, name, s, ry); p.position.set(x, y, z); g.add(p); return p; };
+      if (lv >= 2) at('fbits', lv % 2 ? 'rug_oval_B' : 'rug_oval_A', [1.3, 0.3, 1.3], 3.2, 3.4);
+      // the desk with a computer (you sit behind it, facing the room)
+      at('furniture', 'desk', KN, 3.2, 3.45, Math.PI);
+      at('furniture', 'computerScreen', KN * 0.8, 2.85, 3.55, Math.PI, 0.87);
+      at('furniture', 'computerKeyboard', KN * 0.8, 2.85, 3.2, Math.PI, 0.87);
+      const cup = food('cup-coffee', 0.12); cup.position.set(3.85, 0.87, 3.4); g.add(cup);
+      at('furniture', 'chairDesk', KN * 0.95, 3.2, 2.05);
+      // a bookcase on the back wall, Uncle Ferdi's portrait above the desk, a safe, a plant, a lamp
+      at('furniture', 'bookcaseClosedWide', KN, 5.5, 0.47, Math.PI);
+      if (lv >= 2) at('furniture', 'books', KN, 5.2, 0.45, Math.PI, 1.83);
       const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), new THREE.MeshStandardMaterial({ map: artTexture('ferdi'), roughness: 0.7 }));
       fr.position.set(2.4, 1.85, 0.17); g.add(fr);
       box(1.1, 1.1, 0.06, M('#d4a640', { metalness: 0.5, roughness: 0.35 }), 2.4, 1.3, 0.13, g, false);
       box(0.7, 0.8, 0.6, M('#3a3f4a', { metalness: 0.4, roughness: 0.4 }), 0.6, 0, 6.8, g);
       plant(g, 6.3, 7.3, 1);
-      if (lv >= 2) { const rug = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.2), M('#a3262e')); rug.rotation.x = -Math.PI / 2; rug.position.set(3.2, 0.012, 3.0); g.add(rug); }
+      at('fbits', 'lamp_standing', KK, 0.65, 0.75);
+      if (lv >= 3) { at('fbits', 'armchair_pillows', KK, 1.0, 4.6, Math.PI / 2); at('fbits', 'table_low', [KK * 0.6, KK, KK * 0.6], 1.05, 3.3, Math.PI / 2); }
+      if (lv >= 4) at('furniture', 'televisionVintage', KN, 6.5, 2.6, -Math.PI / 2);
     },
     terrace(g, lv, it, tag) {
       if (!lv) return;
@@ -518,31 +567,33 @@ export async function createWorld(game, markerEl) {
     const pole = M('#8a8f99', { metalness: 0.4, roughness: 0.5 }), board = M('#b08a5a');
     for (const [dx, dz] of [[-1.2, -0.8], [1.2, -0.8], [-1.2, 0.8], [1.2, 0.8]]) cyl(0.05, 0.05, 2.6, pole, cx + dx, 0, cz + dz, g, 6);
     for (const y of [1.2, 2.5]) { box(2.6, 0.06, 0.5, board, cx, y, cz - 0.8, g); box(2.6, 0.06, 0.5, board, cx, y, cz + 0.8, g); }
-    crate(g, cx + 1.9, cz + 1.6, 0.7, 0.3); crate(g, cx + 1.95, cz + 1.6, 0.5, 0.8, 0.7);
+    for (const [y, sc, ry] of [[0, 0.7, 0.3], [0.7, 0.5, 0.8]]) { const b = piece('furniture', 'cardboardBoxClosed', sc / 0.28, ry); b.position.set(cx + 1.9, y, cz + 1.6); g.add(b); }
   }
 
+  // a station: a stove, an oven, a counter or a prep table (its front to the cook, its back to the pass), the dish's
+  // things on it
+  const ST_BASE = { burger: 'stove_multi', noodle: 'stove_single', pizza: 'oven', sushi: 'kitchentable_A', doner: 'kitchencounter_straight_A' };
   function stationModel(dish, lv, L) {
-    const g = new THREE.Group(), top = H.counter;
+    const g = new THREE.Group(), base = ST_BASE[dish] || 'kitchencounter_straight_B';
+    g.add(piece('rbits', base, KST, Math.PI));
+    const top = (base === 'oven' ? 2.02 : base.startsWith('stove') ? 1.2 : 1.0) * KST;
     const steel = M('#c4ccd5', { metalness: 0.45, roughness: 0.38 }), dark = M('#33363d', { roughness: 0.5 });
-    box(1.36, top, 0.8, lv <= 1 ? M('#a39b8e') : steel, 0, 0, 0, g);
     const put = (name, size, x, z, y = top, ry = 0) => { const n = food(name, size); n.position.set(x, y, z); n.rotation.y = ry; g.add(n); return n; };
     switch (dish) {
-      case 'burger': box(1.25, 0.05, 0.62, dark, 0, top, 0, g); put('meat-patty', 0.26, -0.32, -0.02, top + 0.05); put('meat-patty', 0.26, 0.0, 0.08, top + 0.05); put('burger', 0.26, 0.36, -0.06, top + 0.05); break;
+      case 'burger': put('meat-patty', 0.26, -0.27, -0.25, top - 0.02); put('meat-patty', 0.26, 0.27, 0.25, top - 0.02); put('meat-patty', 0.26, 0.27, -0.25, top - 0.02); break;
       case 'hotdog': box(1.1, 0.1, 0.5, steel, 0, top, 0, g); for (let i = 0; i < 6; i++) { const r = cyl(0.035, 0.035, 0.9, M('#b9bec6', { metalness: 0.7, roughness: 0.3 }), 0, 0, 0, g, 8); r.rotation.z = Math.PI / 2; r.position.set(0, top + 0.13, -0.18 + i * 0.07); } put('hot-dog', 0.34, 0.1, -0.05, top + 0.16, 0.2); break;
       case 'doner': box(0.5, 0.9, 0.12, dark, -0.15, top, 0.3, g); cyl(0.02, 0.02, 0.85, steel, 0.1, top, 0.05, g, 6); cyl(0.13, 0.2, 0.6, M('#9b5a2e', { roughness: 0.7 }), 0.1, top + 0.12, 0.05, g, 12); put('sandwich', 0.26, 0.45, -0.2, top, 0.4); break;
-      case 'pizza': { const o = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M('#b5542f', { roughness: 0.9 })); o.scale.set(1.15, 0.9, 0.7); o.position.set(0, top, 0.05); o.castShadow = true; g.add(o);
-        const m = new THREE.Mesh(new THREE.CircleGeometry(0.2, 16, 0, Math.PI), M('#2a1a12', { emissive: '#ff6a1a', emissiveIntensity: 0.7 })); m.position.set(0, top + 0.02, -0.33); m.rotation.y = Math.PI; g.add(m);
-        put('pizza', 0.42, 0.35, -0.28, top, 0); break; }
-      case 'noodle': cyl(0.22, 0.22, 0.06, dark, -0.2, top, 0, g, 16); put('frying-pan', 0.5, -0.2, -0.05, top + 0.06, 0.6); put('chinese', 0.22, 0.4, -0.05, top); break;
+      case 'pizza': put('pizza', 0.5, 0, 0, top, 0); break;
+      case 'noodle': put('frying-pan', 0.5, 0, -0.05, top - 0.02, 0.6); put('chinese', 0.22, 0.4, 0.3, top - 0.05); break;
       case 'fish': box(0.7, 0.16, 0.6, steel, -0.25, top, 0, g); box(0.6, 0.02, 0.5, M('#e6b43a', { roughness: 0.25, emissive: '#6a4a00', emissiveIntensity: 0.3 }), -0.25, top + 0.16, 0, g); put('fries', 0.2, 0.3, -0.05, top); put('fish', 0.26, 0.45, 0.15, top, 1.2); break;
-      case 'sushi': box(1.3, 0.06, 0.7, M('#c49a62'), 0, top, 0, g); put('cutting-board-japanese', 0.55, -0.2, 0, top + 0.06); for (let i = 0; i < 3; i++) put('maki-salmon', 0.1, -0.35 + i * 0.13, -0.05, top + 0.1); put('sushi-salmon', 0.12, 0.38, -0.05, top + 0.06); break;
-      case 'icecream': box(1.3, 0.35, 0.7, M('#ffffff', { roughness: 0.5 }), 0, top - 0.1, 0, g); box(1.2, 0.03, 0.6, M('#bfe3f5', { transparent: true, opacity: 0.55, roughness: 0.1 }), 0, top + 0.25, 0, g); put('ice-cream', 0.18, -0.25, -0.05, top + 0.28); put('ice-cream-cup', 0.16, 0.25, -0.05, top + 0.28); break;
+      case 'sushi': put('cutting-board-japanese', 0.55, -0.2, 0, top); for (let i = 0; i < 3; i++) put('maki-salmon', 0.1, -0.35 + i * 0.13, -0.05, top + 0.04); put('sushi-salmon', 0.12, 0.38, -0.05, top); break;
+      case 'icecream': box(1.1, 0.3, 0.9, M('#ffffff', { roughness: 0.5 }), 0, top, 0, g); box(1.0, 0.03, 0.8, M('#bfe3f5', { transparent: true, opacity: 0.55, roughness: 0.1 }), 0, top + 0.3, 0, g); put('ice-cream', 0.18, -0.25, -0.05, top + 0.33); put('ice-cream-cup', 0.16, 0.25, -0.05, top + 0.33); break;
       default: break;
     }
-    // a hood over it with the dish's picture (the level shows as stars under it)
-    box(1.3, 0.12, 0.7, steel, 0, 2.15, -0.1, g);
-    const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: artTexture('dish-' + dish), transparent: true, alphaTest: 0.1 }));
-    sg.position.set(0, 2.62, -0.1); g.add(sg);
+    // the dish's picture on a little post at the back
+    cyl(0.025, 0.025, 1.0, steel, 0, top, 0.5, g, 6);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: artTexture('dish-' + dish), transparent: true, alphaTest: 0.1 }));
+    sg.position.set(0, top + 1.2, 0.5); g.add(sg);
     void L;
     return g;
   }

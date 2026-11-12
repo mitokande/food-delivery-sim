@@ -1,6 +1,6 @@
-// Packs the Kenney CC0 kits (assets/src/kenney) into one Draco GLB per kit.
+// Packs the Kenney CC0 kits (assets/src/kenney) and the KayKit CC0 kits (assets/src/kaykit) into one Draco GLB per kit.
 //
-//   node tools/pack-kits.mjs            (run from anywhere; paths are resolved from this file)
+//   node tools/pack-kits.mjs [kit-x.glb …]   (run from anywhere; paths are resolved from this file; names: only those)
 //
 // Per kit: ONE material (named after the kit) + ONE embedded colormap PNG shared by every piece,
 // every piece a top-level node named exactly like the Kenney file, node transform identity,
@@ -12,6 +12,8 @@
 //   - TANGENT attributes are dropped (no normal maps; Kenney exports them for Unity).
 //   - industrial "colormap-specular" (identical PBR params, same texture) is merged into `industrial`.
 //   - food glass lids keep a second material `food-glass` (transparent), only on 2 pieces.
+//   - KayKit kits (.gltf + .bin, one atlas texture) pack the same way as Kenney's.
+//   - Kenney's Furniture Kit has no texture: flat colours, unlit. `flat` keeps one lit material per colour name.
 // Texture sampler: mag LINEAR, min LINEAR_MIPMAP_LINEAR (see assets/models/tex/README.md).
 
 import { Document, NodeIO, TextureInfo, PropertyType } from '@gltf-transform/core';
@@ -24,7 +26,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = path.join(ROOT, 'assets/src/kenney');
+const SRC = path.join(ROOT, 'assets/src');
 const OUT = path.join(ROOT, 'assets/models');
 
 const KITS = [
@@ -38,7 +40,12 @@ const KITS = [
       'sedan-sports', 'suv', 'suv-luxury', 'taxi', 'truck', 'truck-flat', 'van', 'cone', 'cone-flat', 'box'],
   },
   { out: 'kit-food.glb', mat: 'food', dir: 'kenney_food-kit' },
+  // Ferdi's (idle4.html): the restaurant's furniture
+  { out: 'kit-restaurant-bits.glb', mat: 'restaurant-bits', models: 'kaykit/restaurant-bits', ext: '.gltf', texture: 'restaurantbits_texture.png', srcMats: ['restaurant'] },
+  { out: 'kit-furniture-bits.glb', mat: 'furniture-bits', models: 'kaykit/furniture-bits', ext: '.gltf', texture: 'furniturebits_texture.png', srcMats: ['furniture_texture'] },
+  { out: 'kit-furniture.glb', mat: 'furniture', models: 'kenney/kenney_furniture-kit/Models/GLTF format', flat: true },
 ];
+const ONLY = process.argv.slice(2);
 
 const io = new NodeIO()
   .registerExtensions(ALL_EXTENSIONS)
@@ -98,8 +105,9 @@ function detachedCopy(doc, prim) {
 }
 
 for (const kit of KITS) {
-  const dir = path.join(SRC, kit.dir, 'Models/GLB format');
-  const names = fs.readdirSync(dir).filter((f) => f.endsWith('.glb')).map((f) => f.slice(0, -4)).sort()
+  if (ONLY.length && !ONLY.includes(kit.out)) continue;
+  const dir = path.join(SRC, kit.models || path.join('kenney', kit.dir, 'Models/GLB format')), ext = kit.ext || '.glb';
+  const names = fs.readdirSync(dir).filter((f) => f.endsWith(ext)).map((f) => f.slice(0, -ext.length)).sort()
     .filter((n) => !kit.only || kit.only.includes(n));
   if (kit.only) for (const n of kit.only) if (!names.includes(n)) throw new Error(`${kit.out}: missing ${n}`);
 
@@ -108,20 +116,30 @@ for (const kit of KITS) {
   const scene = doc.createScene(kit.mat);
   doc.getRoot().setDefaultScene(scene);
 
-  const tex = doc.createTexture('colormap-' + kit.mat).setMimeType('image/png').setURI(kit.mat + '.png')
-    .setImage(palettePNG(path.join(dir, 'Textures/colormap.png')));
+  const tex = kit.flat ? null : doc.createTexture('colormap-' + kit.mat).setMimeType('image/png').setURI(kit.mat + '.png')
+    .setImage(palettePNG(path.join(dir, kit.texture || 'Textures/colormap.png')));
   const material = doc.createMaterial(kit.mat)
     .setBaseColorTexture(tex).setBaseColorFactor([1, 1, 1, 1])
     .setMetallicFactor(0).setRoughnessFactor(1).setDoubleSided(true);
-  material.getBaseColorTextureInfo()
+  if (tex) material.getBaseColorTextureInfo()
     .setMagFilter(TextureInfo.MagFilter.LINEAR).setMinFilter(TextureInfo.MinFilter.LINEAR_MIPMAP_LINEAR)
     .setWrapS(TextureInfo.WrapMode.REPEAT).setWrapT(TextureInfo.WrapMode.REPEAT);
   let glass = null; // food-kit transparent lids
+  const flats = new Map(); // (flat kits) colour name → lit material
 
   const srcMaterialFor = (m) => {
     if (!m) return material;
     const n = m.getName();
-    if (n === 'colormap' || n === 'colormap-specular') return material;
+    if (kit.flat) {
+      if (!flats.has(n)) {
+        const a = m.getBaseColorFactor()[3];
+        flats.set(n, doc.createMaterial(`${kit.mat}-${n}`).setBaseColorFactor(m.getBaseColorFactor())
+          .setMetallicFactor(0).setRoughnessFactor(/metal|glass/i.test(n) ? 0.45 : 0.9)
+          .setAlphaMode(a < 1 ? 'BLEND' : 'OPAQUE').setDoubleSided(true));
+      }
+      return flats.get(n);
+    }
+    if (n === 'colormap' || n === 'colormap-specular' || (kit.srcMats || []).includes(n)) return material;
     if (n === 'glass') {
       if (!glass) {
         glass = doc.createMaterial(kit.mat + '-glass')
@@ -135,7 +153,7 @@ for (const kit of KITS) {
   };
 
   for (const name of names) {
-    const src = await io.read(path.join(dir, name + '.glb'));
+    const src = await io.read(path.join(dir, name + ext));
     const srcScene = src.getRoot().getDefaultScene() || src.getRoot().listScenes()[0];
     const map = mergeDocuments(doc, src);
     const mScene = map.get(srcScene);
@@ -202,7 +220,7 @@ for (const kit of KITS) {
   }
 
   // Remove everything that came from the sources but is no longer used (old materials, textures…).
-  for (const m of doc.getRoot().listMaterials()) if (m !== material && m !== glass) m.dispose();
+  for (const m of doc.getRoot().listMaterials()) if (m !== glass && !(kit.flat ? [...flats.values()].includes(m) : m === material)) m.dispose();
   for (const t of doc.getRoot().listTextures()) if (t !== tex) t.dispose();
   for (const s of doc.getRoot().listScenes()) if (s !== scene) s.dispose();
   for (const e of doc.getRoot().listExtensionsUsed()) e.dispose();
