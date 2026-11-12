@@ -9,7 +9,7 @@
 //   z 17   | entrance     | terrace        |
 //   z 23   ----------- sidewalk ------------
 //                          street
-//   (* later phases: the staff room in phase 2, the courier bay in phase 4)
+//   (* the courier bay comes in phase 4: nobody walks through it until then)
 
 export const ROOMS = {
   office: { x0: 0, x1: 7, z0: 0, z1: 8 },
@@ -35,8 +35,8 @@ export const DOORS = [
   { a: 'dining', b: 'terrace', x: 16, z: 17, axis: 'z', w: 1.5 },
   { a: 'kitchen', b: 'office', x: 7, z: 5, axis: 'x', w: 1.2 },
   { a: 'office', b: 'cashier', x: 3.5, z: 8, axis: 'z', w: 1.2 },
-  { a: 'kitchen', b: 'bay', x: 21, z: 4, axis: 'x', w: 1.2 },
-  { a: 'bay', b: 'staff', x: 24.5, z: 8, axis: 'z', w: 1.2 },
+  { a: 'kitchen', b: 'bay', x: 21, z: 4, axis: 'x', w: 1.2, shut: true },
+  { a: 'bay', b: 'staff', x: 24.5, z: 8, axis: 'z', w: 1.2, shut: true },
   { a: 'dining', b: 'staff', x: 21, z: 11, axis: 'x', w: 1.2 },
 ];
 // the pass: the kitchen's front wall is a counter (an open kitchen): the stations stand right behind it, the cooks put
@@ -101,10 +101,17 @@ QUEUE.forEach(([x, z], k) => spot(`q:${k}`, 'cashier', x, z, { ry: FACE.n }));
 spot('office', 'office', 3.2, 2.15, { ry: FACE.s, sit: true, via: [[4.6, 2.4]] });
 spot('desk', 'office', 3.2, 3.2);
 
+// the staff room: lockers along its left wall (then along the back), where a new hire changes before going to work
+export const LOCKER_SLOTS = [];
+for (let k = 0; k < 9; k++) LOCKER_SLOTS.push({ x: 21.55, z: 12.25 + k * 0.52, ry: FACE.e });
+for (let k = 0; k < 5; k++) LOCKER_SLOTS.push({ x: 23.55 - k * 0.52, z: 8.55, ry: FACE.s });
+export const LOCKERS = 6; // (spots in front of the first lockers)
+for (let k = 0; k < LOCKERS; k++) spot(`locker:${k}`, 'staff', 22.25, 12.25 + k * 0.52, { ry: FACE.w, via: [[23.2, 11.0]] });
+
 // ---------------------------------------------------------------- routes
 // rooms → doors (breadth first; a handful of rooms, so no weights)
 const ADJ = {};
-for (const d of DOORS) { (ADJ[d.a] ||= []).push([d.b, d]); (ADJ[d.b] ||= []).push([d.a, d]); }
+for (const d of DOORS) { if (d.shut) continue; (ADJ[d.a] ||= []).push([d.b, d]); (ADJ[d.b] ||= []).push([d.a, d]); }
 function roomPath(a, b) {
   if (a === b) return [];
   const prev = { [a]: null }, q = [a];

@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `world.js` izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, kamera), `ui.js` üst çubuk + oda paneli + ipucu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1098,5 +1098,44 @@ Hızlı görüntü: `node tools/idle4shot.mjs <klasör> [sorgu] [js] [ms] [adet]
 `?speed=N`, `?away=<sn>`.
 
 Açık konular: denge (özellikle geç oyunda gelir patlaması ve kaybedilen müşteri; idle3 gibi bir denge laboratuvarı
-2. fazda eklenebilir), müşteriler masaların arasından düz yürüyor (yol bulma yok), telefonda gerçek performans
-ölçülmedi.
+eklenebilir), müşteriler masaların arasından düz yürüyor (yol bulma yok), telefonda gerçek performans ölçülmedi.
+
+### 14.1 2. faz: görevler, personel odası, posta kutusu, bahşişler (12 Kasım 2026)
+
+Kullanıcı 1. fazı birleştirdi ("pr merged continue phase"). Dal `idle-phase2`.
+
+- **Üst çubuk:** sen + restoran seviyesi, Ferdi's ve dakikalık kazanç, **ekip `x/y`** (dokununca personel odası; dolunca
+  turuncu), nakit. Ayarlar sağdaki sütunun başına taşındı.
+- **Sağdaki sütun:** ayarlar, **posta kutusu** (okunmamış sayısı), sonraki fazların **kilitli düğmeleri**: Events (Lv 2,
+  3. faz), Managers (Lv 3, 4. faz), City map (Lv 4, 5. faz), Shop (Lv 2, 6. faz). Dokununca "opens at restaurant level
+  N" ya da seviyeye gelinmişse "coming in a later update".
+- **Görev şeridi (`quests.js`):** altta tek görev, ilerlemesi "(3/4)" ve çubukla, ödülü (nakit). Bitince yeşil olur ve
+  "Claim" der; dokununca ödül gelir, sıradaki görev gelir. Bitmemişken dokununca ilgili odaya götürür; bir şey önünü
+  kesiyorsa altında yazar ("The team is full: add a locker in the Staff Room", "Upgrade Ferdi's Office to Lv 2 first",
+  "Max out everything in the Kitchen first (3/4)", ya da müşteri görevlerinde darboğaz tavsiyesi). 39 elle yazılmış
+  görev (aşçı, garson, sosis ızgarası, 15 müşteri, ofis, posta, giriş, bank, 3 bahşiş, masalar, kasa, ... ofis Lv 5),
+  sonra sonu gelmeyen "Serve N customers". Eski ipucu şeridinin yerini aldı.
+- **Personel odası (artık gerçek oda):** tamir $300 / 30 sn (restoran Lv 1 ister), seviyeler $2,5K / $20K / $120K /
+  $400K. Ekip sınırı = 5 + dolap sayısı (dolaplar oda seviyesine göre 3 / 5 / 8 / 10 / 12, $150'den $90K'ya); sınır
+  dolunca aşçı, garson, yazar kasa alınamaz (panelde gri "Team full" düğmesi personel odasına götürür). Kahve makinesi
+  (personel %3 hızlı yürür / seviye), üniformalar (bahşiş bırakma ihtimali +%6 / seviye). Yeni gelen aşçı ve garson
+  sokaktan girip önce bir dolapta üstünü değiştirir. Görünüm: duvar boyunca dolaplar (seviyeyle renk), masa ve
+  sandalyeler, kahve köşesi, askılık, Lv 2'den kanepe ve halı, Lv 3'ten televizyon. Kurye rampasının kapıları kapalı
+  (rotalar oradan geçmez; 4. faz).
+- **Bahşişler:** ödeyen müşterinin %12'si (× üniformalar) hesabın %40'ını sandalyesinin yanına bırakır (yerde
+  bozuk para + para; üstünde sallanan altın "$X" balonu). Dokununca toplanır. Aynı anda en çok 8 bahşiş; kapalıyken
+  toplanmaz.
+- **Posta kutusu:** kapının solunda kaldırımda kırmızı kutu (mektup varken bayrak kalkar, üstünde zarf ve sayı).
+  Mektuplar olaylarla gelir: sağlık müdürlüğü (ofis Lv 1, $40), Mrs. Okafor (150 müşteri, $150), Victor Gristle (Lv 2),
+  manav Bruno (4 yemek, $1,5K), Old Town Gazette (Lv 3, $4K), Ferdi Amca'nın çekmecedeki notu (Lv 4, $20K), Victor
+  yine (Lv 5). Bir dakikadan uzun kapalı kalınca kazanılan para doğrudan nakde değil posta kutusuna gider; "While you
+  were away" kartının "Collect $X" düğmesi alır (kart kapanmadan uygulama kapanırsa kutuda bekler).
+- **Kayıt:** `G.tips`, `G.mail`, `G.quest`, `G.sent`; eski kayıtlar `S.migrate` ile yeni odanın eşyalarını alır.
+
+Denge (bot "plan"; görevleri alır, mektupları açar, bahşişleri 30 sn'de bir toplar): ofis Lv 1 4:58, personel odası
+11:53, restoran Lv 2 17:22, Lv 3 30:48, Lv 4 44:27, Lv 5 68:06 (1. fazda 79:19; görev ödülleri ve bahşişler erken oyunu
+hızlandırdı). Gelir: 5. dk $104/dk, 10. dk $297, 20. dk $2,9K, 30. dk $9K, 60. dk $56K. 90 dakikada 34 görev
+($110K ödül), 634 bahşiş ($448K), 7 mektup. Personel odası Lv 1'e 10. dakika civarında gerçekten gerekiyor (5/5).
+Tarayıcı testi 59 kontrol (yeni: ilk görev ve Claim, ekip 0/5, mektup ve Collect, bahşişe dokunma, kilitli düğme,
+5/5'te altıncı işe alım yok, "Team full" düğmesi, personel odası tamiri, dolap, dolaba giden yeni aşçı, kapalıyken
+kazancın posta kutusundan alınması).

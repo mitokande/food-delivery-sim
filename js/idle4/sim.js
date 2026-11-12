@@ -5,7 +5,9 @@
 // At first you do all of it yourself; every cook and waiter you hire takes a job off your hands, and when nobody needs
 // you any more you sit down in Ferdi's office. Each room has things to buy (tables, staff, stations, upgrades); when
 // everything in a room is at its cap the room can be renovated to the next level, which raises the caps. The office's
-// level is the restaurant's level: no other room can be more than one level above it.
+// level is the restaurant's level: no other room can be more than one level above it. The staff room's lockers set how
+// many people can work here. Customers sometimes leave a tip by their chair, to be picked up (a tap). What the place
+// earns while the game is closed waits in the mailbox, with the letters people send. A chain of quests leads the way.
 // Pure: no DOM, no three.js. G is plain JSON (the save). Every walk is timed on the floor plan's routes (plan.js), the
 // same ones the view walks the characters along.
 import * as P from './plan.js';
@@ -89,19 +91,34 @@ export const ROOMS = {
       parasols: { kind: 'lv', name: 'Parasols', base: 60, g: 1.26, what: 'People outside pay more' },
     },
   },
+  staff: {
+    name: 'Staff Room', start: 0, gate: 1, up: [[300, 30], [2500, 50], [20000, 90], [120000, 140], [400000, 190]],
+    blurb: 'Where the team changes and takes a coffee. Every locker is room for one more on the team.',
+    items: {
+      lockers: { kind: 'n', name: 'Locker', caps: [0, 3, 5, 8, 10, 12], cost: [150, 250, 600, 1500, 3000, 6000, 10000, 16000, 25000, 40000, 60000, 90000], what: 'Room for one more on the team' },
+      coffee: { kind: 'lv', name: 'Coffee machine', base: 14, g: 1.26, what: 'The staff walk faster' },
+      uniforms: { kind: 'lv', name: 'Uniforms', base: 12, g: 1.26, what: 'More people leave a tip' },
+    },
+  },
   bay: { name: 'Courier Bay', soon: 'phase 4', start: 0, gate: 99, up: [], items: {} },
-  staff: { name: 'Staff Room', soon: 'phase 2', start: 0, gate: 99, up: [], items: {} },
 };
 export const ROOM_IDS = Object.keys(ROOMS);
 // effect of one level of each upgrade
-export const STEP = { sign: 0.04, ads: 0.04, decor: 0.1, comfort: 0.08, service: 0.05, ledger: 0.05, training: 0.025, speed: 0.07, upsell: 0.05, parasols: 0.08, stPrice: 0.1, stSpeed: 0.95 };
+export const STEP = { sign: 0.04, ads: 0.04, decor: 0.1, comfort: 0.08, service: 0.05, ledger: 0.05, training: 0.025, speed: 0.07, upsell: 0.05, parasols: 0.08, stPrice: 0.1, stSpeed: 0.95,
+  coffee: 0.03, uniforms: 0.06 };
+// the team: this many can work here without a staff room, one more for every locker in it
+export const STAFF_BASE = 5;
+const HIRE = { cooks: 'cook', waiters: 'waiter', registers: 'cashier' };
+// tips: the chance a paying customer leaves one by their chair (× uniforms), its share of the bill; at most this many
+// lie about at a time
+export const TIPS = { chance: 0.12, share: 0.4, max: 8 };
 
 // ---------------------------------------------------------------- people
 export const WALK = { rate: 8, variety: 0.12, appeal: 0.03 }; // walk-ins a minute (× sign, flyers, dishes, room levels)
 export const PATIENCE = { bench: 30, food: 70 }; // s on a bench before they give up, s at the table waiting for food
 export const EAT = 12;
 export const SPEED = { customer: 1.5, staff: 2.2 }; // m/s
-export const CHECKOUT = 4, BILL = 1.4, PICK = 0.3, PLACE = 0.45, PLATE = 0.25, IDLE_HOME = 1.5;
+export const CHECKOUT = 4, BILL = 1.4, PICK = 0.3, PLACE = 0.45, PLATE = 0.25, IDLE_HOME = 1.5, LOCKER = 1.2;
 export const QMAX = P.QUEUE.length;
 
 // ---------------------------------------------------------------- the save
@@ -116,14 +133,25 @@ export function fresh(keep = {}) {
     seats: {}, benches: {}, // seat / bench id → customer id
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
     acc: { walk: 0.7 },
-    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0 },
+    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0 },
     sold: {},
+    tips: [], // { id, seat, amount }
+    mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
+    quest: { i: 0 }, sent: {}, // (the quest you're on; the letters already sent)
     ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0 },
     settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
     seen: {},
     ...keep,
   };
   G.staff.push(newStaff(G, 'you', 0));
+  return G;
+}
+// an older save: rooms and things it didn't know about yet
+export function migrate(G) {
+  for (const id of ROOM_IDS) {
+    G.rooms[id] ||= { lv: ROOMS[id].start, it: {} };
+    for (const k of Object.keys(ROOMS[id].items)) G.rooms[id].it[k] ??= ITEM_START(id, k);
+  }
   return G;
 }
 function newStaff(G, role, k) {
@@ -153,10 +181,13 @@ const step = (G, room, id) => 1 + STEP[id] * itemOf(G, room, id);
 export const stPrice = (L) => Math.pow(1 + STEP.stPrice, Math.max(0, L - 1));
 export const stTime = (dish, L) => DISH[dish].time * Math.pow(STEP.stSpeed, Math.max(0, L - 1));
 export const variety = (G) => 1 + WALK.variety * (menu(G).length - 1);
-export const appeal = (G) => { let s = 0; for (const id of ROOM_IDS) s += G.rooms[id].lv; return 1 + WALK.appeal * Math.max(0, s - 2); };
+export const appeal = (G) => { let s = 0; for (const id of ROOM_IDS) if (id !== 'staff') s += G.rooms[id].lv; return 1 + WALK.appeal * Math.max(0, s - 2); }; // (the rooms customers see)
 export const walkRate = (G) => WALK.rate * step(G, 'entrance', 'sign') * step(G, 'office', 'ads') * variety(G) * appeal(G); // a minute
 export const trainK = (G) => step(G, 'office', 'training');
-export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') : 1);
+export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * step(G, 'staff', 'coffee') * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') : 1);
+export const staffCount = (G) => G.staff.length - 1; // (not you)
+export const staffCap = (G) => STAFF_BASE + (lvOf(G, 'staff') > 0 ? itemOf(G, 'staff', 'lockers') : 0);
+export const tipChance = (G) => TIPS.chance * step(G, 'staff', 'uniforms');
 export const cookTime = (G, dish) => stTime(dish, itemOf(G, 'kitchen', `st:${dish}`)) / trainK(G);
 export const checkoutTime = (G) => CHECKOUT * Math.pow(1 - STEP.speed, itemOf(G, 'cashier', 'speed')) / trainK(G);
 export const benchPatience = (G) => PATIENCE.bench * step(G, 'entrance', 'decor');
@@ -191,6 +222,8 @@ export function readiness(G, room) {
   }
   return [done, of];
 }
+// can this be bought now, apart from the cash? → null, or 'staff' (a hire, and the team is full: lockers first)
+export const itemBlock = (G, room, id) => (HIRE[id] && staffCount(G) >= staffCap(G) ? 'staff' : null);
 // can the room go up a level now? → null, or why not: 'max' | 'soon' | 'build' (a renovation is going on somewhere) |
 // 'office' (the office has to go up first) | 'gate' (a repair waiting for the office) | 'items' (not everything at its cap)
 export function upBlock(G, room) {
@@ -211,7 +244,7 @@ export const building = (G, room) => (G.build && G.build.room === room ? G.build
 export function prices(G) {
   const out = [];
   for (const room of ROOM_IDS) {
-    if (lvOf(G, room) > 0) for (const id in ROOMS[room].items) { const c = itemCost(G, room, id); if (c != null) out.push({ a: 'item', room, id, cost: c }); }
+    if (lvOf(G, room) > 0) for (const id in ROOMS[room].items) { const c = itemCost(G, room, id); if (c != null && !itemBlock(G, room, id)) out.push({ a: 'item', room, id, cost: c }); }
     if (!upBlock(G, room)) out.push({ a: 'up', room, cost: upCost(G, room) });
   }
   return out;
@@ -228,12 +261,17 @@ export function act(G, a, room, id) {
   }
   if (a === 'item') {
     const it = ROOMS[room]?.items[id];
-    if (!it || lvOf(G, room) < 1 || !pay(G, itemCost(G, room, id))) return false;
+    if (!it || lvOf(G, room) < 1 || itemBlock(G, room, id) || !pay(G, itemCost(G, room, id))) return false;
     G.rooms[room].it[id]++;
-    const role = { cooks: 'cook', waiters: 'waiter', registers: 'cashier' }[id];
+    const role = HIRE[id];
     if (role) {
       const s = newStaff(G, role, G.staff.filter((x) => x.role === role).length);
-      s.at = role === 'cashier' ? homeOf(G, s) : 'front'; // (new staff walk in from the street)
+      // (new staff walk in from the street, change at a locker if there is a staff room, and go to work; a cashier is
+      // at the register at once: people may be waiting to pay)
+      if (role !== 'cashier') {
+        s.at = 'front';
+        if (lvOf(G, 'staff') > 0) startJob(G, s, 'locker', [{ go: `locker:${staffCount(G) % P.LOCKERS}` }, { work: LOCKER, anim: 'work' }], {}, []);
+      }
       G.staff.push(s);
       if (role === 'cashier') G.regs.push(null);
       return { hire: s };
@@ -343,6 +381,19 @@ function paid(G, c, atRegister, ev) {
   const amount = Math.round(priceOf(G, c.dish, seatRoom(c.seat), atRegister) * 10) / 10;
   G.cash += amount; G.stats.earned += amount; G.stats.served++; G.sold[c.dish] = (G.sold[c.dish] || 0) + 1;
   ev.push({ kind: 'paid', cust: c.id, amount, at: c.at, dish: c.dish });
+  // a tip by the chair, now and then
+  if (c.seat && G.tips.length < TIPS.max && rnd(G) < tipChance(G)) {
+    const t = { id: G.seq++, seat: c.seat, amount: Math.max(1, Math.round(amount * TIPS.share)) };
+    G.tips.push(t); ev.push({ kind: 'tip', tip: t.id });
+  }
+}
+// picking a tip up → its amount (0 if it's gone)
+export function collectTip(G, id) {
+  const i = G.tips.findIndex((t) => t.id === id);
+  if (i < 0) return 0;
+  const t = G.tips.splice(i, 1)[0];
+  G.cash += t.amount; G.stats.earned += t.amount; G.stats.tips++; G.stats.tipCash += t.amount;
+  return t.amount;
 }
 function arrive(G, c, ev) {
   c.at = c.b; c.a = c.b = null;
@@ -433,8 +484,9 @@ function stepSim(G, dt, ev) {
     if (s.job && (s.st === 'go' || s.st === 'work') && G.t >= s.t0 + s.dur) stepDone(G, s, ev);
   }
   dispatch(G, ev);
-  // 4. renovation done?
+  // 4. renovation done? the post?
   settleBuild(G, ev);
+  post(G);
   // 5. running measures (what holds the place back)
   const k = Math.min(1, dt / 12);
   const waiting = G.cust.filter((c) => c.st === 'wait').length;
@@ -489,8 +541,43 @@ export function diagnose(G) {
   return { kind: c.length ? c[0][0] : 'ok' };
 }
 
+// ---------------------------------------------------------------- the mailbox: letters (some with a gift) and what was earned while away
+export const LETTERS = [
+  { key: 'health', when: (G) => officeLv(G) >= 1, cash: 40, from: 'Old Town Health Office', title: 'Inspection passed',
+    text: 'Our inspector visited Ferdi\'s on Tuesday. The kitchen was clean, the burgers were hot, and he had two. Keep it up.' },
+  { key: 'regular', when: (G) => G.stats.served >= 150, cash: 150, from: 'Mrs. Okafor, the table by the window', title: 'Thank you',
+    text: 'I ate at Ferdi\'s every Sunday for forty years. When it closed I cried. Now it is open again. Here is something for the jar.' },
+  { key: 'victor1', when: (G) => officeLv(G) >= 2, cash: 0, from: 'Victor Gristle, Gristle Burger', title: 'Cute',
+    text: 'A terrace. Parasols. How quaint. Gristle Burger serves a thousand people an hour, three streets from you. My offer stands. For now.' },
+  { key: 'bruno', when: (G) => menu(G).length >= 4, cash: 1500, from: 'Bruno, Bruno\'s Fresh Produce', title: 'An old friend of Ferdi',
+    text: 'Ferdi bought my tomatoes for thirty years and never paid on time once. I liked him anyway. The first crate for his nephew is on the house.' },
+  { key: 'gazette', when: (G) => officeLv(G) >= 3, cash: 4000, from: 'The Old Town Gazette', title: 'Ferdi\'s is back',
+    text: 'Four stars. "The smash burger alone is worth the walk. The rest of the menu is catching up fast." Readers sent a little something.' },
+  { key: 'ferdi', when: (G) => officeLv(G) >= 4, cash: 20000, from: 'Uncle Ferdi (found in a drawer of his desk)', title: 'If you are reading this',
+    text: 'If you are reading this, you kept the place open. I knew it. Under the floor of my office there is a tin. It was for a rainy day. Make it sunny.' },
+  { key: 'victor2', when: (G) => officeLv(G) >= 5, cash: 0, from: 'Victor Gristle, Gristle Burger', title: 'This isn\'t over',
+    text: 'Fine. Your little place is busy. So was every place I bought. I am patient, and I have a lot of money. See you around.' },
+];
+export const LETTER = Object.fromEntries(LETTERS.map((l) => [l.key, l]));
+function post(G) {
+  for (const l of LETTERS) if (!G.sent[l.key] && l.when(G)) { G.sent[l.key] = 1; G.mail.push({ id: G.seq++, kind: 'letter', key: l.key, cash: l.cash, read: false }); }
+}
+export const unread = (G) => G.mail.filter((m) => !m.read).length;
+// opening a letter (or the money earned while away) → it, its gift added to the cash; read mail goes after a while
+export function openMail(G, id) {
+  const m = G.mail.find((x) => x.id === id);
+  if (!m || m.read) return null;
+  m.read = true;
+  G.cash += m.cash || 0;
+  if (m.kind === 'letter') G.stats.letters++;
+  const keep = new Set(G.mail.filter((x) => x.read).slice(-8)); // (the last few read stay, to read again)
+  G.mail = G.mail.filter((x) => !x.read || keep.has(x));
+  return m;
+}
+
 // ---------------------------------------------------------------- while the game is closed
-// The restaurant runs on: the time away is played through (up to AWAY.max), renovations finish too.
+// The restaurant runs on: the time away is played through (up to AWAY.max), renovations finish too. What it earned in a
+// longer absence (AWAY.card and up) waits in the mailbox.
 export const AWAY = { max: 2 * 3600, card: 60 };
 export function away(G, secs) {
   const ran = Math.max(0, Math.min(AWAY.max, secs || 0));
@@ -501,7 +588,13 @@ export function away(G, secs) {
     for (const e of tick(G, d, d)) if (e.kind === 'built') built.push(e);
   }
   const d = (k) => G.stats[k] - s0[k];
-  return { secs, ran, capped: secs > AWAY.max + 1, earned: d('earned'), served: d('served'), lost: d('lost'), built };
+  const r = { secs, ran, capped: secs > AWAY.max + 1, earned: d('earned'), served: d('served'), lost: d('lost'), built, mail: null };
+  if (secs >= AWAY.card && r.earned > 0) {
+    G.cash -= r.earned;
+    const m = { id: G.seq++, kind: 'away', cash: r.earned, secs, served: r.served, lost: r.lost, read: false };
+    G.mail.push(m); r.mail = m.id;
+  }
+  return r;
 }
 
 export const short = (n) => {

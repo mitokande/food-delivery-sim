@@ -10,9 +10,9 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 
 function run(name) {
   const t0 = Date.now();
-  const { G, marks, buys, mins, diag, gone } = play(name, MIN);
+  const { G, marks, buys, mins, diag, gone, quests } = play(name, MIN);
   if (LOG) for (const p of buys) console.log(`${fmt(p.t)} ${p.a === 'up' ? 'UP ' + p.room : p.room + '.' + p.id} $${p.cost}`);
-  const rows = mins.filter((r) => [1, 2, 3, 5, 10, 15, 20, 30, 40, 50, 60, 90, 120].includes(r.m)).map((r) => `${r.m}m $${Math.round(r.earned)}/min L${r.lv} [${r.rooms}] m${r.menu} c${r.cooks} w${r.waiters} lost${r.lost}`);
+  const rows = mins.filter((r) => [1, 2, 3, 5, 10, 15, 20, 30, 40, 50, 60, 90, 120].includes(r.m)).map((r) => `${r.m}m $${Math.round(r.earned)}/min L${r.lv} [${r.rooms}] m${r.menu} c${r.cooks} w${r.waiters} team ${r.team} lost${r.lost}`);
   const st = G.stats, n = Object.values(diag).reduce((a, b) => a + b, 0);
   console.log(`\n== ${name}: earned $${Math.round(st.earned)} · served ${st.served} · lost ${st.lost} of ${st.walkins} · cash $${Math.round(G.cash)} · ${Date.now() - t0} ms`);
   console.log('   rooms ' + S.ROOM_IDS.map((r) => `${r} ${S.lvOf(G, r)}`).join(', '));
@@ -20,5 +20,7 @@ function run(name) {
   console.log('   ' + rows.join('\n   '));
   console.log(`   closed for ${S.AWAY.max / 3600} h at: ${gone.map((g) => `${g.m}m +$${Math.round(g.earned)}`).join(' | ')}`);
   console.log('   holding back: ' + Object.entries(diag).map(([k, v]) => `${k} ${Math.round(v / n * 100)}%`).join(', '));
+  console.log(`   quests: ${quests.length} done, $${quests.reduce((a, q) => a + q.cash, 0)} in rewards · tips ${st.tips} ($${Math.round(st.tipCash)}) · letters ${st.letters}`);
+  if (LOG) for (const q of quests) console.log(`   ${fmt(q.t)} quest: ${q.text} +$${q.cash}`);
 }
 for (const n of Object.keys(PLAYERS)) if (ONLY === 'all' || ONLY === n) run(n);
