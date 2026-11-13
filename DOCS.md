@@ -1297,3 +1297,36 @@ Kullanıcı arayüzün ekranda çok yer kapladığını söyledi ve tuvalde fark
 - **Denemek için:** sayfa adresine `?ui=` (0.5–1.3) ve `?font=` eklenebilir. Seçenekler: lilita, baloo, fredoka, nunito,
   rubik, titan, luckiest, bungee.
 - **Önbellek:** sayfanın önbellek anahtarı yenilendi (v=3).
+
+### 14.8 7. faz: pencereler, şöhret, rehber Rita, portreler (13 Kasım 2026)
+
+Kullanıcı tuvaldeki örnek pencereleri beğendi ve "faz 7nin bütün maddelerini yapmaya başla" dedi. Dal `idle-windows`.
+Yeni görseller iki ayrı sayfa olarak üretildi (GPT Image 2.6, Higgsfield, 1'er kredi):
+- 25 eşya ikonu, `assets/ui4/items`.
+- 12 portre: dört mektup yazarı ve faz 6'daki yorumlar için 8 müşteri.
+
+- **Pencereler.** Hepsi Police Chief'in diliyle; geçerli olduğu yerler: oda paneli, bütün kartlar, posta kutusu, mektup.
+  - Lacivert kalın çerçeve, içi hafif çapraz çizgili açık mavi kâğıt.
+  - Penceredeki ilk `<h2>` turuncu kurdeleye dönüşüp çerçevenin üstüne biner (`modal()` bunu kendisi yapar).
+  - Dokunarak kapanan pencerelerde kırmızı yuvarlak bir kapat düğmesi var.
+  - Satırlar beyaz kart; yeşil, altın ve mavi düğmeler tok.
+  - Oda panelinde oda adı kurdelede, seviye rozeti çerçevenin üstünde. Eşya satırlarında boyalı ikonlar var (terasın
+    masaları için ayrı bir ikon), yükseltme satırında boya rulosu.
+  - Yönetici satırlarında ve kartında portreler var.
+  - Posta kutusunda her mektup, yazanın portresinden çıkan bir konuşma balonu: hediyesi altın çip, yenisi kırmızı
+    "New", okunmuşu tik.
+  - Mektup: bantlı, köşesi kıvrık bir kâğıt, yazanın yüzü üstüne taşar. Portreler: denetçi, Mrs. Okafor, Bruno, gazete
+    muhabiri, Victor, Ferdi.
+  - Bildirimler ve kutlama kartı da boyalı ikonlara geçti.
+- **Şöhret.** `sim.js` `fame()`: oda seviyelerinin karesi × 120, her eşya seviyesi × 6, menüdeki her yemek × 150,
+  ekipteki her kişi × 25, her yönetici × 300.
+  - Üst çubukta gelirin yanında kupayla görünür, artınca zıplar.
+  - Kutlama kartında "Fame önce → sonra" satırı var.
+- **Rehber Rita.** Ferdi'nin 30 yıllık garsonu. Bir şey ilk kez olduğunda ekranın altındaki kutuda konuşur: portresi
+  kutunun üstüne taşar, adı kurdelede yazar, satır harf harf yazılır, dokunmak devam ettirir. Konuşurken oyun durur.
+  - Konuştuğu anlar, her biri bir kez (`G.seen['g:…']`): hikâyeden sonra merhaba, ilk aşçı, oyuncunun serbest kalması,
+    ilk inşaat, ilk tamir, ilk mektup, olayların açılması, Victor'un ilk kamyonu, yöneticilerin açılması, kurye rampası.
+  - Bazılarının sonunda zıplayan bir ok dokunulacak yeri gösterir: görev çubuğu, sayaç, posta, Events, Managers, olay
+    bandı. Ok, o yere dokununca ya da 12 saniye sonra kaybolur.
+- Tarayıcı testi 101 kontrol. Yeni kontroller: Rita'nın merhabası, adı ve yüzü; o konuşurken oyunun durması; dokunarak
+  geçilmesi; görev çubuğunu gösteren ok; üst çubuktaki şöhret; kutlama kartındaki şöhret satırı.
