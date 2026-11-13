@@ -17,8 +17,10 @@ window.__started = true;
 const q = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 let SPEED = Math.max(0.25, Math.min(20, +(q.get('speed') || 1)));
-// trying the interface's size and font (?ui=0.85&font=baloo): the CSS variables in idle4.css
-const FONTS = { lilita: ["'Lilita One'", 400], baloo: ["'Baloo 2'", 800, 'Baloo+2:wght@800'], fredoka: ["'Fredoka'", 700], nunito: ["'Nunito'", 900, 'Nunito:wght@900'] };
+// trying the interface's size, font and outline (?ui=0.85&font=rubik&thin): the CSS variables in idle4.css
+const FONTS = { lilita: ["'Lilita One'", 400], baloo: ["'Baloo 2'", 800, 'Baloo+2:wght@800'], fredoka: ["'Fredoka'", 700], nunito: ["'Nunito'", 900, 'Nunito:wght@900'],
+  rubik: ["'Rubik'", 800, 'Rubik:wght@800'], titan: ["'Titan One'", 400, 'Titan+One'], luckiest: ["'Luckiest Guy'", 400, 'Luckiest+Guy'], bungee: ["'Bungee'", 400, 'Bungee'] };
+if (q.has('thin')) document.documentElement.classList.add('thin');
 if (q.has('ui')) document.documentElement.style.setProperty('--ui', String(Math.max(0.5, Math.min(1.3, +q.get('ui') || 1))));
 const font = FONTS[q.get('font')];
 if (font) {

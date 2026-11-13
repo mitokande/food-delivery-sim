@@ -14,6 +14,8 @@
    so they stay true); --display / --dw: its display font and that font's weight (a setting) */
 :root { --ui: 1; --dw: 400; }
 .hud4 > .top, .hud4 > .evbar, .hud4 > .slot.mail, .hud4 > .nav4, .hud4 > .quest, #markers .marker > * { zoom: var(--ui); }
+/* a thin outline with a drop shadow instead of the thick outline (?thin) */
+.thin :is(.plate b, .plate .rush, .evbar .et b, .quest .qtext, .quest .qr b, .quest .qr .claim, .nav4 .slot small, .rl .rname, .rl .rfix, .bchip .bt, .bhelp, .lvb b, .rbadge b, .lvup b) { -webkit-text-stroke-width: 1.6px; text-shadow: 0 2px 0 rgba(0,0,0,.55); }
 :root { --plate: rgba(12, 18, 34, .64); --plate-edge: inset 0 0 0 1.5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); --ink-o: #101828; }
 
 /* ---------- top bar: you, two dark plates (the clock, the team, cash; income, the rush), settings ---------- */
