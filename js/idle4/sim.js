@@ -13,6 +13,9 @@
 // The courier bay takes orders from the delivery app: the cooks bag them, couriers ride them out on their motors.
 // A table someone has left is dirty until a waiter clears it. Managers (from restaurant level 3) look after a room:
 // a bonus, and if you like they buy its things for you.
+// Everyone who leaves counts toward the restaurant's mood (how many leave happy); some write a review. The mood brings
+// people in or keeps them away. Each calendar day's mood is kept, and the next day you play brings a reward by it; so
+// does just coming back each day (a daily gift).
 // Pure: no DOM, no three.js. G is plain JSON (the save). Every walk is timed on the floor plan's routes (plan.js), the
 // same ones the view walks the characters along.
 import * as P from './plan.js';
@@ -147,6 +150,16 @@ const mgrK = (G, room) => (hasMgr(G, room) ? MANAGERS[room].k : 1);
 // tips: the chance a paying customer leaves one by their chair (× uniforms), its share of the bill; at most this many
 // lie about at a time
 export const TIPS = { chance: 0.12, share: 0.4, max: 6 };
+// reputation: everyone who leaves scores 1 (fast food, little waiting), 0.5 (they waited) or 0 (they left without
+// eating, or the delivery never came) into the mood, a running average over about REP.window guests; the share that
+// writes a review, by how it went; reviews kept; walk-ins × walk[0] at a mood of 0 … × walk[1] at 1; s waiting for the
+// food (from sitting down) that is still fast / still all right, s on a bench that is still all right
+export const REP = { start: 0.6, window: 60, review: { 1: 0.08, 0.5: 0.15, 0: 0.35 }, keep: 30, walk: [0.85, 1.15], food: [28, 50], bench: 15 };
+// a day's mood, in tiers (from the share happy): its name, and its reward the next day (minutes of income)
+export const MOOD_TIERS = [{ from: 0, name: 'Furious', min: 0 }, { from: 0.3, name: 'Unhappy', min: 2 }, { from: 0.5, name: 'Mixed', min: 5 }, { from: 0.7, name: 'Happy', min: 10 }, { from: 0.9, name: 'Delighted', min: 20 }];
+export const tierOf = (m) => MOOD_TIERS.reduce((t, x, i) => (m >= x.from - 1e-9 ? i : t), 0);
+// the daily gift for coming back: minutes of income, a week round
+export const SIGNIN = [5, 8, 12, 16, 20, 25, 40];
 
 // ---------------------------------------------------------------- people
 export const WALK = { rate: 8, variety: 0.12, appeal: 0.03 }; // walk-ins a minute (× sign, flyers, dishes, room levels)
@@ -174,6 +187,8 @@ export function fresh(keep = {}) {
     tips: [], // { id, seat, amount }
     mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
     quest: { i: 0 }, sent: {}, // (the quest you're on; the letters already sent)
+    rep: { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] }, // (reputation; reviews read up to seq `seen`; today so far; days before)
+    daily: { last: null, n: 0 }, // (the daily gift: the day it was last claimed, how many so far)
     event: null, evNext: null, evLog: [], mods: [], quiet: false, // (the event on now, when the next comes, the last few; boosts and slumps)
     ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0, srv: 0 }, // (srv: customers paid a second)
     settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
@@ -185,6 +200,8 @@ export function fresh(keep = {}) {
 }
 // an older save: rooms and things it didn't know about yet
 export function migrate(G) {
+  G.rep ||= { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] };
+  G.daily ||= { last: null, n: 0 };
   for (const id of ROOM_IDS) {
     G.rooms[id] ||= { lv: ROOMS[id].start, it: {} };
     for (const k of Object.keys(ROOMS[id].items)) G.rooms[id].it[k] ??= ITEM_START(id, k);
@@ -219,7 +236,8 @@ export const stPrice = (L) => Math.pow(1 + STEP.stPrice, Math.max(0, L - 1));
 export const stTime = (dish, L) => DISH[dish].time * Math.pow(STEP.stSpeed, Math.max(0, L - 1));
 export const variety = (G) => 1 + WALK.variety * (menu(G).length - 1);
 export const appeal = (G) => { let s = 0; for (const id of ROOM_IDS) if (id !== 'staff') s += G.rooms[id].lv; return 1 + WALK.appeal * Math.max(0, s - 2); }; // (the rooms customers see)
-export const walkRate = (G) => WALK.rate * step(G, 'entrance', 'sign') * step(G, 'office', 'ads') * variety(G) * appeal(G) * dayK(G) * modK(G, 'walk'); // a minute
+export const moodK = (G) => REP.walk[0] + (REP.walk[1] - REP.walk[0]) * G.rep.mood;
+export const walkRate = (G) => WALK.rate * step(G, 'entrance', 'sign') * step(G, 'office', 'ads') * variety(G) * appeal(G) * dayK(G) * modK(G, 'walk') * moodK(G); // a minute
 
 // ---------------------------------------------------------------- the day
 // A day is DAY.len seconds of game time; the clock starts at 08:00. People come in waves: a lunch and a dinner rush,
@@ -437,6 +455,7 @@ function happen(G, s, j, on, ev) {
     const c = custBy(G, j.cust);
     if (!c || c.st !== 'wait') { ev.push({ kind: 'wasted', dish: j.dish }); return; }
     if (c.vip) c.stars = starsFor(G.t - c.t0);
+    c.fw = G.t - c.t0; // (how long the food took)
     c.st = 'eat'; c.t0 = G.t; c.dur = EAT;
     ev.push({ kind: 'served', cust: c.id, dish: j.dish, seat: c.seat, by: s.id });
     return;
@@ -453,7 +472,7 @@ function happen(G, s, j, on, ev) {
     s.carry = null;
     const i = G.online.findIndex((x) => x.id === j.order); if (i >= 0) G.online.splice(i, 1);
     const amount = Math.round(deliveryPrice(G, j.dish) * 10) / 10;
-    G.cash += amount; G.stats.earned += amount; G.stats.delivered++; G.sold[j.dish] = (G.sold[j.dish] || 0) + 1;
+    G.cash += amount; G.stats.earned += amount; G.stats.delivered++; G.sold[j.dish] = (G.sold[j.dish] || 0) + 1; rate(G, 1, 'delivered', ev, null, j.dish);
     ev.push({ kind: 'delivered', amount, by: s.id, dish: j.dish });
     return;
   }
@@ -494,6 +513,7 @@ function leaveSeat(G, c, lost, cleared = false) {
 function lose(G, c, ev, why) {
   G.stats.lost++;
   ev.push({ kind: 'lost', cust: c.id, why, at: c.at });
+  rate(G, why === 'full' ? 0.5 : 0, why, ev, c); // (turned away at the door: they never got to taste it)
   if (c.vip) guestLeft(G, c, 1, ev);
 }
 function paid(G, c, atRegister, ev) {
@@ -507,6 +527,8 @@ function paid(G, c, atRegister, ev) {
     G.tips.push(t); ev.push({ kind: 'tip', tip: t.id });
   }
   if (c.vip) guestLeft(G, c, c.stars || 3, ev);
+  const fast = (c.fw ?? 0) <= REP.food[0] && (c.bw ?? 0) <= REP.bench;
+  rate(G, fast ? 1 : (c.fw ?? 0) <= REP.food[1] ? 0.5 : 0, fast ? 'fast' : 'slow', ev, c);
 }
 // picking a tip up → its amount (0 if it's gone)
 export function collectTip(G, id) {
@@ -553,6 +575,7 @@ export function tick(G, dtIn, max = 1) {
 
 function stepSim(G, dt, ev) {
   G.t += dt;
+  G.rep.day.sum += G.rep.mood * dt; G.rep.day.n += dt;
   settleBuild(G, ev);
   // 1. people walk in off the street (from the left mostly) and decide at the door
   G.acc.walk += walkRate(G) / 60 * dt * (0.5 + rnd(G));
@@ -572,7 +595,7 @@ function stepSim(G, dt, ev) {
   if (G.online.length) for (const o of G.online) {
     if (o.st !== 'ticket' || G.t - o.t0 <= DELIVERY.patience) continue;
     const i = G.tickets.findIndex((t) => t.online === o.id); if (i >= 0) G.tickets.splice(i, 1);
-    o.st = 'gone'; G.stats.lostOnline++; ev.push({ kind: 'lost', why: 'online', order: o.id });
+    o.st = 'gone'; G.stats.lostOnline++; ev.push({ kind: 'lost', why: 'online', order: o.id }); rate(G, 0, 'online', ev, null, o.dish);
   }
   if (G.online.some((o) => o.st === 'gone')) G.online = G.online.filter((o) => o.st !== 'gone');
   // managers buy their room's things (once a second, not while the game is closed)
@@ -601,7 +624,7 @@ function stepSim(G, dt, ev) {
   }
   // waiting on a bench → the first free seat (longest waiting first)
   const benchers = G.cust.filter((c) => c.st === 'bench').sort((a, b) => (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || a.t0 - b.t0);
-  for (const c of benchers) { const seat = seatFree(G); if (!seat) break; delete G.benches[c.bench]; c.bench = null; sitDown(G, c, seat); }
+  for (const c of benchers) { const seat = seatFree(G); if (!seat) break; delete G.benches[c.bench]; c.bench = null; c.bw = G.t - c.t0; sitDown(G, c, seat); }
   // done eating: to the line at the cashier (if there's room in it), else wait for the bill at the table
   if (cashierOpen(G)) {
     for (const c of G.cust) {
@@ -822,6 +845,62 @@ export const LETTERS = [
     text: 'Fine. Your little place is busy. So was every place I bought. I am patient, and I have a lot of money. See you around.' },
 ];
 export const LETTER = Object.fromEntries(LETTERS.map((l) => [l.key, l]));
+
+// ---------------------------------------------------------------- reputation: reviews, the mood, the days
+// what people write, by how it went ({dish}: what they had)
+export const REVIEW_TEXT = {
+  fast: ['Hot food, fast. Just like the old days.', 'Best smash burger in Old Town!', 'I barely sat down and my {dish} was there.', 'Cosy, clean and quick. I\'ll be back.',
+    'Ferdi would be proud of this place.', 'That {dish} was perfect.', 'Friendly staff, great {dish}.'],
+  slow: ['Good {dish}, but I waited a long time.', 'Tasty, but slow. Hire more cooks!', 'Nice place. The kitchen needs more hands.', 'The {dish} was worth the wait. Just about.'],
+  food: ['Sat there forever. My food never came.', 'Waited and waited, then gave up.', 'Nobody brought my {dish}. I went to Gristle Burger.'],
+  bench: ['No table for ages, so I left.', 'The waiting bench is not a meal.', 'Too busy to get a seat. More tables, please!'],
+  full: ['Couldn\'t even get in the door!', 'Packed to the walls. Need more room.'],
+  delivered: ['The delivery came hot and fast!', 'The courier was lovely. Great {dish}.', 'Best delivery in Old Town.'],
+  online: ['My delivery never came.', 'Ordered on the app, nothing arrived.'],
+};
+// who writes it (the eight regulars' faces, c1…c8): the smiling ones when it went well, the grumpy ones when it didn't
+const REVIEW_FACES = { 1: [1, 3, 4, 5, 7, 8], 0.5: [1, 2, 3, 4, 5, 6, 7, 8], 0: [2, 6] };
+// someone leaves: the mood moves; maybe a review
+function rate(G, score, why, ev, c, dish = c?.dish) {
+  const r = G.rep;
+  r.mood += (score - r.mood) / REP.window;
+  if (rnd(G) >= (REP.review[score] ?? 0.1)) return;
+  const pool = REVIEW_TEXT[why] || REVIEW_TEXT.slow;
+  const text = pool[Math.floor(rnd(G) * pool.length)].replace('{dish}', DISH[dish]?.name || 'food');
+  const faces = REVIEW_FACES[score] || REVIEW_FACES[0.5];
+  const rv = { id: G.seq++, t: G.t, face: `c${faces[Math.floor(rnd(G) * faces.length)]}`, up: score >= 1, text };
+  r.reviews.push(rv); if (r.reviews.length > REP.keep) r.reviews.shift();
+  ev.push({ kind: 'review', review: rv.id, up: rv.up });
+}
+export const newReviews = (G) => G.rep.reviews.filter((x) => x.id > G.rep.seen).length;
+export const readReviews = (G) => { G.rep.seen = G.seq; };
+// income a minute, about (what the rewards are worth)
+export const perMin = (G) => Math.max(10, G.ema.srv * avgBill(G) * 60);
+// today so far (the running average of the mood over the day's play)
+export const todayMood = (G) => (G.rep.day.n > 0 ? G.rep.day.sum / G.rep.day.n : G.rep.mood);
+// a new calendar day (key: its date): the last one's mood is kept, and its reward goes into the mailbox → that mail, or null
+export function newDay(G, key) {
+  const d = G.rep.day;
+  if (d.key === key) return null;
+  if (d.key == null) { d.key = key; return null; }
+  const mood = todayMood(G), tier = tierOf(mood);
+  G.rep.hist.push({ key: d.key, mood }); if (G.rep.hist.length > 7) G.rep.hist.shift();
+  G.rep.day = { key, sum: 0, n: 0 };
+  const cash = Math.round(perMin(G) * MOOD_TIERS[tier].min);
+  if (!cash) return null;
+  const m = { id: G.seq++, kind: 'daily', day: d.key, mood, tier, cash, read: false };
+  G.mail.push(m);
+  return m;
+}
+// the daily gift: due today? claim it → { day (1…7), cash }, or null
+export const signinDue = (G, key) => G.daily.last !== key;
+export function claimSignin(G, key) {
+  if (!signinDue(G, key)) return null;
+  const i = G.daily.n % SIGNIN.length, cash = Math.max(25 * (i + 1), Math.round(perMin(G) * SIGNIN[i]));
+  G.daily.last = key; G.daily.n++; G.cash += cash;
+  return { day: i + 1, cash };
+}
+export const signinCash = (G, i) => Math.max(25 * (i + 1), Math.round(perMin(G) * SIGNIN[i]));
 function post(G) {
   for (const l of LETTERS) if (!G.sent[l.key] && l.when(G)) { G.sent[l.key] = 1; G.mail.push({ id: G.seq++, kind: 'letter', key: l.key, cash: l.cash, read: false }); }
 }

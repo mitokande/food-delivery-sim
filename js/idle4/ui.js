@@ -35,7 +35,7 @@ const itemIcon = (room, id) => (room === 'terrace' && id === 'tables' ? IT('terr
 // the managers' and the letter writers' faces
 const MGR_FACE = { entrance: 'rosa', dining: 'marco', kitchen: 'aiko', cashier: 'patel', terrace: 'lou', staff: 'greta', bay: 'dex' };
 const MAIL_FACE = { health: 'inspector', regular: 'okafor', victor1: 'victor', victor2: 'victor', bruno: 'bruno', gazette: 'reporter' };
-const mailPic = (m) => (m.kind === 'away' ? UI('cash') : m.key === 'ferdi' ? `<img src="${ART('ferdi')}" alt="">` : MAIL_FACE[m.key] ? `<img src="${FACE(MAIL_FACE[m.key])}" alt="">` : UI('mail'));
+const mailPic = (m) => (m.kind === 'away' ? UI('cash') : m.kind === 'daily' ? UI(`mood/m${m.tier}`) : m.key === 'ferdi' ? `<img src="${ART('ferdi')}" alt="">` : MAIL_FACE[m.key] ? `<img src="${FACE(MAIL_FACE[m.key])}" alt="">` : UI('mail'));
 // the features of the later phases, locked for now (the restaurant level they're planned to open at)
 const FEATURES = [
   { f: 'shop', name: 'Shop', icon: 'gems', lv: 2 },
@@ -110,7 +110,8 @@ export function createUI(game) {
       <button class="gear" data-act="settings" aria-label="Settings">${GEAR}</button>
     </header>
     <button class="evbar" data-act="evfocus" hidden></button>
-    <button class="slot mail" data-act="mail" aria-label="Mailbox">${UI('mail')}<i class="badge" hidden></i></button>
+    <button class="slot mail" data-act="mail" aria-label="Mailbox">${UI('mail')}<i class="badge" hidden></i><i class="rdot" hidden></i></button>
+    <button class="slot daily" data-act="daily" aria-label="Daily gift"><img class="face" src="${FACE('guide')}" alt="" draggable="false"><small>Daily</small><i class="badge" hidden>!</i></button>
     <nav class="nav4">
       <button class="slot events locked" data-act="events" aria-label="Events">${UI('calendar')}<i class="lock">${UI('lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
       <button class="slot managers locked" data-act="managers" aria-label="Managers"><img class="u4 face" src="${FACE('marco')}" alt="" draggable="false"><i class="lock">${UI('lock')}</i><i class="badge" hidden></i><small>Lv ${S.MGR_LV}</small></button>
@@ -392,7 +393,8 @@ export function createUI(game) {
       const fresh = !questKey.startsWith(g.quest.i + '|');
       questKey = key;
       $('.qic', questEl).innerHTML = UI('quest');
-      $('.qtext', questEl).innerHTML = `${q.text} <i>(${a.toLocaleString('en-US')}/${n.toLocaleString('en-US')})</i>`;
+      const u = q.k === 'mood' ? '%' : '';
+      $('.qtext', questEl).innerHTML = `${q.text} <i>(${a.toLocaleString('en-US')}${u}/${n.toLocaleString('en-US')}${u})</i>`;
       $('.qhelp', questEl).textContent = help ? help[1] : '';
       $('.qbar u', questEl).style.width = pct(n ? a / n : 0);
       $('.qr', questEl).innerHTML = done ? `<span class="claim">Claim<b>${M(q.cash)}</b></span>` : `${UI('cash')}<b>${M(q.cash)}</b>`;
@@ -421,6 +423,8 @@ export function createUI(game) {
     if (+bd.textContent !== nm || bd.hidden !== !nm) { bd.hidden = !nm; bd.textContent = nm; }
     if (nm > lastMail && lastMail >= 0) { toast(`${UI('mail')} You've got mail!`, 'warn'); sfx('notif-order', { vol: 0.6 }); }
     lastMail = nm;
+    const rd = $('.slot.mail .rdot', hud), nr = S.newReviews(g) > 0 && !nm; if (rd.hidden !== !nr) rd.hidden = !nr;
+    const db = $('.slot.daily .badge', hud), due = S.signinDue(g, game.today()); if (db.hidden !== !due) db.hidden = !due;
     if (room) {
       const bd = S.building(g, room);
       const u = body.querySelector('[data-live="build"]'), eta = body.querySelector('[data-live="eta"]');
@@ -430,6 +434,8 @@ export function createUI(game) {
     updateEvents(g);
     if (upQ.length) nextUp();
     guideTick(g); placePointer();
+    const key = game.today();
+    if (!talking && signinShown !== key && g.quest.i >= 3 && S.signinDue(g, key) && !room && !upQ.length && !modals.children.length && !api.guideOff) { signinShown = key; signin(); }
   }
   let lastMail = -1, lastFame = -1;
 
@@ -530,9 +536,12 @@ export function createUI(game) {
     { key: 'events', when: (g) => S.restaurantLv(g) >= S.EVENT_LV, point: '.nav4 .slot.events', lines: ['We\'re getting noticed. Critics, celebrities, tour vans... and trouble. Keep an eye on Events.'] },
     { key: 'threat', when: (g) => g.event?.kind === 'threat', point: '.evbar', lines: ['That\'s Victor\'s truck! Serve enough people before it parks, or it steals our customers. Or pay to have it moved on.'] },
     { key: 'managers', when: (g) => S.restaurantLv(g) >= S.MGR_LV, point: '.nav4 .slot.managers', lines: ['We can afford managers now. Each one looks after a room, and buys its things while you\'re busy.'] },
+    { key: 'reviews', when: (g) => g.rep.reviews.length > 0, point: '.slot.mail', lines: [
+      'People have started writing reviews! Fast food and clean tables make them happy, and happy reviews bring more people in.',
+      'Each day\'s reviews earn a reward, sent by mail the next day you play. They\'re in the mailbox, under Reviews.'] },
     { key: 'bay', when: (g) => S.lvOf(g, 'bay') > 0, lines: ['The courier bay! Orders come in on the app, the cooks bag them, the couriers ride them out. No table needed.'] },
   ];
-  let talking = false, pointer = null;
+  let talking = false, pointer = null, signinShown = null;
   function guideTick(g) {
     if (talking || api.guideOff || !g.seen.intro || room || upQ.length || modals.children.length) return;
     const gl = GUIDE.find((x) => !g.seen[`g:${x.key}`] && x.when(g));
@@ -576,21 +585,47 @@ export function createUI(game) {
   }
   document.addEventListener('pointerdown', (e) => { if (pointer && e.target.closest?.(pointer.dataset.sel)) { pointer.remove(); pointer = null; } }, true);
 
-  // ---------- the mailbox ----------
-  const mailFrom = (m) => (m.kind === 'away' ? 'Ferdi\'s' : S.LETTER[m.key]?.from || '');
-  const mailTitle = (m) => (m.kind === 'away' ? 'While you were away' : S.LETTER[m.key]?.title || '');
-  function mailbox() {
-    const g = G(), list = [...g.mail].reverse().sort((a, b) => a.read - b.read);
-    const mm = modal(`<h2>${UI('mail')} Mailbox</h2>
-      ${list.length ? `<div class="mlist">${list.map((m) => `<button class="mrow ${m.read ? 'read' : ''}" data-m="${m.id}">
-        <span class="mi ${m.kind === 'away' ? 'away' : ''}">${mailPic(m)}</span>
+  // ---------- the mailbox: letters, and the reviews (the mood bar, what people wrote) ----------
+  const pctS = (x) => `${Math.round(x * 100)}%`;
+  const dayLabel = (key) => { const [, mo, d] = String(key).split('-'); return mo && d ? `${mo}/${d}` : String(key); };
+  const mailFrom = (m) => (m.kind === 'away' ? 'Ferdi\'s' : m.kind === 'daily' ? `Reviews · ${pctS(m.mood)} happy` : S.LETTER[m.key]?.from || '');
+  const mailTitle = (m) => (m.kind === 'away' ? 'While you were away' : m.kind === 'daily' ? `${dayLabel(m.day)}: a ${S.MOOD_TIERS[m.tier].name.toLowerCase()} day` : S.LETTER[m.key]?.title || '');
+  const MOOD_LINE = ['People are walking out angry. Faster food, more tables!', 'Too many people leave unhappy.', 'Some love it, some don\'t.', 'People love Ferdi\'s!', 'Everyone in Old Town is talking about Ferdi\'s!'];
+  function moodBar(g) {
+    const m = g.rep.mood;
+    return `<div class="moodbar">${UI('mood/m4', 'mf')}<span class="mtrack"><u style="width:${pctS(m)}"></u><b>${pctS(m)}</b></span>${UI('mood/m0', 'mf')}</div>
+      <p class="moodmsg">${MOOD_LINE[S.tierOf(m)]}</p>`;
+  }
+  function mailbox(tab = 'letters') {
+    const g = G();
+    const letters = () => { const list = [...g.mail].reverse().sort((a, b) => a.read - b.read);
+      return list.length ? `<div class="mlist">${list.map((m) => `<button class="mrow ${m.read ? 'read' : ''}" data-m="${m.id}">
+        <span class="mi ${m.kind === 'away' ? 'away' : m.kind === 'daily' ? 'daily' : ''}">${mailPic(m)}</span>
         <span class="mb"><span class="mt"><b>${mailTitle(m)}</b><small>${mailFrom(m)}</small></span>
         ${m.read ? '<i class="tick"></i>' : m.cash ? `<span class="gift">${UI('cash')}<b>${M(m.cash)}</b></span>` : '<span class="gift new">New</span>'}</span></button>`).join('')}</div>`
-        : '<p>No mail yet. People write as the restaurant grows.</p>'}
+        : '<p>No mail yet. People write as the restaurant grows.</p>'; };
+    const reviews = () => { const list = [...g.rep.reviews].reverse();
+      return `${moodBar(g)}<button class="btn gold sm days" data-x="days">${UI('daily')}<b>Daily rewards</b></button>
+        ${list.length ? `<div class="rvlist">${list.map((r) => `<div class="rv ${r.up ? 'up' : 'down'}"><span class="mi"><img src="${FACE(r.face)}" alt=""></span><span class="rb">${r.text}</span><span class="th">${UI(r.up ? 'thumbup' : 'thumbdown')}</span></div>`).join('')}</div>`
+          : '<p>No reviews yet. People write them on their way out.</p>'}`; };
+    const nl = S.unread(g), nr = S.newReviews(g);
+    const mm = modal(`<h2>${UI('mail')} Mailbox</h2>
+      <div class="mtabs"><button class="mtab" data-tab="letters">Letters${nl ? `<i>${nl}</i>` : ''}</button><button class="mtab" data-tab="reviews">Reviews${nr ? `<i>${Math.min(99, nr)}</i>` : ''}</button></div>
+      <div class="mpane"></div>
       <button class="btn big" data-x="close">Close</button>`, { cls: 'mailbox', dismiss: true });
+    const pane = $('.mpane', mm.card);
+    const show = (t) => {
+      tab = t; pane.innerHTML = t === 'reviews' ? reviews() : letters();
+      for (const b of mm.card.querySelectorAll('.mtab')) b.classList.toggle('on', b.dataset.tab === t);
+      if (t === 'reviews') { S.readReviews(g); const i = $('.mtab[data-tab="reviews"] i', mm.card); if (i) i.remove(); live(); }
+    };
+    show(tab);
     mm.card.addEventListener('click', (e) => {
+      const tb = e.target.closest('[data-tab]');
+      if (tb) { show(tb.dataset.tab); sfx('ui-tap', { vol: 0.4 }); return; }
       const b = e.target.closest('[data-m]');
       if (b) { mm.close(); setTimeout(() => letter(+b.dataset.m), 160); return; }
+      if (e.target.closest('[data-x="days"]')) { mm.close(); setTimeout(() => daysCard(), 160); return; }
       if (e.target.closest('[data-x="close"]')) mm.close();
     });
     sfx('ui-open', { vol: 0.5 });
@@ -599,10 +634,56 @@ export function createUI(game) {
     const g = G(), m = g.mail.find((x) => x.id === id);
     if (!m) return;
     if (m.kind === 'away') { if (m.read) mailbox(); else away({ secs: m.secs, earned: m.cash, served: m.served, lost: m.lost, mail: m.id }); return; }
-    const L = S.LETTER[m.key];
-    const mm = modal(`<div class="letter"><span class="lpic">${mailPic(m)}</span><i class="tape"></i><small class="from">From: ${L.from}</small><h2>${L.title}</h2><p>${L.text}</p></div>
+    const L = m.kind === 'daily'
+      ? { from: 'Ferdi\'s reviews', title: `${dayLabel(m.day)}: ${pctS(m.mood)} happy`, text: `A ${S.MOOD_TIERS[m.tier].name.toLowerCase()} day. Old Town noticed, and here is something for it. Keep the food fast and the tables clean for a better one tomorrow.` }
+      : S.LETTER[m.key];
+    const mm = modal(`<div class="letter"><span class="lpic ${m.kind === 'daily' ? 'mood' : ''}">${mailPic(m)}</span><i class="tape"></i><small class="from">From: ${L.from}</small><h2>${L.title}</h2><p>${L.text}</p></div>
       <button class="btn big ${m.cash && !m.read ? 'gold' : ''}" data-x="ok">${m.cash && !m.read ? `Collect ${M(m.cash)}` : 'Close'}</button>`, { cls: 'lettercard', pause: !m.read });
     mm.card.querySelector('[data-x="ok"]').addEventListener('click', () => { mm.close(); if (!m.read) game.openMail(m.id); });
+  }
+  // ---------- the days: each day's mood (the calendar's days), the reward each tier brings ----------
+  const leftToday = () => { const d = new Date(), e = new Date(d); e.setHours(24, 0, 0, 0); return Math.max(0, (e - d) / 1000); };
+  const hms = (t) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((x) => String(x).padStart(2, '0')).join(':');
+  function daysCard() {
+    const g = G(), today = S.todayMood(g), tier = S.tierOf(today);
+    const bars = [...g.rep.hist.slice(-3).map((d) => ({ label: dayLabel(d.key), mood: d.mood })), { label: 'Today', mood: today, now: true }];
+    const ys = [0.9, 0.7, 0.5, 0.3, 0.1];
+    const mm = modal(`<h2>${UI('daily')} Reviews by day</h2>
+      <p class="small dl">Today ends in <b class="dleft">${hms(leftToday())}</b></p>
+      <div class="chart"><div class="cy">${ys.map((y, i) => `<span>${UI(`mood/m${4 - i}`)}<b>${Math.round(y * 100)}%</b></span>`).join('')}</div>
+        <div class="cbars">${ys.map((y) => `<i class="cl" style="bottom:${(y - 0.1) / 0.85 * 100}%"></i>`).join('')}${bars.map((b) => `<span class="cb ${b.now ? 'now' : ''}"><b>${pctS(b.mood)}</b><u style="height:${Math.max(3, (b.mood - 0.05) / 0.9 * 100)}%"></u><small>${b.label}</small></span>`).join('')}</div></div>
+      <div class="tiers">${S.MOOD_TIERS.map((t, i) => `<button class="tier ${i === tier ? 'on' : ''}" data-t="${i}" aria-label="${t.name}">${UI(`mood/m${i}`)}</button>`).join('')}</div>
+      <div class="treward"></div>
+      <p class="small">A day's reward comes by mail the next day you play.</p>
+      <button class="btn big" data-x="close">Close</button>`, { cls: 'dayscard', dismiss: true });
+    const showTier = (i) => {
+      for (const b of mm.card.querySelectorAll('.tier')) b.classList.toggle('on', +b.dataset.t === i);
+      const t = S.MOOD_TIERS[i], cash = Math.round(S.perMin(g) * t.min);
+      $('.treward', mm.card).innerHTML = `<b>${t.name}${i < 4 ? ` · ${Math.round(t.from * 100)}–${Math.round(S.MOOD_TIERS[i + 1].from * 100)}%` : ' · 90% and up'}</b>${cash ? `<span class="gift">${UI('cash')}<b>${M(cash)}</b></span>` : '<small>No reward</small>'}`;
+    };
+    showTier(tier);
+    const iv = setInterval(() => { const e = $('.dleft', mm.card); if (!e) clearInterval(iv); else e.textContent = hms(leftToday()); }, 1000);
+    mm.card.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-t]'); if (t) { showTier(+t.dataset.t); sfx('ui-tap', { vol: 0.4 }); return; }
+      if (e.target.closest('[data-x="close"]')) mm.close();
+    });
+  }
+  // ---------- the daily gift: a week round, one a calendar day ----------
+  function signin() {
+    const g = G(), key = game.today(), due = S.signinDue(g, key), at = g.daily.n % S.SIGNIN.length;
+    const last = due ? at - 1 : (g.daily.n - 1) % S.SIGNIN.length; // (the last day of this week already claimed)
+    const tiles = S.SIGNIN.map((_, i) => { const st = i <= last ? 'done' : due && i === at ? 'today' : 'later';
+      return `<span class="stile ${st} ${i === 6 ? 'big' : ''}"><small>Day ${i + 1}</small>${UI(i === 6 ? 'gift' : 'cash')}<b>${M(S.signinCash(g, i))}</b>${st === 'done' ? '<i class="tick"></i>' : ''}</span>`; }).join('');
+    const mm = modal(`<h2>${UI('daily')} Daily gift</h2>
+      <div class="rsay"><img src="${FACE('guide')}" alt="Rita"><p>Come back every day, love. There's always a little something for you.</p></div>
+      <div class="sgrid">${tiles}</div>
+      ${due ? `<button class="btn gold big" data-x="claim">Claim ${M(S.signinCash(g, at))}</button>` : '<button class="btn big" disabled>Come back tomorrow</button>'}`, { cls: 'signin', dismiss: true });
+    mm.card.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-x="claim"]')) return;
+      const r = game.claimSignin();
+      if (r) { mm.close(); toast(`${UI('gift')} Day ${r.day} gift: +${M(r.cash)}`, 'good'); }
+    });
+    sfx('ui-open', { vol: 0.5 });
   }
   function settings() {
     const s = G().settings;
@@ -613,7 +694,7 @@ export function createUI(game) {
       <div class="set"><span>Graphics</span><button class="btn sm blue" data-s="quality">${s.quality}</button></div>
       <button class="btn ghost" data-s="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <button class="btn ghost danger" data-s="reset">Start over</button>
-      <p class="small">Prototype: phase 7 of the remake (painted windows, fame, Rita the guide). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
+      <p class="small">Prototype: phases 6 and 7 of the remake (reviews and daily rewards; painted windows, fame, Rita the guide). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
       <button class="btn big" data-x="close">Done</button>`, { cls: 'settings', dismiss: true });
     m.card.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
@@ -635,12 +716,13 @@ export function createUI(game) {
     else if (a === 'room') game.openRoom(el.dataset.room);
     else if (a === 'quest') {
       if (Q.done(G())) game.claimQuest();
-      else if (questGo === 'mail') mailbox();
+      else if (questGo === 'mail') mailbox(Q.current(G()).k === 'mood' ? 'reviews' : 'letters');
       else if (questGo === 'events') eventsCard();
       else if (questGo === 'managers') managersCard();
       else if (questGo) game.openRoom(questGo);
     }
     else if (a === 'mail') mailbox();
+    else if (a === 'daily') signin();
     else if (a === 'events') eventsCard();
     else if (a === 'managers') managersCard();
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
@@ -658,13 +740,17 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, upgraded, away, mailbox, letter, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${UI('quest')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${IT({ cook: 'pan', waiter: 'tray', courier: 'helmet' }[s.role] || 'register')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },
     managersCard,
     // (no more of Rita: the tests, once they have seen her)
-    skipGuide() { for (const x of GUIDE) G().seen[`g:${x.key}`] = true; pointer?.remove(); pointer = null; },
+    skipGuide() {
+      for (const x of GUIDE) G().seen[`g:${x.key}`] = true;
+      pointer?.remove(); pointer = null; signinShown = game.today();
+      if (talking) { $('.modal.talkm', modals)?.remove(); talking = false; game.paused = false; }
+    },
     youFree() { toast(`<img class="u4 face" src="${FACE('you')}" alt=""> Nobody needs you on the floor: off to the office!`, 'warn'); },
   });
   return api;

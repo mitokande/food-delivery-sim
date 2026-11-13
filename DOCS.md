@@ -1330,3 +1330,40 @@ Yeni görseller iki ayrı sayfa olarak üretildi (GPT Image 2.6, Higgsfield, 1'e
     bandı. Ok, o yere dokununca ya da 12 saniye sonra kaybolur.
 - Tarayıcı testi 101 kontrol. Yeni kontroller: Rita'nın merhabası, adı ve yüzü; o konuşurken oyunun durması; dokunarak
   geçilmesi; görev çubuğunu gösteren ok; üst çubuktaki şöhret; kutlama kartındaki şöhret satırı.
+
+### 14.9 6. faz: itibar, yorumlar, günlük ödüller (13 Kasım 2026)
+
+Kullanıcı faz 7'yi birleştirdi (#25) ve "faz 6ya başla" dedi. Dal `idle-phase6`. Yeni görsel olarak memnuniyet yüzleri,
+başparmaklar, yıldız ve günlük hediye takvimi tek bir sayfadan üretildi (1 kredi).
+
+- **Memnuniyet (`G.rep.mood`).** Giden her misafir bir puan bırakır, son ~60 misafirin ortalaması tutulur. Baştaki değer
+  0,6.
+  - 1 puan: yemek 28 sn içinde gelmiş ve bankta 15 sn'den az beklemiş.
+  - 0,5 puan: yemek 50 sn içinde gelmiş ya da kapıdan geri dönmüş.
+  - 0 puan: yemeği beklerken ya da bankta sıkılıp gitmiş.
+  - Teslimatlar: gelen 1, iptal edilen 0.
+  - Etkisi: müşteri gelişi ×0,85 (memnuniyet 0) ile ×1,15 (memnuniyet 1) arasında değişir.
+- **Yorumlar.** Mutlu misafirlerin %8'i, yarım puanlıların %15'i, kızgınların %35'i bir cümle yazar (son 30'u tutulur).
+  - Cümle neden gittiğine göre seçilir: hızlı, yavaş, yemek gelmedi, yer yoktu, içeri giremedi, teslimat geldi ya da
+    gelmedi.
+  - Yorumu yazan müdavim yüzü de tona göre seçilir: güleç yüzler iyi yorumlarda, asık suratlılar kötülerde.
+  - Posta kutusunda "Letters" ve "Reviews" sekmeleri var. Reviews sekmesinde memnuniyet çubuğu (yeşil-kırmızı, yüzde),
+    duruma göre bir cümle, "Daily rewards" düğmesi ve yorumlar (yüz, balon, yeşil ya da kırmızı başparmak) görünür.
+    Okunmamış yorum varsa posta düğmesinde sarı bir nokta yanar.
+- **Günler (gerçek takvim).** Her günün ortalama memnuniyeti oyun oynandıkça birikir; son 7 gün saklanır.
+  - Yeni bir gün başlayınca bir önceki günün seviyesine göre ödül posta kutusuna gelir. Seviyeler Furious, Unhappy,
+    Mixed, Happy ve Delighted; sınırlar %30, %50, %70 ve %90. Ödüller 0, 2, 5, 10 ve 20 dakikalık gelir.
+  - "Reviews by day" kartında günün bitmesine kalan süre, son üç günün ve bugünün çubukları (eşik çizgileri ve yüzlerle)
+    ve beş seviye var. Seviyeye dokununca ödülü görünür.
+  - Gün değişimi oyun açılırken ve oynarken 30 saniyede bir kontrol edilir.
+- **Günlük hediye.** Her takvim günü bir kez alınır. Yedi günlük bir tur: 5, 8, 12, 16, 20, 25 ve 40 dakikalık gelir
+  (7. gün hediye kutusu).
+  - Üst çubuğun sağında Rita'nın yüzüyle "Daily" düğmesi var, hediye hazırsa kırmızı nokta yanar.
+  - Kart, oyuncu ilk birkaç görevi geçtikten sonra günde bir kez kendiliğinden açılır.
+- **Görevler.** "Make 70% of the guests happy" ve "Make 85% of the guests happy" eklendi; görev çubuğu yüzde gösterir,
+  dokununca Reviews sekmesini açar.
+- **Rita.** İlk yorum geldiğinde yorumları ve günlük ödülü anlatır, posta düğmesini gösterir.
+- **Denge.** Bot dengesi kabaca aynı kaldı. Memnuniyet kabaca %75–94 arasında geziyor. Bu koşuda bot, Victor'un iki
+  kamyonunu da kovamadığı için o görevde takıldı; bu rastlantıya bağlı ve faz 6'dan önce de vardı.
+- **Test.** Tarayıcı testi 108 kontrol. Yeni kontroller: yorumlar ve memnuniyet; Reviews sekmesi; okundu sayılması; günler
+  kartı; yeni günün postayla gelen ödülü; günlük hediye kartı, alınması ve aynı gün tekrar alınamaması.

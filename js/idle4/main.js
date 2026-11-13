@@ -104,6 +104,15 @@ const game = {
     save(); ui.live(); ui.renderRoom();
   },
   openMailbox() { ui.mailbox(); },
+  // today, by the calendar (the daily gift, each day's reviews)
+  today() { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; },
+  // a new calendar day: yesterday's reviews bring their reward (into the mailbox)
+  checkDay() { const m = S.newDay(G, game.today()); if (m) { save(); ui.live(); } return m; },
+  claimSignin() {
+    const r = S.claimSignin(G, game.today());
+    if (r) { audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live(); }
+    return r;
+  },
   // a tap on the timer over a room being worked on: lend the builder a hand
   hurry() {
     const x = S.hurry(G);
@@ -152,7 +161,7 @@ let lastWall = Date.now();
 
 // ---------------------------------------------------------------- loop
 const timer = new THREE.Timer();
-let liveT = 0, saveT = 0, coinT = 0, bellT = 0, appT = 0;
+let liveT = 0, saveT = 0, coinT = 0, bellT = 0, appT = 0, dayT = 0;
 function frame() {
   timer.update();
   const raw = timer.getDelta(), dt = Math.min(0.05, raw);
@@ -186,6 +195,7 @@ function frame() {
   world.update(Math.min(0.25, raw) * (game.paused ? 0 : Math.min(SPEED, 3)) || dt * 0.0001, innerWidth, innerHeight);
   liveT += dt; if (liveT > 0.1) { liveT = 0; ui.live(); }
   saveT += dt; if (saveT > 5) { saveT = 0; save(); }
+  dayT -= dt; if (dayT <= 0) { dayT = 30; game.checkDay(); }
   renderer.render(world.scene, world.camera);
 }
 renderer.setAnimationLoop(frame);

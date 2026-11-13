@@ -5,7 +5,8 @@ import * as S from './sim.js';
 
 // k: what is counted. 'item' (room, id: how many / its level), 'lv' (a room's level), 'served' (customers, all
 // together), 'tips' (picked up), 'letters' (read), 'staff' (the team), 'menu' (dishes on it), 'threats' (Victor's
-// truck driven off by serving fast enough), 'stars' (the best review), 'delivered' (deliveries), 'managers' (hired).
+// truck driven off by serving fast enough), 'stars' (the best review), 'delivered' (deliveries), 'managers' (hired),
+// 'mood' (the share of guests leaving happy, %).
 // room: where the bar takes you ('mail': the mailbox, 'events': the events card, 'managers': the managers card).
 // cash: the reward.
 const Q = (k, n, cash, room, text, o = {}) => ({ k, n, cash, room, text, ...o });
@@ -32,6 +33,7 @@ export const CHAIN = [
   Q('lv', 2, 500, 'office', 'Upgrade Ferdi\'s Office to Lv 2'),
   Q('lv', 1, 600, 'terrace', 'Open the Terrace'),
   Q('threats', 1, 700, 'events', 'Drive off Victor\'s food truck'),
+  Q('mood', 70, 800, 'mail', 'Make 70% of the guests happy'),
   Q('item', 3, 800, 'terrace', 'Have 3 tables on the Terrace', { id: 'tables' }),
   Q('lv', 1, 1000, 'bay', 'Open the Courier Bay'),
   Q('item', 1, 600, 'bay', 'Hire a courier', { id: 'couriers' }),
@@ -49,6 +51,7 @@ export const CHAIN = [
   Q('tips', 50, 6000, 'dining', 'Pick up 50 tips'),
   Q('lv', 4, 12000, 'kitchen', 'Renovate the Kitchen to Lv 4'),
   Q('managers', 4, 15000, 'managers', 'Have 4 managers'),
+  Q('mood', 85, 12000, 'mail', 'Make 85% of the guests happy'),
   st('fish', 15000, 'Build a fryer'),
   Q('lv', 4, 25000, 'office', 'Upgrade Ferdi\'s Office to Lv 4'),
   Q('lv', 4, 25000, 'staff', 'Renovate the Staff Room to Lv 4'),
@@ -81,6 +84,7 @@ export function progress(G, q = current(G)) {
     case 'stars': have = G.stats.stars; break;
     case 'delivered': have = G.stats.delivered; break;
     case 'managers': have = Object.keys(G.mgr).length; break;
+    case 'mood': have = Math.round(G.rep.mood * 100); break;
     default: break;
   }
   return [Math.min(have, q.n), q.n];
