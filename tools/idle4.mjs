@@ -10,6 +10,7 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 7: Rita the guide (after the story: her lines, the arrow), the fame in the top bar and on the card.
 // Phase 5: the building work: scaffolding over the room, the timer over it (a tap lends a hand, up to a third of the
 // time), the card when it's done (a picture of the room, what the level brings, what the office opens), the gold
 // arrow on a room whose renovation is within reach.
@@ -55,6 +56,15 @@ for (let i = 0; i < 4; i++) {
   await page.click('.modal.in [data-x="next"]'); await wait(450);
 }
 check(titles.join() === 'A letter,Everything,A visitor,The menu' && await ev('game.G.seen.intro'), 'four story cards: the letter, the building, the rival, the menu');
+// phase 7: Rita says hello (her face, her name, the line typing itself out), a tap goes on, an arrow shows what's next
+check(await until('!!document.querySelector(".modal.talkm.in .tbox")', 5000), 'Rita says hello after the story');
+check(await ev('document.querySelector(".talk .tname").textContent === "Rita" && document.querySelector(".talk .rita").naturalWidth > 0 && game.paused'), 'her name, her face; the restaurant waits');
+await shot('1b-rita');
+for (let i = 0; i < 8 && await ev('!!document.querySelector(".modal.talkm")'); i++) { await ev('document.querySelector(".modal.talkm").click()'); await wait(450); }
+check(await ev('!document.querySelector(".modal.talkm") && !game.paused && game.G.seen["g:hello"]'), 'taps take her through her lines and away');
+check(await until('!!document.querySelector(".pointer") && document.querySelector(".pointer").dataset.sel === ".quest"', 2000), 'an arrow points at the quest bar');
+await ev('game.ui.skipGuide()'); // (the rest of her lines would only be in the way)
+check(await ev('+document.querySelector(".famev").textContent.replace(/,/g, "") === game.S.fame(game.G) && game.S.fame(game.G) > 0'), 'the top bar shows the fame');
 
 // the building: labels on every room, the ruins, the hint
 check(await ev('document.querySelectorAll("#markers .mk.rlab").length') === 8, 'every room has a label');
@@ -167,6 +177,7 @@ await page.click('#sheet .reno [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "dining") === 2', 60000), 'the dining hall goes to level 2');
 const card3 = await upCard();
 check(card3.includes('Upgrade complete!') && /Tables\s*4\s*6/.test(card3) && /Upgrades up to\s*Lv 5\s*Lv 10/.test(card3), 'its card: tables 4 → 6, upgrades up to Lv 10');
+check(/Fame\s*[\d.,K]+\s*[\d.,K]+/.test(card3), 'and the fame before → after');
 await closeCard();
 // (from here on the cards would only be in the way)
 await ev('game.ui.upCard = game.ui.upgraded; game.ui.upgraded = () => {}');

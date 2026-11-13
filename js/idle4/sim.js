@@ -283,6 +283,15 @@ export function readiness(G, room) {
   }
   return [done, of];
 }
+// fame: one number for how far the restaurant has come (the top bar, and the card when a room goes up): a room's level
+// counts squared, then every thing bought, every dish on the menu, everyone on the team, every manager
+export const FAME = { room: 120, item: 6, dish: 150, staff: 25, mgr: 300 };
+export const roomFame = (L) => L * L * FAME.room;
+export function fame(G) {
+  let f = 0;
+  for (const id of ROOM_IDS) { f += roomFame(lvOf(G, id)); for (const k in G.rooms[id].it) f += G.rooms[id].it[k] * FAME.item; }
+  return Math.round(f + menu(G).length * FAME.dish + staffCount(G) * FAME.staff + Object.keys(G.mgr || {}).length * FAME.mgr);
+}
 // can this be bought now, apart from the cash? → null, or 'staff' (a hire, and the team is full: lockers first)
 export const itemBlock = (G, room, id) => (HIRE[id] && staffCount(G) >= staffCap(G) ? 'staff' : null);
 // can the room go up a level now? → null, or why not: 'max' | 'soon' | 'build' (a renovation is going on somewhere) |
