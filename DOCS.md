@@ -1256,3 +1256,25 @@ işler, 9. şehir haritası ve şubeler, 10. elmas, mağaza, reklam, Adapty, ana
 Tarayıcı testi 95 kontrol (yeni: iskele, sayaç, iki dokunuş 2 sn, üçte bir sınırı, giriş kartı, kartın fotoğrafı,
 iskelenin kalkması, dokununca kapanma, ofis kartı ve açılan personel odası, altın ok, salon kartı, ofis Lv 2 kartı:
 teras, kurye rampası, olaylar).
+
+### 14.6 Boyalı oyun arayüzü: ana ekran (13 Kasım 2026)
+
+Kullanıcı arayüzü "ham" buldu ve Police Chief yönünde öneriler istedi. İlk iki öneri turunu beğenmedi: tuvalde A/B/C,
+sonra D/E. İkincisi için "çok websitesi gibi" dedi. Varılan sonuç şu: aranan his CSS'ten değil, aynı tarzda boyanmış
+görsellerden geliyor (ikonlar, portreler). Kullanıcı "başla" dedi. Dal `idle-ui-kit`.
+
+- **Görseller (`assets/ui4`, kaynak notu `assets/ui4/CREDITS.md`):** GPT Image 2.6 (Higgsfield) ile iki sayfa üretildi,
+  ikisi de orta kalite, 2K ve saydam zeminli; bir script ile kesildi.
+  - 16 ikon: para, elmas, altın para, güneş, şef şapkası, zarf, hediye, takvim, şehir adası, kilit, çekiç, kupa, görev
+    panosu, servis kapağı, yeşil ok, kronometre.
+  - 9 portre (`faces/`): oyuncu, rehber olacak baş garson ve 7 yönetici. Ferdi ve Victor'un resimleri stil referansı
+    olarak verildi. `victor.webp` rakibin resminden kesildi.
+- **Üst çubuk:** oyuncunun portresi ve mavi seviye rozeti, yanında iki koyu yarı saydam plaka. İlkinde saat, ekip ve
+  para; ikincisinde dakikalık gelir ve yoğun saat. Ayarlar sağ üstte.
+- **Olay bandı:** sol kenara yapışık. Tehditte kırmızıdır ve Victor'un yüzü bandın üstüne taşar; diğer olaylarda boyalı
+  bir ikon durur.
+- **Alt çubuk:** Events, Managers ve Shop (kilitli), sağda büyük City düğmesi (kilitli). Posta bunun üstünde yüzen bir
+  düğme. Görev çubuğu solunda görev panosu olan koyu bir şerit. Oda paneli açıkken alt çubuk ve posta düğmesi gizlenir.
+- **Oda etiketleri:** koyu plakalar, mavi seviye rozetleri, boyalı ok ve çekiç.
+- **Para gösterimi:** $999.999 artık "$1M" görünür, "$1000K" değil.
+- **Henüz eski görünümde:** oda paneli, kartlar ve pencereler.
