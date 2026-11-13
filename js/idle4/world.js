@@ -540,7 +540,7 @@ export async function createWorld(game, markerEl) {
         return;
       }
       const at = (kit, name, s, x, z, ry = 0, y = 0) => { const p = piece(kit, name, s, ry); p.position.set(x, y, z); g.add(p); return p; };
-      if (lv >= 2) at('fbits', lv % 2 ? 'rug_oval_B' : 'rug_oval_A', [1.3, 0.3, 1.3], 3.2, 3.4);
+      if (lv >= 2) g.add(ovalRug(OFFICE_RUG[Math.min(lv, 5)], 3.2, 3.4, 1.75, 1.35));
       // the desk with a computer (you sit behind it, facing the room)
       at('furniture', 'desk', KN, 3.2, 3.45, Math.PI);
       at('furniture', 'computerScreen', KN * 0.8, 2.85, 3.55, Math.PI, 0.87);
@@ -616,6 +616,22 @@ export async function createWorld(game, markerEl) {
       stripe.rotation.x = -Math.PI / 2; stripe.position.set(27.7, 0.012, 4.4); g.add(stripe);
     },
   };
+  // a smooth oval rug lying flat on the floor (the kit's oval rug, squashed flat, showed its jagged rim): a field, a
+  // border, a thin ring; [field, border, ring] colours
+  const OFFICE_RUG = [null, null, ['#8e2b2b', '#d4a640', '#f3e2b8'], ['#2f3f6a', '#e9dcc0', '#d4a640'], ['#6a2033', '#d4a640', '#f3e2b8'], ['#1f5a4a', '#e8bd4f', '#fff3d6']];
+  const rugTex = new Map();
+  function ovalRug([field, border, ring], x, z, rx, rz) {
+    const k = field + border + ring;
+    if (!rugTex.has(k)) rugTex.set(k, canvasTex(256, 256, (c, w) => {
+      const r = w / 2;
+      const disc = (rr, col) => { c.fillStyle = col; c.beginPath(); c.arc(r, r, rr, 0, Math.PI * 2); c.fill(); };
+      disc(r, border); disc(r * 0.86, ring); disc(r * 0.8, field);
+      c.strokeStyle = ring; c.lineWidth = 3; c.globalAlpha = 0.5; c.beginPath(); c.arc(r, r, r * 0.55, 0, Math.PI * 2); c.stroke(); c.globalAlpha = 1;
+    }));
+    const m = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshStandardMaterial({ map: rugTex.get(k), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.012, z); m.receiveShadow = true;
+    return m;
+  }
   // a locker (front: +z); a little nicer every level
   const LOCKER_LOOK = [null, ['#7d8a96', '#5c6772'], ['#5f8fb0', '#466e8a'], ['#2f9a8c', '#227265'], ['#c4482f', '#933221'], ['#3a4e7a', '#2a3a5c']];
   function locker(lv, k) {
