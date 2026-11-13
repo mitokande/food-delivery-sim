@@ -1278,3 +1278,22 @@ görsellerden geliyor (ikonlar, portreler). Kullanıcı "başla" dedi. Dal `idle
 - **Oda etiketleri:** koyu plakalar, mavi seviye rozetleri, boyalı ok ve çekiç.
 - **Para gösterimi:** $999.999 artık "$1M" görünür, "$1000K" değil.
 - **Henüz eski görünümde:** oda paneli, kartlar ve pencereler.
+
+### 14.7 Arayüz boyutu ve yazı tipi (13 Kasım 2026)
+
+Kullanıcı arayüzün ekranda çok yer kapladığını söyledi ve tuvalde farklı boyut ve yazı tiplerini görmek istedi.
+- **1. tur:** %100, %85 ve %72 boyutta Lilita One, Baloo 2, Fredoka ve Nunito denendi. Kullanıcı fontların neredeyse
+  hiç değişmediğini söyledi: dördü de kalın ve yuvarlaktı, kalın kontur da farkı yutuyordu.
+- **2. tur:** belirgin biçimde farklı fontlar denendi: ince konturlu Lilita ve Rubik, Titan One, Luckiest Guy, Bungee.
+- **Seçim:** önerim olan %85 boyut ve ince konturlu Rubik ExtraBold. Kullanıcı "önerin güzel" dedi.
+
+- **Boyut (`--ui`, `css/idle4.css`):** bina üstündeki arayüzün her parçasına uygulanan bir zoom; varsayılan .85. Etkilenen
+  parçalar: üst çubuk, olay bandı, posta düğmesi, alt çubuk, görev çubuğu ve binadaki işaretler. Telefonun güvenli
+  alanları zoom'a bölünür ki doğru kalsın.
+- **Yazı tipi (`--display` / `--dw`):** Rubik 800. Bina üstündeki yazılarda ince kontur ve alt gölge kullanılıyor; kalın
+  kontur kalktı.
+- **Uygulama paketi:** Rubik ExtraBold (latin, latin-ext) ve OFL lisansı `mobile/fonts`'a eklendi, mağaza uygulaması
+  çevrimdışı da gösterir.
+- **Denemek için:** sayfa adresine `?ui=` (0.5–1.3) ve `?font=` eklenebilir. Seçenekler: lilita, baloo, fredoka, nunito,
+  rubik, titan, luckiest, bungee.
+- **Önbellek:** sayfanın önbellek anahtarı yenilendi (v=3).

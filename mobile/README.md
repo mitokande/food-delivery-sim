@@ -194,6 +194,6 @@ splash 2732²) and run `npm run assets`.
 
 ## Fonts
 
-`fonts/` holds Fredoka and Lilita One (SIL OFL 1.1, licenses alongside), exactly the files Google Fonts serves the site.
+`fonts/` holds Fredoka, Lilita One and Rubik ExtraBold (SIL OFL 1.1, licenses alongside), exactly the files Google Fonts serves the site.
 If `idle3.html` ever asks Google Fonts for other families or weights, fetch that stylesheet with a modern browser's
 user agent, download its `woff2` files here and point `fonts.css` at them.
