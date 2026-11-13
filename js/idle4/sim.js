@@ -15,7 +15,7 @@
 // a bonus, and if you like they buy its things for you.
 // Everyone who leaves counts toward the restaurant's mood (how many leave happy); some write a review. The mood brings
 // people in or keeps them away. Each calendar day's mood is kept, and the next day you play brings a reward by it; so
-// does just coming back each day (a daily gift).
+// does just coming back each day (a daily gift). Gems, the premium currency, finish building work at once or buy cash.
 // Pure: no DOM, no three.js. G is plain JSON (the save). Every walk is timed on the floor plan's routes (plan.js), the
 // same ones the view walks the characters along.
 import * as P from './plan.js';
@@ -160,6 +160,13 @@ export const MOOD_TIERS = [{ from: 0, name: 'Furious', min: 0 }, { from: 0.3, na
 export const tierOf = (m) => MOOD_TIERS.reduce((t, x, i) => (m >= x.from - 1e-9 ? i : t), 0);
 // the daily gift for coming back: minutes of income, a week round
 export const SIGNIN = [5, 8, 12, 16, 20, 25, 40];
+// gems: what a new restaurant starts with; s of building work a gem finishes; cash for gems (minutes of income); the
+// daily gift's gems by its day, a day's reward's gems by its tier; a rewarded ad's gems, and how many such ads a day
+export const GEMS = {
+  start: 20, build: 30,
+  skips: [{ id: 'skip30', min: 30, gems: 20 }, { id: 'skip120', min: 120, gems: 60 }, { id: 'skip480', min: 480, gems: 200 }],
+  signin: [0, 0, 10, 0, 0, 0, 30], mood: [0, 0, 0, 5, 10], ad: 5, adsADay: { gems: 3, build: 5 },
+};
 
 // ---------------------------------------------------------------- people
 export const WALK = { rate: 8, variety: 0.12, appeal: 0.03 }; // walk-ins a minute (× sign, flyers, dishes, room levels)
@@ -182,13 +189,14 @@ export function fresh(keep = {}) {
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
     online: [], bags: [], dirty: {}, clearing: {}, mgr: {}, // (delivery orders, bags on the shelf, seats to clear and who's on it, managers: room → { auto })
     acc: { walk: 0.7 },
-    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0, delivered: 0, lostOnline: 0, cleared: 0 },
+    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0, delivered: 0, lostOnline: 0, cleared: 0, gems: 0, gemsSpent: 0 },
     sold: {},
     tips: [], // { id, seat, amount }
     mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
     quest: { i: 0 }, sent: {}, // (the quest you're on; the letters already sent)
     rep: { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] }, // (reputation; reviews read up to seq `seen`; today so far; days before)
     daily: { last: null, n: 0 }, // (the daily gift: the day it was last claimed, how many so far)
+    gems: GEMS.start, shop: { starter: false, bought: 0 }, ads: { key: null, n: {} }, // (gems; the starter pack, packs bought; ads watched today)
     event: null, evNext: null, evLog: [], mods: [], quiet: false, // (the event on now, when the next comes, the last few; boosts and slumps)
     ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0, srv: 0 }, // (srv: customers paid a second)
     settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
@@ -202,6 +210,7 @@ export function fresh(keep = {}) {
 export function migrate(G) {
   G.rep ||= { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] };
   G.daily ||= { last: null, n: 0 };
+  G.gems ??= GEMS.start; G.shop ||= { starter: false, bought: 0 }; G.ads ||= { key: null, n: {} };
   for (const id of ROOM_IDS) {
     G.rooms[id] ||= { lv: ROOMS[id].start, it: {} };
     for (const k of Object.keys(ROOMS[id].items)) G.rooms[id].it[k] ??= ITEM_START(id, k);
@@ -888,17 +897,17 @@ export function newDay(G, key) {
   G.rep.day = { key, sum: 0, n: 0 };
   const cash = Math.round(perMin(G) * MOOD_TIERS[tier].min);
   if (!cash) return null;
-  const m = { id: G.seq++, kind: 'daily', day: d.key, mood, tier, cash, read: false };
+  const m = { id: G.seq++, kind: 'daily', day: d.key, mood, tier, cash, gems: GEMS.mood[tier], read: false };
   G.mail.push(m);
   return m;
 }
 // the daily gift: due today? claim it → { day (1…7), cash }, or null
 export const signinDue = (G, key) => G.daily.last !== key;
-export function claimSignin(G, key) {
+export function claimSignin(G, key, times = 1) {
   if (!signinDue(G, key)) return null;
-  const i = G.daily.n % SIGNIN.length, cash = Math.max(25 * (i + 1), Math.round(perMin(G) * SIGNIN[i]));
-  G.daily.last = key; G.daily.n++; G.cash += cash;
-  return { day: i + 1, cash };
+  const i = G.daily.n % SIGNIN.length, cash = signinCash(G, i) * times, gems = GEMS.signin[i] * times;
+  G.daily.last = key; G.daily.n++; G.cash += cash; addGems(G, gems);
+  return { day: i + 1, cash, gems };
 }
 export const signinCash = (G, i) => Math.max(25 * (i + 1), Math.round(perMin(G) * SIGNIN[i]));
 function post(G) {
@@ -911,10 +920,48 @@ export function openMail(G, id) {
   if (!m || m.read) return null;
   m.read = true;
   G.cash += m.cash || 0;
+  if (m.gems) addGems(G, m.gems);
   if (m.kind === 'letter') G.stats.letters++;
   const keep = new Set(G.mail.filter((x) => x.read).slice(-8)); // (the last few read stay, to read again)
   G.mail = G.mail.filter((x) => !x.read || keep.has(x));
   return m;
+}
+
+// ---------------------------------------------------------------- gems
+export function addGems(G, n) { if (n > 0) { G.gems += n; G.stats.gems += n; } }
+function spendGems(G, n) { if (!(n > 0) || G.gems < n) return false; G.gems -= n; G.stats.gemsSpent += n; return true; }
+// finishing the building work at once: a gem for every GEMS.build s left → the gems it costs (0: nothing being built)
+export const buildGems = (G) => (G.build ? Math.max(1, Math.ceil((G.build.t0 + G.build.dur - G.t) / GEMS.build)) : 0);
+// (the next tick finishes it, as if the time were up: the usual 'built' then)
+const endBuildNow = (G) => { if (G.build) G.build.dur = Math.max(0, G.t - G.build.t0); };
+export function finishWithGems(G) { const c = buildGems(G); if (!c || !spendGems(G, c)) return 0; endBuildNow(G); return c; }
+// cash for gems: minutes of income → the cash (0: not enough gems)
+export const skipCash = (G, id) => Math.round(perMin(G) * (GEMS.skips.find((x) => x.id === id)?.min || 0));
+export function buySkip(G, id) {
+  const sk = GEMS.skips.find((x) => x.id === id);
+  if (!sk || !spendGems(G, sk.gems)) return 0;
+  const cash = skipCash(G, id); G.cash += cash;
+  return cash;
+}
+// rewarded ads: how many of a kind are left today (key: the calendar day); one watched → what it gave
+export function adsLeft(G, kind, key) {
+  if (G.ads.key !== key) { G.ads.key = key; G.ads.n = {}; }
+  const cap = GEMS.adsADay[kind];
+  return cap == null ? Infinity : Math.max(0, cap - (G.ads.n[kind] || 0));
+}
+export function adWatched(G, kind, key) {
+  if (adsLeft(G, kind, key) <= 0) return null;
+  G.ads.n[kind] = (G.ads.n[kind] || 0) + 1;
+  if (kind === 'gems') { addGems(G, GEMS.ad); return { gems: GEMS.ad }; }
+  if (kind === 'build') { endBuildNow(G); return { build: true }; }
+  return {};
+}
+// a gem pack bought in the shop (store.js checks the purchase): its gems, and the starter pack's cash once
+export function packBought(G, pack) {
+  addGems(G, pack.gems); G.shop.bought++;
+  let cash = 0;
+  if (pack.once) { G.shop.starter = true; cash = Math.round(perMin(G) * (pack.cashMin || 0)); G.cash += cash; }
+  return { gems: pack.gems, cash };
 }
 
 // ---------------------------------------------------------------- while the game is closed

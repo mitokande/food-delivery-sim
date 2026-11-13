@@ -8,7 +8,7 @@ import * as S from './sim.js';
 // truck driven off by serving fast enough), 'stars' (the best review), 'delivered' (deliveries), 'managers' (hired),
 // 'mood' (the share of guests leaving happy, %).
 // room: where the bar takes you ('mail': the mailbox, 'events': the events card, 'managers': the managers card).
-// cash: the reward.
+// cash: the reward (gems: some quests give gems too).
 const Q = (k, n, cash, room, text, o = {}) => ({ k, n, cash, room, text, ...o });
 const st = (dish, cash, text) => Q('item', 1, cash, 'kitchen', text, { id: `st:${dish}` });
 export const CHAIN = [
@@ -16,7 +16,7 @@ export const CHAIN = [
   Q('item', 1, 15, 'dining', 'Hire a waiter', { id: 'waiters' }),
   st('hotdog', 25, 'Build a sausage grill'),
   Q('served', 15, 25, 'dining', 'Serve 15 customers'),
-  Q('lv', 1, 50, 'office', 'Fix up Ferdi\'s Office'),
+  Q('lv', 1, 50, 'office', 'Fix up Ferdi\'s Office', { gems: 10 }),
   Q('letters', 1, 20, 'mail', 'Read your mail'),
   Q('lv', 1, 40, 'entrance', 'Repair the Entrance'),
   Q('item', 1, 25, 'entrance', 'Add a waiting bench', { id: 'benches' }),
@@ -30,41 +30,41 @@ export const CHAIN = [
   Q('staff', 6, 200, 'staff', 'Have a team of 6'),
   Q('lv', 2, 250, 'kitchen', 'Renovate the Kitchen to Lv 2'),
   st('doner', 300, 'Put Döner on the menu'),
-  Q('lv', 2, 500, 'office', 'Upgrade Ferdi\'s Office to Lv 2'),
+  Q('lv', 2, 500, 'office', 'Upgrade Ferdi\'s Office to Lv 2', { gems: 15 }),
   Q('lv', 1, 600, 'terrace', 'Open the Terrace'),
   Q('threats', 1, 700, 'events', 'Drive off Victor\'s food truck'),
-  Q('mood', 70, 800, 'mail', 'Make 70% of the guests happy'),
+  Q('mood', 70, 800, 'mail', 'Make 70% of the guests happy', { gems: 10 }),
   Q('item', 3, 800, 'terrace', 'Have 3 tables on the Terrace', { id: 'tables' }),
-  Q('lv', 1, 1000, 'bay', 'Open the Courier Bay'),
+  Q('lv', 1, 1000, 'bay', 'Open the Courier Bay', { gems: 10 }),
   Q('item', 1, 600, 'bay', 'Hire a courier', { id: 'couriers' }),
   Q('lv', 2, 1000, 'staff', 'Renovate the Staff Room to Lv 2'),
   Q('lv', 2, 1000, 'cashier', 'Renovate the Cashier to Lv 2'),
   Q('served', 500, 1500, 'dining', 'Serve 500 customers'),
   st('pizza', 2000, 'Build a pizza oven'),
   Q('lv', 3, 2500, 'dining', 'Renovate the Dining Hall to Lv 3'),
-  Q('lv', 3, 5000, 'office', 'Upgrade Ferdi\'s Office to Lv 3'),
+  Q('lv', 3, 5000, 'office', 'Upgrade Ferdi\'s Office to Lv 3', { gems: 25 }),
   Q('stars', 4, 5000, 'events', 'Get a 4-star review from a critic'),
-  Q('managers', 1, 4000, 'managers', 'Hire a manager'),
+  Q('managers', 1, 4000, 'managers', 'Hire a manager', { gems: 15 }),
   Q('delivered', 50, 5000, 'bay', 'Make 50 deliveries'),
   Q('staff', 10, 5000, 'staff', 'Have a team of 10'),
   st('noodle', 6000, 'Put Noodles on the menu'),
   Q('tips', 50, 6000, 'dining', 'Pick up 50 tips'),
   Q('lv', 4, 12000, 'kitchen', 'Renovate the Kitchen to Lv 4'),
   Q('managers', 4, 15000, 'managers', 'Have 4 managers'),
-  Q('mood', 85, 12000, 'mail', 'Make 85% of the guests happy'),
+  Q('mood', 85, 12000, 'mail', 'Make 85% of the guests happy', { gems: 20 }),
   st('fish', 15000, 'Build a fryer'),
-  Q('lv', 4, 25000, 'office', 'Upgrade Ferdi\'s Office to Lv 4'),
+  Q('lv', 4, 25000, 'office', 'Upgrade Ferdi\'s Office to Lv 4', { gems: 40 }),
   Q('lv', 4, 25000, 'staff', 'Renovate the Staff Room to Lv 4'),
   Q('served', 3000, 40000, 'dining', 'Serve 3,000 customers'),
   st('sushi', 50000, 'Open a sushi bar'),
   Q('lv', 5, 60000, 'dining', 'Renovate the Dining Hall to Lv 5'),
   st('icecream', 80000, 'Build an ice cream bar'),
-  Q('lv', 5, 120000, 'office', 'Upgrade Ferdi\'s Office to Lv 5'),
+  Q('lv', 5, 120000, 'office', 'Upgrade Ferdi\'s Office to Lv 5', { gems: 60 }),
 ];
 // after the chain: serve more and more people
 function tail(j) {
   const n = 4000 + j * 1500;
-  return Q('served', n, Math.round(100000 * Math.pow(1.15, j) / 1000) * 1000, 'dining', `Serve ${n.toLocaleString('en-US')} customers`);
+  return Q('served', n, Math.round(100000 * Math.pow(1.15, j) / 1000) * 1000, 'dining', `Serve ${n.toLocaleString('en-US')} customers`, { gems: 5 });
 }
 export const questAt = (i) => (i < CHAIN.length ? CHAIN[i] : tail(i - CHAIN.length));
 export const current = (G) => questAt(G.quest.i);
@@ -94,6 +94,6 @@ export const done = (G) => { const [a, b] = progress(G); return a >= b; };
 export function claim(G) {
   if (!done(G)) return null;
   const q = current(G);
-  G.cash += q.cash; G.quest.i++;
+  G.cash += q.cash; S.addGems(G, q.gems || 0); G.quest.i++;
   return q;
 }

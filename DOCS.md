@@ -1367,3 +1367,48 @@ başparmaklar, yıldız ve günlük hediye takvimi tek bir sayfadan üretildi (1
   kamyonunu da kovamadığı için o görevde takıldı; bu rastlantıya bağlı ve faz 6'dan önce de vardı.
 - **Test.** Tarayıcı testi 108 kontrol. Yeni kontroller: yorumlar ve memnuniyet; Reviews sekmesi; okundu sayılması; günler
   kartı; yeni günün postayla gelen ödülü; günlük hediye kartı, alınması ve aynı gün tekrar alınamaması.
+
+### 14.10 10. faz: elmas, dükkân, ödüllü reklam altyapısı (13 Kasım 2026)
+
+Kullanıcı faz 10'u 8 ve 9'dan önce istedi. Kararları:
+- Elmas paketleri gerçek parayla Adapty üzerinden satılsın; önerdiğim fiyatlarla.
+- Ödüllü reklam için şimdilik yalnızca altyapı ve yer tutucu kurulsun.
+- Mağaza uygulamaları Ferdi's'e geçmesin.
+- Analitik olmasın.
+
+Dal `idle-phase10`.
+
+- **Elmas (`sim.js` `GEMS`).** Yeni bir restoran 20 elmasla başlar.
+  - Kazanma:
+    - Bazı görevler elmas da verir: ofisin her seviyesi (10, 15, 25, 40, 60), kurye rampası, ilk yönetici, memnuniyet
+      görevleri ve sonsuz görevlerin her biri (5).
+    - Günlük hediyenin 3. günü 10, 7. günü 30 elmas verir.
+    - Happy bir günün ödülü 5, Delighted bir günün ödülü 10 elmas.
+    - Reklam izlemek 5 elmas verir, günde 3 kez.
+  - Harcama:
+    - İnşaatı hemen bitirmek: kalan her 30 saniye için 1 elmas. Oda panelinde "Finish now" düğmesi.
+    - Nakit almak: 30 dakikalık gelir 20, 2 saatlik 60, 8 saatlik 200 elmas.
+  - Elmas üst çubuktaki ana plakada dördüncü bölüm olarak görünür; dokununca dükkân açılır. Görev çubuğu elmas ödülünü
+    de gösterir. Rita ilk elmas kazanıldığında dükkânı gösterir.
+- **Dükkân.** Alt menüdeki Shop sekmesi artık açık. İçinde:
+  - Elmas bakiyesi.
+  - Bir kerelik başlangıç paketi: 300 elmas ve 2 saatlik gelir, $1.99.
+  - 5 elmas paketi: 80, 500 (Popular), 1.200, 2.600 ve 7.000 (Best value); $0.99 ile $49.99 arası.
+  - Reklamla bedava elmas.
+  - Nakit karşılığı elmas.
+- **Gerçek para (`js/idle4/store.js`).** Uygulamada Adapty'nin `ferdis_shop` yerleşimindeki paywall'dan ürünler ve
+  fiyatlar çekilir (`getFlow`, `getPaywallProducts`), satın alma `makePurchase` ile yapılır, başarılı olunca elmas
+  verilir. Ürünler mağazalarda ve Adapty'de açılana kadar uygulamada fiyat yerine "Soon" yazar.
+  - Web'de mağaza yok; paketlerde "In the app" yazar. `?iap=test` ile her satın alma bedavaya gerçekleşir.
+  - Ürün kimlikleri ve kurulum adımları `mobile/README.md`'de ("Ferdi's gem packs").
+- **Ödüllü reklam.** Henüz reklam ağı yok.
+  - Web'de geri sayan bir yer tutucu "reklam" oynar (`?adms=` süresini değiştirir); sonuna kadar izlenirse ödül verilir.
+  - Uygulamada reklam teklifleri gizli (`store.js` `adsOn`).
+  - Reklamın ödül verdiği yerler: dükkânda +5 elmas (günde 3), inşaatı bitirmek (günde 5), "yokken" kazancını ikiye
+    katlamak, günlük hediyeyi ikiye katlamak.
+- **Test.** Tarayıcı testi 121 kontrol. Yeni kontroller:
+  - üst çubuktaki elmas;
+  - dükkân: 5 paket ve teklif, web'de "In the app", 20 elmasa 30 dakikalık gelir;
+  - yer tutucu reklam: oynaması, oyunu durdurması, +5 elmas, kalan hak;
+  - inşaatı elmasla bitirmek;
+  - `?iap=test` ile paket satın almak; başlangıç paketinin bir kez alınabilmesi.

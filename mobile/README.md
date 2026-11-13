@@ -167,6 +167,31 @@ like every other package here; raise it with `npm i -E @adapty/capacitor@x.y.z`,
 - iOS: Adapty supports Swift Package Manager only, which `ios/` already uses (`CapApp-SPM`). After an SDK change, run
   `npm run ios` on the Mac and let Xcode resolve packages, then commit the updated `Package.resolved`.
 
+### Ferdi's gem packs (idle4.html)
+
+Ferdi's sells gems through Adapty (`../js/idle4/store.js`). The shop asks Adapty for the products of the paywall at the
+placement **`ferdis_shop`**; each pack's id below is its store product id, the same everywhere. All are consumables.
+
+| Product id | Gems | Price (tier) |
+| --- | --- | --- |
+| `ferdis_starter` | 300 + 2 h of income, once per player | $1.99 |
+| `ferdis_gems_80` | 80 | $0.99 |
+| `ferdis_gems_500` | 500 | $4.99 |
+| `ferdis_gems_1200` | 1,200 | $9.99 |
+| `ferdis_gems_2600` | 2,600 | $19.99 |
+| `ferdis_gems_7000` | 7,000 | $49.99 |
+
+To switch them on:
+1. **App Store Connect:** under the app, In-App Purchases, add each as a Consumable with the id above. Set its price,
+   a display name and a review screenshot (the shop).
+2. **Play Console:** under Monetize → In-app products, add each with the same id and price.
+3. **Adapty:** add the six products (App Store and Google Play ids), make a paywall with them, and attach it to a
+   placement with the id `ferdis_shop`.
+
+Until all that exists, the shop in the app shows "Soon" in place of a price, and nothing can be bought. On the web the
+packs show "In the app"; `idle4.html?iap=test` makes every purchase go through for free, to try the shop. Rewarded ads:
+there is no ad network yet. The web plays a stand-in, and the apps hide the ad offers (`store.js` `adsOn`).
+
 ## Icon and splash
 
 The icon is Idle Restaurant Manager's (below). Before it, it was the courier on the red Vespetta, rendered in Blender by the

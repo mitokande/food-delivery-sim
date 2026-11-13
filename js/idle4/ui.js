@@ -8,6 +8,7 @@
 import * as S from './sim.js';
 import * as Q from './quests.js';
 import { app } from '../native.js';
+import * as St from './store.js';
 
 const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 const ART = (n) => `assets/story/${n}.webp`;
@@ -38,7 +39,6 @@ const MAIL_FACE = { health: 'inspector', regular: 'okafor', victor1: 'victor', v
 const mailPic = (m) => (m.kind === 'away' ? UI('cash') : m.kind === 'daily' ? UI(`mood/m${m.tier}`) : m.key === 'ferdi' ? `<img src="${ART('ferdi')}" alt="">` : MAIL_FACE[m.key] ? `<img src="${FACE(MAIL_FACE[m.key])}" alt="">` : UI('mail'));
 // the features of the later phases, locked for now (the restaurant level they're planned to open at)
 const FEATURES = [
-  { f: 'shop', name: 'Shop', icon: 'gems', lv: 2 },
   { f: 'map', name: 'City map', label: 'City', icon: 'map', lv: 4, big: true },
 ];
 const STAFF = { cooks: 1, waiters: 1, registers: 1, couriers: 1 };
@@ -104,6 +104,8 @@ export function createUI(game) {
           <button class="res team" data-act="room" data-room="staff" aria-label="The team">${UI('chef')}<b class="teamv">0/5</b></button>
           <i class="sep"></i>
           <span class="res cash">${UI('cash')}<b class="cashv">$0</b></span>
+          <i class="sep"></i>
+          <button class="res gems" data-act="shop" aria-label="Gems: the shop">${UI('gems')}<b class="gemsv">0</b></button>
         </div>
         <div class="prow"><div class="plate sub">${UI('coin')}<b class="ipm">$0/min</b><small class="rush"></small></div><div class="plate fame" aria-label="Fame">${UI('trophy')}<b class="famev">0</b></div></div>
       </div>
@@ -115,6 +117,7 @@ export function createUI(game) {
     <nav class="nav4">
       <button class="slot events locked" data-act="events" aria-label="Events">${UI('calendar')}<i class="lock">${UI('lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
       <button class="slot managers locked" data-act="managers" aria-label="Managers"><img class="u4 face" src="${FACE('marco')}" alt="" draggable="false"><i class="lock">${UI('lock')}</i><i class="badge" hidden></i><small>Lv ${S.MGR_LV}</small></button>
+      <button class="slot shop" data-act="shop" aria-label="Shop">${UI('gems')}<small>Shop</small></button>
       ${FEATURES.map((f) => `<button class="slot locked ${f.big ? 'big' : ''}" data-act="locked" data-f="${f.f}" aria-label="${f.name} (locked)">${UI(f.icon)}<i class="lock">${UI('lock')}</i><small>${f.label || `Lv ${f.lv}`}</small></button>`).join('')}
     </nav>
     <button class="quest" data-act="quest"><span class="qic"></span><span class="qt"><b class="qtext"></b><small class="qhelp"></small><span class="qbar"><u></u></span></span><span class="qr"></span></button>
@@ -197,13 +200,13 @@ export function createUI(game) {
     else if (lv === 0) {
       const cost = S.upCost(g, room);
       html = `<div class="repair"><p>${R.blurb}</p>
-        ${b ? `<div class="prog"><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div><small class="hint">Tap the timer over the room to lend a hand</small>`
+        ${b ? `<div class="prog"><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>${hurryRow(g)}`
           : block ? `<button class="btn big" disabled>${BLOCK_TEXT[block](g, room)}</button>`
           : `<button class="btn gold big" data-act="up" data-room="${room}" data-cost="${cost}">Repair · ${M(cost)}<small>${secs(S.upTime(g, room))}</small></button>`}</div>`;
     } else {
       html += `<p class="blurb">${R.blurb}</p>`;
       if (S.MANAGERS[room]) html += mgrRow(g, room);
-      if (b) html += `<div class="prog"><b>Renovating to Lv ${b.to}</b><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div><small class="hint">Tap the timer over the room to lend a hand</small>`;
+      if (b) html += `<div class="prog"><b>Renovating to Lv ${b.to}</b><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>${hurryRow(g)}`;
       html += `<div class="items">${Object.keys(R.items).map((id) => itemRow(g, room, id)).join('')}</div>`;
       if (!b && lv < S.MAXLV && R.up[lv]?.[0]) {
         const cost = S.upCost(g, room);
@@ -217,6 +220,14 @@ export function createUI(game) {
     }
     body.innerHTML = html;
     live();
+  }
+
+  // building work: finish it with gems (or an ad, where there are ads); the tip about the timer
+  function hurryRow(g) {
+    const ad = St.adsOn && S.adsLeft(g, 'build', game.today()) > 0;
+    return `<div class="hurry"><button class="btn blue sm" data-act="finish" data-gems="${S.buildGems(g)}"><small>Finish now</small><b>${UI('gems')}<span data-live="bgems">${S.buildGems(g)}</span></b></button>
+      ${ad ? `<button class="btn ghost sm" data-act="adbuild"><small>Watch an ad</small><b>${UI('stopwatch')}Finish</b></button>` : ''}</div>
+      <small class="hint">Or tap the timer over the room to lend a hand</small>`;
   }
 
   // ---------- managers ----------
@@ -397,7 +408,8 @@ export function createUI(game) {
       $('.qtext', questEl).innerHTML = `${q.text} <i>(${a.toLocaleString('en-US')}${u}/${n.toLocaleString('en-US')}${u})</i>`;
       $('.qhelp', questEl).textContent = help ? help[1] : '';
       $('.qbar u', questEl).style.width = pct(n ? a / n : 0);
-      $('.qr', questEl).innerHTML = done ? `<span class="claim">Claim<b>${M(q.cash)}</b></span>` : `${UI('cash')}<b>${M(q.cash)}</b>`;
+      const qg = q.gems ? `<em class="qg">${UI('gems')}${q.gems}</em>` : '';
+      $('.qr', questEl).innerHTML = done ? `<span class="claim">Claim<b>${M(q.cash)}${q.gems ? ` +${q.gems}` : ''}</b></span>` : `${UI('cash')}<b>${M(q.cash)}</b>${qg}`;
       questEl.classList.toggle('done', done);
       if (fresh) { questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); }
     }
@@ -409,6 +421,7 @@ export function createUI(game) {
   function live() {
     const g = G();
     $('.cashv', hud).textContent = M(g.cash);
+    const gv = S.short(g.gems); if ($('.gemsv', hud).textContent !== gv) $('.gemsv', hud).textContent = gv;
     const fm = S.fame(g), fe = $('.famev', hud);
     if (fm !== lastFame) { fe.textContent = fm.toLocaleString('en-US'); if (lastFame >= 0 && fm > lastFame) { const p = fe.parentNode; p.classList.remove('up'); void p.offsetWidth; p.classList.add('up'); } lastFame = fm; }
     $('.rlv', hud).textContent = S.restaurantLv(g);
@@ -429,6 +442,8 @@ export function createUI(game) {
       const bd = S.building(g, room);
       const u = body.querySelector('[data-live="build"]'), eta = body.querySelector('[data-live="eta"]');
       if (bd && u) { u.style.width = pct(Math.min(1, (g.t - bd.t0) / Math.max(0.01, bd.dur))); eta.textContent = `${secs(Math.max(0, bd.t0 + bd.dur - g.t))} left`; }
+      const bg = body.querySelector('[data-live="bgems"]'), fb = body.querySelector('[data-act="finish"]');
+      if (bd && bg) { const c = S.buildGems(g); if (bg.textContent !== String(c)) bg.textContent = c; fb.disabled = g.gems < c; }
     }
     updateQuest();
     updateEvents(g);
@@ -516,8 +531,14 @@ export function createUI(game) {
       <div class="awaygrid"><span>${UI('cash')}<b>${M(r.earned)}</b><small>earned</small></span><span>${UI('cloche')}<b>${r.served}</b><small>served</small></span><span>${UI('stopwatch')}<b>${r.lost}</b><small>walked away</small></span></div>
       ${r.built?.length ? `<p class="small">Finished: ${r.built.map((b) => `${S.ROOMS[b.room].name} Lv ${b.lv}`).join(', ')}</p>` : ''}
       ${r.capped ? `<p class="small">(The restaurant runs for ${S.AWAY.max / 3600} hours at most while you're away.)</p>` : ''}
-      <button class="btn big gold" data-x="ok">Collect ${M(r.earned)}</button>`, { cls: 'awaycard', pause: true });
+      <button class="btn big gold" data-x="ok">Collect ${M(r.earned)}</button>
+      ${St.adsOn && r.mail != null ? `<button class="btn big blue" data-x="ad2">${UI('stopwatch')}Watch an ad: ${M(r.earned * 2)}</button>` : ''}`, { cls: 'awaycard', pause: true });
     mm.card.querySelector('[data-x="ok"]').addEventListener('click', () => { mm.close(); if (r.mail != null) game.openMail(r.mail); else sfx('ui-coins'); });
+    mm.card.querySelector('[data-x="ad2"]')?.addEventListener('click', async () => {
+      const got = await game.watchAd('away');
+      if (!got) return;
+      mm.close(); game.openMail(r.mail); G().cash += r.earned; game.save(); toast(`${UI('cash')} Doubled: +${M(r.earned * 2)}`, 'good');
+    });
   }
   // ---------- Rita, thirty years a waitress at Ferdi's, shows you round ----------
   // A few words when something is new (each once: G.seen['g:<key>']): her face over a box at the bottom, a tap goes on.
@@ -536,6 +557,8 @@ export function createUI(game) {
     { key: 'events', when: (g) => S.restaurantLv(g) >= S.EVENT_LV, point: '.nav4 .slot.events', lines: ['We\'re getting noticed. Critics, celebrities, tour vans... and trouble. Keep an eye on Events.'] },
     { key: 'threat', when: (g) => g.event?.kind === 'threat', point: '.evbar', lines: ['That\'s Victor\'s truck! Serve enough people before it parks, or it steals our customers. Or pay to have it moved on.'] },
     { key: 'managers', when: (g) => S.restaurantLv(g) >= S.MGR_LV, point: '.nav4 .slot.managers', lines: ['We can afford managers now. Each one looks after a room, and buys its things while you\'re busy.'] },
+    { key: 'gems', when: (g) => g.stats.gems > 0, point: '.nav4 .slot.shop', lines: [
+      'Gems! Keep them safe, love. They finish building work at once, or buy a pile of cash in the Shop.'] },
     { key: 'reviews', when: (g) => g.rep.reviews.length > 0, point: '.slot.mail', lines: [
       'People have started writing reviews! Fast food and clean tables make them happy, and happy reviews bring more people in.',
       'Each day\'s reviews earn a reward, sent by mail the next day you play. They\'re in the mailbox, under Reviews.'] },
@@ -602,7 +625,7 @@ export function createUI(game) {
       return list.length ? `<div class="mlist">${list.map((m) => `<button class="mrow ${m.read ? 'read' : ''}" data-m="${m.id}">
         <span class="mi ${m.kind === 'away' ? 'away' : m.kind === 'daily' ? 'daily' : ''}">${mailPic(m)}</span>
         <span class="mb"><span class="mt"><b>${mailTitle(m)}</b><small>${mailFrom(m)}</small></span>
-        ${m.read ? '<i class="tick"></i>' : m.cash ? `<span class="gift">${UI('cash')}<b>${M(m.cash)}</b></span>` : '<span class="gift new">New</span>'}</span></button>`).join('')}</div>`
+        ${m.read ? '<i class="tick"></i>' : m.cash ? `<span class="gift">${UI('cash')}<b>${M(m.cash)}</b></span>${m.gems ? `<span class="gift gems">${UI('gems')}<b>${m.gems}</b></span>` : ''}` : '<span class="gift new">New</span>'}</span></button>`).join('')}</div>`
         : '<p>No mail yet. People write as the restaurant grows.</p>'; };
     const reviews = () => { const list = [...g.rep.reviews].reverse();
       return `${moodBar(g)}<button class="btn gold sm days" data-x="days">${UI('daily')}<b>Daily rewards</b></button>
@@ -638,7 +661,7 @@ export function createUI(game) {
       ? { from: 'Ferdi\'s reviews', title: `${dayLabel(m.day)}: ${pctS(m.mood)} happy`, text: `A ${S.MOOD_TIERS[m.tier].name.toLowerCase()} day. Old Town noticed, and here is something for it. Keep the food fast and the tables clean for a better one tomorrow.` }
       : S.LETTER[m.key];
     const mm = modal(`<div class="letter"><span class="lpic ${m.kind === 'daily' ? 'mood' : ''}">${mailPic(m)}</span><i class="tape"></i><small class="from">From: ${L.from}</small><h2>${L.title}</h2><p>${L.text}</p></div>
-      <button class="btn big ${m.cash && !m.read ? 'gold' : ''}" data-x="ok">${m.cash && !m.read ? `Collect ${M(m.cash)}` : 'Close'}</button>`, { cls: 'lettercard', pause: !m.read });
+      <button class="btn big ${m.cash && !m.read ? 'gold' : ''}" data-x="ok">${m.cash && !m.read ? `Collect ${M(m.cash)}${m.gems ? ` + ${m.gems} gems` : ''}` : 'Close'}</button>`, { cls: 'lettercard', pause: !m.read });
     mm.card.querySelector('[data-x="ok"]').addEventListener('click', () => { mm.close(); if (!m.read) game.openMail(m.id); });
   }
   // ---------- the days: each day's mood (the calendar's days), the reward each tier brings ----------
@@ -668,20 +691,78 @@ export function createUI(game) {
       if (e.target.closest('[data-x="close"]')) mm.close();
     });
   }
+  // ---------- the shop: gem packs (real money: store.js), free gems for an ad, cash for gems ----------
+  function shop() {
+    const g = G(), key = game.today();
+    const packs = St.PACKS.map((p, i) => `<button class="pack ${p.tag ? 'tagged' : ''}" data-pack="${p.id}">${p.tag ? `<i class="ptag">${p.tag}</i>` : ''}
+      <span class="pgems" style="--n:${i}">${UI('gems')}</span><b>${p.gems.toLocaleString('en-US')}</b><span class="price" data-price="${p.id}">…</span></button>`).join('');
+    const starter = g.shop.starter ? '' : `<button class="offer" data-pack="${St.STARTER.id}"><span class="ob">${UI('gift')}</span>
+      <span class="ot"><b>Starter pack</b><small>${St.STARTER.gems} gems + ${M(S.perMin(g) * St.STARTER.cashMin)} · once only</small></span><span class="price" data-price="${St.STARTER.id}">…</span></button>`;
+    const adsLeft = S.adsLeft(g, 'gems', key);
+    const free = St.adsOn ? `<div class="srow"><span class="si">${UI('stopwatch')}</span><span class="st"><b>Free gems</b><small>Watch an ad: +${S.GEMS.ad} gems · ${adsLeft} left today</small></span>
+      <button class="btn blue sm" data-x="adgems" ${adsLeft ? '' : 'disabled'}><small>Watch</small><b>${UI('gems')}+${S.GEMS.ad}</b></button></div>` : '';
+    const skips = S.GEMS.skips.map((k) => `<div class="srow"><span class="si">${UI('cash')}</span><span class="st"><b>${k.min >= 60 ? `${k.min / 60} hours` : `${k.min} minutes`} of income</b><small>+${M(S.skipCash(g, k.id))} at once</small></span>
+      <button class="btn gold sm" data-skip="${k.id}" data-gems="${k.gems}"><small>Buy</small><b>${UI('gems')}${k.gems}</b></button></div>`).join('');
+    const mm = modal(`<h2>${UI('gems')} Shop</h2>
+      <div class="gbal">${UI('gems')}<b>${g.gems.toLocaleString('en-US')}</b><small>gems</small></div>
+      ${starter}
+      <h3 class="sh">Gems</h3><div class="packs">${packs}</div>
+      ${free}
+      <h3 class="sh">Cash</h3>${skips}
+      <p class="small">${St.testMode ? 'Test mode: purchases are free.' : app ? 'Prices are set by the App Store and Google Play.' : 'Gems are sold in the app.'}</p>`, { cls: 'shopcard', dismiss: true });
+    // the store's prices (they come late, or not at all: "In the app", "Soon")
+    for (const el of mm.card.querySelectorAll('[data-price]')) St.priceOf(el.dataset.price).then((p) => { el.textContent = p || (app ? 'Soon' : 'In the app'); el.parentNode.classList.toggle('na', !p); });
+    const gemsDis = () => { for (const b of mm.card.querySelectorAll('[data-gems]')) b.disabled = G().gems < +b.dataset.gems; };
+    gemsDis();
+    mm.card.addEventListener('click', async (e) => {
+      const pk = e.target.closest('[data-pack]');
+      if (pk) {
+        if (pk.classList.contains('na') || pk.dataset.busy) return;
+        pk.dataset.busy = '1';
+        const got = await game.buyPack(pk.dataset.pack);
+        delete pk.dataset.busy;
+        if (got) { mm.close(); toast(`${UI('gems')} +${got.gems.toLocaleString('en-US')} gems${got.cash ? ` and ${M(got.cash)}` : ''}. Thank you!`, 'good'); }
+        return;
+      }
+      const sk = e.target.closest('[data-skip]');
+      if (sk) { const c = game.buySkip(sk.dataset.skip); if (c) { mm.close(); toast(`${UI('cash')} +${M(c)}`, 'good'); } return; }
+      if (e.target.closest('[data-x="adgems"]')) { const r = await game.watchAd('gems'); if (r) { mm.close(); toast(`${UI('gems')} +${r.gems} gems`, 'good'); } }
+    });
+    sfx('ui-open', { vol: 0.5 });
+  }
+  // the rewarded ad's stand-in (there is no ad network yet): a card that counts down; closed before the end, no reward
+  function standInAd() {
+    return new Promise((done) => {
+      let ok = false;
+      const mm = modal(`<h2>${UI('stopwatch')} Ad</h2>
+        <div class="adbox"><span class="adring"><i></i><b class="adleft">${Math.ceil(St.AD_MS / 1000)}</b></span><p>A short ad plays here.<br><small>(A stand-in: no ads in the game yet.)</small></p></div>
+        <button class="btn ghost" data-x="skip">Close without the reward</button>`, { cls: 'adcard', pause: true, onClose: () => done(ok) });
+      const t0 = performance.now(), ring = $('.adring', mm.card);
+      const iv = setInterval(() => {
+        const f = Math.min(1, (performance.now() - t0) / St.AD_MS);
+        ring.style.setProperty('--p', f.toFixed(3)); $('.adleft', mm.card).textContent = Math.ceil((1 - f) * St.AD_MS / 1000);
+        if (f >= 1) { clearInterval(iv); ok = true; mm.close(); }
+      }, 100);
+      mm.card.querySelector('[data-x="skip"]').addEventListener('click', () => { clearInterval(iv); mm.close(); });
+    });
+  }
+
   // ---------- the daily gift: a week round, one a calendar day ----------
   function signin() {
     const g = G(), key = game.today(), due = S.signinDue(g, key), at = g.daily.n % S.SIGNIN.length;
     const last = due ? at - 1 : (g.daily.n - 1) % S.SIGNIN.length; // (the last day of this week already claimed)
     const tiles = S.SIGNIN.map((_, i) => { const st = i <= last ? 'done' : due && i === at ? 'today' : 'later';
-      return `<span class="stile ${st} ${i === 6 ? 'big' : ''}"><small>Day ${i + 1}</small>${UI(i === 6 ? 'gift' : 'cash')}<b>${M(S.signinCash(g, i))}</b>${st === 'done' ? '<i class="tick"></i>' : ''}</span>`; }).join('');
+      const gm = S.GEMS.signin[i] ? `<em>${UI('gems')}+${S.GEMS.signin[i]}</em>` : '';
+      return `<span class="stile ${st} ${i === 6 ? 'big' : ''}"><small>Day ${i + 1}</small>${UI(i === 6 ? 'gift' : 'cash')}<b>${M(S.signinCash(g, i))}</b>${gm}${st === 'done' ? '<i class="tick"></i>' : ''}</span>`; }).join('');
     const mm = modal(`<h2>${UI('daily')} Daily gift</h2>
       <div class="rsay"><img src="${FACE('guide')}" alt="Rita"><p>Come back every day, love. There's always a little something for you.</p></div>
       <div class="sgrid">${tiles}</div>
-      ${due ? `<button class="btn gold big" data-x="claim">Claim ${M(S.signinCash(g, at))}</button>` : '<button class="btn big" disabled>Come back tomorrow</button>'}`, { cls: 'signin', dismiss: true });
-    mm.card.addEventListener('click', (e) => {
-      if (!e.target.closest('[data-x="claim"]')) return;
-      const r = game.claimSignin();
-      if (r) { mm.close(); toast(`${UI('gift')} Day ${r.day} gift: +${M(r.cash)}`, 'good'); }
+      ${due ? `<button class="btn gold big" data-x="claim">Claim ${M(S.signinCash(g, at))}</button>
+        ${St.adsOn ? `<button class="btn blue big" data-x="claim2">${UI('stopwatch')}Watch an ad: ×2</button>` : ''}` : '<button class="btn big" disabled>Come back tomorrow</button>'}`, { cls: 'signin', dismiss: true });
+    const claimed = (r) => { if (r) { mm.close(); toast(`${UI('gift')} Day ${r.day} gift: +${M(r.cash)}${r.gems ? ` +${r.gems} gems` : ''}`, 'good'); } };
+    mm.card.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-x="claim"]')) claimed(game.claimSignin());
+      else if (e.target.closest('[data-x="claim2"]') && await game.watchAd('gift')) claimed(game.claimSignin(2));
     });
     sfx('ui-open', { vol: 0.5 });
   }
@@ -694,7 +775,7 @@ export function createUI(game) {
       <div class="set"><span>Graphics</span><button class="btn sm blue" data-s="quality">${s.quality}</button></div>
       <button class="btn ghost" data-s="story">${FERDI}Read Uncle Ferdi's letter again</button>
       <button class="btn ghost danger" data-s="reset">Start over</button>
-      <p class="small">Prototype: phases 6 and 7 of the remake (reviews and daily rewards; painted windows, fame, Rita the guide). ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
+      <p class="small">Prototype: phase 10 of the remake (gems, the shop, rewarded ads) on top of phases 1–7. ${app ? '' : '<a class="link" href="idle3.html">Idle Restaurant Manager</a> · <a class="link" href="index.html">The courier game</a>'}</p>
       <button class="btn big" data-x="close">Done</button>`, { cls: 'settings', dismiss: true });
     m.card.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
@@ -723,6 +804,9 @@ export function createUI(game) {
     }
     else if (a === 'mail') mailbox();
     else if (a === 'daily') signin();
+    else if (a === 'shop') shop();
+    else if (a === 'finish') { if (game.finishNow()) renderRoom(); }
+    else if (a === 'adbuild') game.watchAd('build').then((r) => { if (r) { toast(`${UI('hammer')} The builders hurried up!`, 'good'); renderRoom(); } });
     else if (a === 'events') eventsCard();
     else if (a === 'managers') managersCard();
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
@@ -740,7 +824,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, shop, standInAd, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${UI('quest')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${IT({ cook: 'pan', waiter: 'tray', courier: 'helmet' }[s.role] || 'register')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },

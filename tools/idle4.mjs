@@ -10,6 +10,8 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 10: gems in the top bar, the shop (packs, prices, cash for gems, free gems for the stand-in ad, ?iap=test
+// purchases, the starter pack once), finishing building work with gems.
 // Phase 6: reviews and the mood (the mailbox's Reviews tab), each day's rewards, the daily gift.
 // Phase 7: Rita the guide (after the story: her lines, the arrow), the fame in the top bar and on the card.
 // Phase 5: the building work: scaffolding over the room, the timer over it (a tap lends a hand, up to a third of the
@@ -43,7 +45,7 @@ const cash = (n) => ev(`game.G.cash = ${n}`);
 const upCard = async () => { if (!(await until('!!document.querySelector(".modal.upcard.in")', 6000))) return ''; await wait(800); return ev('document.querySelector(".modal.upcard").innerText'); };
 const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
-await boot('idle4.html?fresh&speed=4');
+await boot('idle4.html?fresh&speed=4&adms=400');
 await page.waitForSelector('.modal.story .btn', { timeout: 10000 });
 await shot('0-story');
 check(await ev('document.querySelector(".modal.story .ferdi img").naturalWidth > 0'), "the letter shows Uncle Ferdi's portrait");
@@ -72,6 +74,7 @@ check(await ev('document.querySelectorAll("#markers .mk.rlab").length') === 8, '
 check(await ev('document.querySelector("#markers .rl.ruin") && !document.querySelector("#markers .rl.soon") && [...document.querySelectorAll("#markers .rl.ruin")].some((e) => e.textContent.includes("Courier Bay") && e.textContent.includes("Restaurant Lv 2"))'), 'ruined rooms show a repair price (the courier bay: from restaurant level 2)');
 check(await ev('document.querySelector(".quest .qtext").textContent.includes("Hire a cook (0/1)")'), 'the first quest: hire a cook (0/1)');
 check(await ev('document.querySelector(".teamv").textContent') === '0/5', 'the top bar shows the team: 0/5');
+check(await ev('document.querySelector(".gemsv").textContent') === String(await ev('game.S.GEMS.start')), 'and the gems a new restaurant starts with');
 check(/^0[89]:\d\d$/.test(await ev('document.querySelector(".clk").textContent')), 'the clock: morning');
 await page.click('.slot.events'); await wait(300);
 check(await ev('document.querySelector(".slot.events").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Events: opens at restaurant level 2"))'), 'events: locked before restaurant level 2');
@@ -187,6 +190,29 @@ check(await ev('game.S.upBlock(game.G, "dining")') === 'office', 'level 3 waits 
 check(await ev('document.querySelectorAll("#sheet .irow").length >= 4 && document.querySelector("#sheet .reno .why").textContent.includes("Office")'), 'the panel says so');
 await ev('game.ui.closeRoom()');
 
+// phase 10: the shop (gem packs: no store on the web; cash for gems; free gems for the stand-in ad), finishing building
+// work with gems or an ad
+await ev('game.G.gems = 100'); await wait(200);
+await page.click('.nav4 .slot.shop'); await wait(600);
+check(await ev('document.querySelectorAll(".modal.shopcard .pack").length === 5 && !!document.querySelector(".modal.shopcard .offer")'), 'the shop: five gem packs and the starter pack');
+check(await until('[...document.querySelectorAll(".modal.shopcard .price")].every((e) => e.textContent === "In the app")', 3000), 'no store on the web: "In the app"');
+const sk = await ev('[game.G.cash, game.S.skipCash(game.G, "skip30")]');
+await page.click('.modal.shopcard [data-skip="skip30"]'); await wait(400);
+check(await ev('game.G.gems') === 80 && await ev('game.G.cash') >= sk[0] + sk[1] * 0.9, '30 minutes of income for 20 gems');
+await page.click('.nav4 .slot.shop'); await wait(600);
+await shot('9e-shop');
+await page.click('.modal.shopcard [data-x="adgems"]'); await wait(300);
+check(await ev('!!document.querySelector(".modal.adcard .adring") && game.paused'), 'free gems: the stand-in ad plays (and the restaurant waits)');
+check(await until('game.G.gems === 85 && !document.querySelector(".modal.adcard")', 3000), 'watched to the end: +5 gems');
+check(await ev('game.S.adsLeft(game.G, "gems", game.today())') === 2, 'two more today');
+await ev('document.querySelectorAll(".modal").forEach((m) => m.remove()); game.paused = false');
+await ev('(() => { const g = game.G; g.build = null; g.build = { room: "entrance", to: game.S.lvOf(g, "entrance") + 1, t0: g.t, dur: 200 }; game.openRoom("entrance"); })()'); await wait(600);
+const fin = await ev('[game.S.buildGems(game.G), game.S.lvOf(game.G, "entrance"), game.G.gems]');
+check(fin[0] >= 6 && fin[0] <= 7 && await ev('!!document.querySelector("#sheet [data-act=finish]") && !!document.querySelector("#sheet [data-act=adbuild]")'), 'building work: Finish now for gems, or an ad');
+await page.click('#sheet [data-act="finish"]');
+check(await until(`game.S.lvOf(game.G, "entrance") === ${fin[1] + 1}`, 3000) && await ev('game.G.gems') === fin[2] - fin[0], 'finished at once, for its gems');
+await ev('game.ui.closeRoom()');
+
 // the team: full at 5 without a staff room; its lockers make room for more (a new hire changes at one first)
 await wait(300);
 const team = await ev('[game.S.staffCount(game.G), document.querySelector(".teamv").textContent, game.G.staff.map((s) => s.role).join()]');
@@ -289,11 +315,24 @@ await shot('8c-night');
 // save + reload
 await ev('game.save()');
 const before = await ev('({ rooms: JSON.stringify(game.G.rooms), cash: game.G.cash, served: game.G.stats.served })');
-await boot('idle4.html?speed=4');
+await boot('idle4.html?speed=4&iap=test');
 // (the reload takes a few seconds, which the restaurant plays through: it only earns more)
 const after = await ev('({ rooms: JSON.stringify(game.G.rooms), cash: game.G.cash, served: game.G.stats.served })');
 check(after.rooms === before.rooms && after.cash >= before.cash - 0.01 && after.served >= before.served, 'save + reload keep the rooms, the cash and the stats');
 check(await ev('!document.querySelector(".modal.story")'), 'no story the second time');
+// gem packs, bought (?iap=test: the purchase always goes through, as the store would say)
+await ev('(() => { game.ui.skipGuide(); document.querySelectorAll(".modal").forEach((m) => m.remove()); game.paused = false; })()');
+const gm0 = await ev('game.G.gems');
+await page.click('.nav4 .slot.shop'); await wait(600);
+check(await until('document.querySelector(".modal.shopcard .price").textContent === "$1.99"', 3000), 'test mode: the packs have prices');
+await page.click('.modal.shopcard [data-pack="ferdis_gems_80"]');
+check(await until(`game.G.gems === ${gm0 + 80} && !document.querySelector(".modal.shopcard")`, 3000), 'a gem pack bought: +80 gems');
+await page.click('.nav4 .slot.shop'); await wait(600);
+await page.click('.modal.shopcard [data-pack="ferdis_starter"]');
+check(await until(`game.G.gems === ${gm0 + 380} && game.G.shop.starter`, 3000), 'the starter pack: +300 gems (and its cash)');
+await page.click('.nav4 .slot.shop'); await wait(600);
+check(await ev('!document.querySelector(".modal.shopcard .offer")'), 'once only: the offer is gone');
+await ev('document.querySelectorAll(".modal").forEach((m) => m.remove()); game.paused = false; game.save()');
 
 // closed for two hours (an event is due when it closes: nothing new may start while it is)
 await ev('(() => { const g = game.G; g.event = null; g.evNext = g.t; g.evLog.length = 0; g.cust = g.cust.filter((c) => !c.vip); })()');

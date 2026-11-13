@@ -10,6 +10,7 @@ import { keep, restore } from '../native.js';
 import { buzz } from '../haptics.js';
 import * as S from './sim.js';
 import * as Q from './quests.js';
+import * as St from './store.js';
 import { createUI } from './ui.js';
 import { createWorld } from './world.js';
 
@@ -108,9 +109,39 @@ const game = {
   today() { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; },
   // a new calendar day: yesterday's reviews bring their reward (into the mailbox)
   checkDay() { const m = S.newDay(G, game.today()); if (m) { save(); ui.live(); } return m; },
-  claimSignin() {
-    const r = S.claimSignin(G, game.today());
+  claimSignin(times = 1) {
+    const r = S.claimSignin(G, game.today(), times);
     if (r) { audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live(); }
+    return r;
+  },
+  // gems: finish the building work at once; cash for gems; a pack bought in the shop (real money: store.js)
+  finishNow() {
+    const c = S.finishWithGems(G);
+    if (!c) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return 0; }
+    audio.play('ui-purchase'); buzz(20); save(); ui.live();
+    return c;
+  },
+  buySkip(id) {
+    const cash = S.buySkip(G, id);
+    if (!cash) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return 0; }
+    audio.play('ui-coins'); buzz(20); save(); ui.live();
+    return cash;
+  },
+  async buyPack(id) {
+    const pack = St.packOf(id);
+    if (!pack || (pack.once && G.shop.starter)) return null;
+    const r = await St.buy(id);
+    if (r !== 'success') { if (r !== 'cancelled') ui.toast(r === 'pending' ? 'The purchase is waiting for approval' : 'The store isn\'t available right now', r === 'pending' ? 'warn' : 'bad'); return null; }
+    const got = S.packBought(G, pack);
+    audio.play('ui-levelup'); setTimeout(() => audio.play('ui-coins'), 200); buzz(40); save(); ui.live();
+    return got;
+  },
+  // a rewarded ad (store.js: the web's stand-in for now) → what it gave, or null (not watched to the end, none left)
+  async watchAd(kind) {
+    if (!St.adsOn || S.adsLeft(G, kind, game.today()) <= 0) return null;
+    if (!(await ui.standInAd())) return null;
+    const r = S.adWatched(G, kind, game.today());
+    if (r) { audio.play('pickup-bonus'); buzz(20); save(); ui.live(); }
     return r;
   },
   // a tap on the timer over a room being worked on: lend the builder a hand
