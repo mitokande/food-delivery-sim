@@ -859,6 +859,7 @@ export const short = (n) => {
   if (a < 1000) return (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
   const u = ['K', 'M', 'B', 'T']; let i = -1, x = a;
   while (x >= 1000 && i < u.length - 1) { x /= 1000; i++; }
+  if (x >= 999.5 && i < u.length - 1) { x /= 1000; i++; } // (999,999 is $1M, not $1000K)
   const t = x >= 100 ? String(Math.round(x)) : String(parseFloat(x.toFixed(x >= 10 ? 1 : 2)));
   return (n < 0 ? '-' : '') + t + u[i];
 };

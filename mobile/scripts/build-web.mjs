@@ -19,7 +19,7 @@ const NM = path.join(MOBILE, 'node_modules');
 // the apps' game, and what only the other one needs (left out)
 const PAGES = {
   'idle3.html': ['js/idle3/lab.js', 'js/idle3/lab-worker.js', 'js/idle3/labbar.js', 'js/idle3/bot.js', 'css/idle3-lab.css',
-    'js/idle4', 'css/idle4.css', 'assets/story/rival.webp', 'assets/models/CREDITS-furniture.md',
+    'js/idle4', 'css/idle4.css', 'assets/ui4', 'assets/story/rival.webp', 'assets/models/CREDITS-furniture.md',
     'assets/models/kit-restaurant-bits.glb', 'assets/models/kit-furniture-bits.glb', 'assets/models/kit-furniture.glb'],
   'idle4.html': ['js/idle3', 'css/idle3.css', 'css/idle3-lab.css', 'js/idle4/bot.js'],
 };

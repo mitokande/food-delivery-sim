@@ -669,6 +669,7 @@ export async function createWorld(game, markerEl) {
     const k = room === 'kitchen' ? 0.18 : 0.3;
     return [R.x0 + (R.x1 - R.x0) * k + 0.6, 2.2, R.z0 + (R.z1 - R.z0) * 0.22 + 0.4];
   }
+  const UP = '<img class="u4" src="assets/ui4/up.webp" alt="" draggable="false">';
   // the little counters on a label: people seated / seats, waiting / bench seats, in line to pay
   function count(g, room) {
     if (room === 'bay') { const out = g.staff.filter((s) => s.role === 'courier' && s.anim === 'ride' && s.st === 'work').length; return S.nCouriers(g) ? `${g.online.length} order${g.online.length === 1 ? '' : 's'}${out ? ` · ${out} out` : ''}` : ''; }
@@ -700,7 +701,7 @@ export async function createWorld(game, markerEl) {
         if (soon) m.el.innerHTML = `<span class="rl soon">${name}<small>Coming soon</small></span>`;
         else if (b) m.el.innerHTML = `<span class="rl busy"><span class="rbadge prog"><i class="ring"></i><b>${b.to}</b></span>${name}</span>`;
         else if (ruin) m.el.innerHTML = `<span class="rl ruin">${name}<span class="rfix ${block === 'gate' ? 'locked' : up ? 'can' : ''}">${block === 'gate' ? `Restaurant Lv ${R.gate}` : `Repair ${S.money(S.upCost(g, room))}`}</span></span>`;
-        else m.el.innerHTML = `<span class="rl"><span class="rbadge"><b>${lv}</b></span>${name}${cnt ? `<small class="cnt">${cnt}</small>` : ''}${reno ? `<i class="lvup"><b>Lv ${lv + 1}</b></i>` : up ? '<i class="uparrow"></i>' : ''}</span>`;
+        else m.el.innerHTML = `<span class="rl"><span class="rbadge"><b>${lv}</b></span>${name}${cnt ? `<small class="cnt">${cnt}</small>` : ''}${reno ? `<i class="lvup">${UP}<b>Lv ${lv + 1}</b></i>` : up ? UP.replace('u4', 'u4 upa') : ''}</span>`;
       }
       if (b) m.el.style.setProperty('--p', Math.min(1, (g.t - b.t0) / Math.max(0.01, b.dur)).toFixed(3));
     }
@@ -940,7 +941,6 @@ export async function createWorld(game, markerEl) {
     scaf.g.scale.y = Math.max(0.001, scaf.out ? k * k : 1 - Math.pow(1 - k, 3) + Math.sin(k * Math.PI) * 0.12);
     if (scaf.out && k <= 0) { scaf.g.removeFromParent(); scaf.g.userData.dispose(); scaf = null; }
   }
-  const HAMMER = '<svg viewBox="0 0 24 24"><path fill="#d9dde4" stroke="#1b2238" stroke-width="1.2" stroke-linejoin="round" d="M4.2 6.6 9.6 2.4l3.1 1.4 2.4-.9 1.6 1.6-1.6 1.7.4 2.3-1.8 1.8-2.3-2.4L6.4 9.5z"/><path fill="#c98a4b" stroke="#1b2238" stroke-width="1.2" stroke-linejoin="round" d="m10.6 8.8 2.2 2.2-7.7 9.6a1.8 1.8 0 0 1-2.7-2.2z"/></svg>';
   const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60, p = (n) => String(n).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(ss)}` : `${p(m)}:${p(ss)}`; };
   let bmk = null; // the timer
   function syncTimer() {
@@ -949,7 +949,7 @@ export async function createWorld(game, markerEl) {
     if (!b) return;
     if (!bmk) {
       const R = P.ROOMS[b.room];
-      bmk = markers.add({ x: (R.x0 + R.x1) / 2, y: 0.9, z: (R.z0 + R.z1) / 2 + 0.6, cls: 'mk bmk', html: `<span class="bchip"><i class="bham">${HAMMER}</i><b class="bt"></b></span><small class="bhelp">Tap to help!</small>`, onTap: () => game.hurry() });
+      bmk = markers.add({ x: (R.x0 + R.x1) / 2, y: 0.9, z: (R.z0 + R.z1) / 2 + 0.6, cls: 'mk bmk', html: `<span class="bchip"><i class="bham"><img class="u4" src="assets/ui4/hammer.webp" alt="" draggable="false"></i><b class="bt"></b></span><small class="bhelp">Tap to help!</small>`, onTap: () => game.hurry() });
       bmk.room = b.room;
     }
     const txt = clock(Math.max(0, Math.ceil(b.t0 + b.dur - g.t - 1e-6)));

@@ -1,16 +1,19 @@
-// Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level, income, the team, cash), the clock
-// (the rushes), the event on now in a banner under it, the buttons down the right side (settings, the mailbox, the
-// events card, the managers card, the features still to come, locked), the quest bar at the bottom (one
+// Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level; the clock, the team, cash; income and
+// the rush), settings, the event on now in a banner under it, the mailbox button, the bar along the bottom (the
+// events card, the managers card, the features still to come, locked; the city map), the quest bar above it (one
 // quest at a time: where it takes you, what holds it up, its reward to claim), the room panel that slides up when a
 // room is tapped (what it holds, what to buy, its renovation), the card when a renovation is done, the mailbox and its
-// letters, the story cards, the "while you were away" card, settings, toasts. Numbers that change every frame are patched by live(); renderRoom() rebuilds
-// the panel.
+// letters, the story cards, the "while you were away" card, settings, toasts. The painted art (icons, faces) is in
+// assets/ui4. Numbers that change every frame are patched by live(); renderRoom() rebuilds the panel.
 import * as S from './sim.js';
 import * as Q from './quests.js';
 import { app } from '../native.js';
 
 const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 const ART = (n) => `assets/story/${n}.webp`;
+// the painted interface art (assets/ui4: icons, and faces for the people)
+const UI = (n, cls = '') => `<img class="u4 ${cls}" src="assets/ui4/${n}.webp" alt="" draggable="false">`;
+const FACE = (n) => `assets/ui4/faces/${n}.webp`;
 const DICON = (id) => `<img class="ic" src="${ART('dish-' + id)}" alt="" draggable="false">`;
 const FERDI = `<span class="ferdi"><img src="${ART('ferdi')}" alt="Uncle Ferdi" draggable="false"></span>`;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -29,8 +32,8 @@ const ITEM_ICON = {
 };
 // the features of the later phases, locked for now (the restaurant level they're planned to open at)
 const FEATURES = [
-  { f: 'map', name: 'City map', icon: 'ui-pin', lv: 4 },
-  { f: 'shop', name: 'Shop', icon: 'ui-gem', lv: 2 },
+  { f: 'shop', name: 'Shop', icon: 'gems', lv: 2 },
+  { f: 'map', name: 'City map', label: 'City', icon: 'map', lv: 4, big: true },
 ];
 const MAIL_ICON = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5zm2.2-.3 6.8 5.3 6.8-5.3zM19 8.3l-7 5.4-7-5.4v9.2c0 .3.2.5.5.5h13c.3 0 .5-.2.5-.5z"/></svg>';
 const STAFF = { cooks: 1, waiters: 1, registers: 1, couriers: 1 };
@@ -88,19 +91,25 @@ export function createUI(game) {
   root.innerHTML = `
   <div id="hud" class="hud4">
     <header class="top">
-      <button class="me" data-act="room" data-room="office" aria-label="Ferdi's Office"><span class="ava">${ICON('char-male-c')}</span><span class="lvb"><b class="rlv">1</b></span></button>
-      <span class="name"><b>Ferdi's</b><small class="ipm">$0/min</small></span>
-      <button class="res team" data-act="room" data-room="staff" aria-label="The team">${ICON('ui-people')}<b class="teamv">0/5</b></button>
-      <span class="res cash">${ICON('ui-cash')}<b class="cashv">$0</b></span>
+      <button class="me" data-act="room" data-room="office" aria-label="Ferdi's Office"><span class="ava"><img src="${FACE('you')}" alt="" draggable="false"></span><span class="lvb"><b class="rlv">1</b></span></button>
+      <div class="plates">
+        <div class="plate main">
+          <button class="clock" data-act="events" aria-label="The clock"><span class="cic">${UI('sun')}</span><b class="clk">08:00</b></button>
+          <i class="sep"></i>
+          <button class="res team" data-act="room" data-room="staff" aria-label="The team">${UI('chef')}<b class="teamv">0/5</b></button>
+          <i class="sep"></i>
+          <span class="res cash">${UI('cash')}<b class="cashv">$0</b></span>
+        </div>
+        <div class="plate sub">${UI('coin')}<b class="ipm">$0/min</b><small class="rush"></small></div>
+      </div>
+      <button class="gear" data-act="settings" aria-label="Settings">${GEAR}</button>
     </header>
-    <button class="clock" data-act="events" aria-label="The clock"><span class="cic"></span><b class="clk">08:00</b><small class="rush"></small></button>
     <button class="evbar" data-act="evfocus" hidden></button>
-    <nav class="side">
-      <button class="slot gear" data-act="settings" aria-label="Settings">${GEAR}</button>
-      <button class="slot mail" data-act="mail" aria-label="Mailbox"><span class="sic">${MAIL_ICON}</span><i class="badge" hidden></i><small>Mail</small></button>
-      <button class="slot events locked" data-act="events" aria-label="Events">${ICON('ui-calendar')}<i class="lock">${ICON('ui-lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
-      <button class="slot managers locked" data-act="managers" aria-label="Managers">${ICON('char-male-f')}<i class="lock">${ICON('ui-lock')}</i><i class="badge" hidden></i><small>Lv ${S.MGR_LV}</small></button>
-      ${FEATURES.map((f) => `<button class="slot locked" data-act="locked" data-f="${f.f}" aria-label="${f.name} (locked)">${ICON(f.icon)}<i class="lock">${ICON('ui-lock')}</i><small>Lv ${f.lv}</small></button>`).join('')}
+    <button class="slot mail" data-act="mail" aria-label="Mailbox">${UI('mail')}<i class="badge" hidden></i></button>
+    <nav class="nav4">
+      <button class="slot events locked" data-act="events" aria-label="Events">${UI('calendar')}<i class="lock">${UI('lock')}</i><i class="badge" hidden>!</i><small>Lv ${S.EVENT_LV}</small></button>
+      <button class="slot managers locked" data-act="managers" aria-label="Managers"><img class="u4 face" src="${FACE('marco')}" alt="" draggable="false"><i class="lock">${UI('lock')}</i><i class="badge" hidden></i><small>Lv ${S.MGR_LV}</small></button>
+      ${FEATURES.map((f) => `<button class="slot locked ${f.big ? 'big' : ''}" data-act="locked" data-f="${f.f}" aria-label="${f.name} (locked)">${UI(f.icon)}<i class="lock">${UI('lock')}</i><small>${f.label || `Lv ${f.lv}`}</small></button>`).join('')}
     </nav>
     <button class="quest" data-act="quest"><span class="qic"></span><span class="qt"><b class="qtext"></b><small class="qhelp"></small><span class="qbar"><u></u></span></span><span class="qr"></span></button>
     <section id="sheet" class="rsheet" data-state="closed">
@@ -137,13 +146,13 @@ export function createUI(game) {
 
   // ---------- the room panel ----------
   function openRoom(r) {
-    room = r; sheet.dataset.state = 'open'; sheet.dataset.room = r;
+    room = r; sheet.dataset.state = 'open'; sheet.dataset.room = r; hud.classList.add('sheet-open');
     renderRoom(); sfx('ui-open', { vol: 0.4 });
     api.onSheet?.(true);
   }
   function closeRoom() {
     if (!room) return;
-    room = null; sheet.dataset.state = 'closed';
+    room = null; sheet.dataset.state = 'closed'; hud.classList.remove('sheet-open');
     api.onSheet?.(false);
   }
   function itemRow(g, r, id) {
@@ -233,10 +242,10 @@ export function createUI(game) {
   const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   const EV = {
     threat: { icon: '🚚', title: 'Victor\'s truck is coming', cls: 'threat' },
-    critic: { icon: '★', title: 'A food critic is here', cls: 'critic' },
-    star: { icon: '✦', title: 'A celebrity walked in', cls: 'star' },
-    inspector: { icon: '✚', title: 'Health inspection', cls: 'inspector' },
-    van: { icon: '🚐', title: 'A tour van stopped', cls: 'van' },
+    critic: { icon: '★', art: 'trophy', title: 'A food critic is here', cls: 'critic' },
+    star: { icon: '✦', art: 'gems', title: 'A celebrity walked in', cls: 'star' },
+    inspector: { icon: '✚', art: 'quest', title: 'Health inspection', cls: 'inspector' },
+    van: { icon: '🚐', art: 'map', title: 'A tour van stopped', cls: 'van' },
   };
   const MOD = { truck: 'Victor\'s truck outside', review: 'The review', fans: 'Fans', gossip: 'Bad gossip', grade: 'A on the door' };
   const pctMod = (x) => `${x >= 1 ? '+' : '−'}${Math.round(Math.abs(x - 1) * 100)}% walk-ins`;
@@ -254,7 +263,7 @@ export function createUI(game) {
     // the clock
     const h = S.hourOf(g), rush = S.rushOf(g), night = h < 6 || h >= 20.5;
     const ck = $('.clk', hud), ct = hhmm(h);
-    if (ck.textContent !== ct) { ck.textContent = ct; $('.rush', hud).textContent = RUSH[rush] || ''; $('.clock', hud).className = `clock ${rush || ''}`; $('.cic', hud).innerHTML = ICON(night ? 'ui-moon' : 'ui-sun'); }
+    if (ck.textContent !== ct) { ck.textContent = ct; $('.rush', hud).textContent = RUSH[rush] || ''; $('.clock', hud).className = `clock ${rush || ''}`; $('.cic', hud).innerHTML = night ? ICON('ui-moon') : UI('sun'); $('.plate.sub', hud).className = `plate sub ${rush || ''}`; }
     // the events and managers buttons
     const on = S.restaurantLv(g) >= S.EVENT_LV, eb = $('.slot.events', hud);
     eb.classList.toggle('locked', !on); $('.lock', eb).hidden = on; $('small', eb).textContent = on ? 'Events' : `Lv ${S.EVENT_LV}`;
@@ -267,11 +276,11 @@ export function createUI(game) {
     if (e) {
       const [line, f, left] = evLine(g, e), d = EV[e.kind];
       const k = `${e.id}|${line}|${left == null ? '' : Math.ceil(left)}`;
-      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls}`; bar.innerHTML = `<span class="ei">${d.icon}</span><span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
+      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls}`; bar.innerHTML = `${d.art ? `<span class="ei">${UI(d.art)}</span>` : `<img class="eface" src="${FACE('victor')}" alt="">`}<span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
       bar.hidden = !!room;
     } else if (mod) {
       const k = `m|${mod.why}|${Math.ceil(mod.until - g.t)}`;
-      if (k !== evKey) { evKey = k; bar.className = `evbar mod ${mod.x >= 1 ? 'up' : 'down'}`; bar.innerHTML = `<span class="ei">${mod.x >= 1 ? '▲' : '▼'}</span><span class="et"><b>${MOD[mod.why] || 'Boost'} <i>${mmss(mod.until - g.t)}</i></b><small>${pctMod(mod.x)}</small></span>`; }
+      if (k !== evKey) { evKey = k; bar.className = `evbar mod ${mod.x >= 1 ? 'up' : 'down'}`; bar.innerHTML = `<span class="ei">${UI('up', mod.x >= 1 ? '' : 'down')}</span><span class="et"><b>${MOD[mod.why] || 'Boost'} <i>${mmss(mod.until - g.t)}</i></b><small>${pctMod(mod.x)}</small></span>`; }
       bar.hidden = !!room;
     } else bar.hidden = true;
   }
@@ -361,9 +370,6 @@ export function createUI(game) {
     if (q.k === 'stars') return g.event?.kind === 'critic' ? ['events', 'The critic is here: serve them fast!'] : ['events', 'Critics come now and then: fast food, more stars'];
     return null;
   }
-  const QICON = { item: (q) => (q.id?.startsWith('st:') ? DICON(q.id.slice(3)) : ITEM_ICON[q.id] || ICON('ui-star')), lv: () => ICON('ui-building'), served: () => ICON('ui-people'),
-    tips: () => ICON('ui-coin'), letters: () => `<span class="mic">${MAIL_ICON}</span>`, staff: () => ICON('ui-people'), menu: () => ICON('food-burger'),
-    threats: () => '<b class="qemo">🚚</b>', stars: () => ICON('ui-star'), delivered: () => ICON('helmet'), managers: () => ICON('char-male-f') };
   let questKey = '';
   function updateQuest() {
     const g = G(), q = Q.current(g), [a, n] = Q.progress(g, q), done = a >= n;
@@ -373,11 +379,11 @@ export function createUI(game) {
     if (key !== questKey) {
       const fresh = !questKey.startsWith(g.quest.i + '|');
       questKey = key;
-      $('.qic', questEl).innerHTML = (QICON[q.k] || QICON.lv)(q);
+      $('.qic', questEl).innerHTML = UI('quest');
       $('.qtext', questEl).innerHTML = `${q.text} <i>(${a.toLocaleString('en-US')}/${n.toLocaleString('en-US')})</i>`;
       $('.qhelp', questEl).textContent = help ? help[1] : '';
       $('.qbar u', questEl).style.width = pct(n ? a / n : 0);
-      $('.qr', questEl).innerHTML = done ? `<span class="claim">Claim<b>${M(q.cash)}</b></span>` : `${ICON('ui-cash')}<b>${M(q.cash)}</b>`;
+      $('.qr', questEl).innerHTML = done ? `<span class="claim">Claim<b>${M(q.cash)}</b></span>` : `${UI('cash')}<b>${M(q.cash)}</b>`;
       questEl.classList.toggle('done', done);
       if (fresh) { questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); }
     }
