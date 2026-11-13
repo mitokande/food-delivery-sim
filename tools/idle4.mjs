@@ -10,6 +10,7 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 6: reviews and the mood (the mailbox's Reviews tab), each day's rewards, the daily gift.
 // Phase 7: Rita the guide (after the story: her lines, the arrow), the fame in the top bar and on the card.
 // Phase 5: the building work: scaffolding over the room, the timer over it (a tap lends a hand, up to a third of the
 // time), the card when it's done (a picture of the room, what the level brings, what the office opens), the gold
@@ -208,6 +209,27 @@ await ev(`(() => { const g = game.G, S = game.S; for (let t = 0; t < 900; t += 0
 await wait(1500);
 check(await ev('game.G.cust.length > 8 && game.world.peek().views > 12'), 'a full house: people and staff on screen');
 await shot('6-busy');
+
+// phase 6: reviews and the mood; the days and their rewards; the daily gift
+check(await ev('game.G.rep.reviews.length > 0 && game.G.rep.mood > 0 && game.G.rep.mood < 1 && game.G.rep.reviews.every((r) => typeof r.text === "string" && /^c[1-8]$/.test(r.face))'), 'people leave reviews; the mood moves');
+await ev('game.ui.mailbox()'); await wait(500);
+await page.click('.modal.mailbox [data-tab="reviews"]'); await wait(400);
+check(await ev('document.querySelectorAll(".modal.mailbox .rv").length') === Math.min(30, await ev('game.G.rep.reviews.length')) && /^\d+%$/.test(await ev('document.querySelector(".mtrack b").textContent')), 'the mailbox\'s Reviews tab: the mood bar, what people wrote');
+check(await ev('game.G.rep.seen > 0 && game.G.rep.reviews.filter((r) => r.id <= game.G.rep.seen).length > 0'), 'and they count as read');
+await shot('6c-reviews');
+await page.click('.modal.mailbox [data-x="days"]'); await wait(600);
+check(await ev('document.querySelectorAll(".modal.dayscard .cb").length >= 1 && document.querySelectorAll(".modal.dayscard .tier").length === 5 && /\\d\\d:\\d\\d:\\d\\d/.test(document.querySelector(".dleft").textContent)'), 'Daily rewards: the days, the five tiers, the time left today');
+await ev('document.querySelector(".modal.dayscard [data-x=close]").click()'); await wait(400);
+await ev('(() => { game.realToday = game.today; const d = game.G.rep.day; d.sum = 0.8 * Math.max(1, d.n); d.n = Math.max(1, d.n); game.today = () => "2099-01-02"; game.checkDay(); })()');
+check(await ev('(() => { const m = game.G.mail.find((x) => x.kind === "daily"); return !!m && m.cash > 0 && m.tier === 3 && game.G.rep.hist.length > 0 && game.G.rep.day.key === "2099-01-02"; })()'), 'a new day: yesterday\'s mood (a happy day) sends a reward by mail');
+const c4 = await ev('game.G.cash'), gift1 = await ev('game.S.signinCash(game.G, 0)');
+await ev('game.ui.signin()'); await wait(500);
+check(await ev('!!document.querySelector(".modal.signin .stile.today") && document.querySelectorAll(".modal.signin .stile").length === 7'), 'the daily gift: seven days, today\'s lit');
+await shot('6d-signin');
+await page.click('.modal.signin [data-x="claim"]'); await wait(500);
+const claimed = await ev('[game.G.cash, game.G.daily.n, game.S.signinDue(game.G, "2099-01-02")]');
+check(claimed[0] >= c4 + gift1 * 0.9 && claimed[1] === 1 && !claimed[2], 'claimed: the cash, and not again today' + (claimed[1] === 1 ? '' : `: ${JSON.stringify({ claimed, c4, gift1 })}`));
+await ev('(() => { game.today = game.realToday; game.ui.skipGuide(); document.querySelectorAll(".modal").forEach((m) => m.remove()); game.paused = false; })()');
 
 // the office at level 2: the terrace, the courier bay and the events open
 await ev('(() => { const g = game.G; if (g.rooms.office.lv < 2) g.rooms.office.lv = 2; game.ui.upCard("office", 2); })()');

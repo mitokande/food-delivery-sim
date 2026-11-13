@@ -19,3 +19,5 @@ shares one style and one light.
 - `faces/inspector`, `okafor`, `bruno`, `reporter` (the letter writers) and `faces/c1`…`c8` (customers, for their
   reviews later): one 4×3 sheet, made the same way on 2026-11-13, with the same two style references.
   `faces/guide.webp` (Rita) was cut again from its sheet at 384 px for her dialogue box.
+- `mood/m0`…`m4` (furious → delighted), `thumbup`, `thumbdown`, `star`, `daily`: one 3×3 sheet, made the same way on
+  2026-11-13, for the reviews, each day's mood and the daily gift.
