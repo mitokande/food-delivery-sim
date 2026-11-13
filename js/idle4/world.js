@@ -2,7 +2,8 @@
 // room shows: floors and walls per room and level (in ruins at level 0: planks, crates, dust), the furniture the room
 // has bought, the street in front. Everyone in it follows the rules (sim.js) exactly: customers and staff stand at
 // their spots or walk the routes of the floor plan (plan.js) at the times the sim gives. Rooms carry a label with their
-// name, level badge and a green arrow when something in them is affordable; a tap on a room opens it (ui.js). The light
+// name, level badge and a green arrow when something in them is affordable (a gold one when the renovation is); a tap
+// on a room opens it (ui.js). A room being worked on is under scaffolding, with the timer over it. The light
 // follows the clock (dusk, night with the lamps and windows lit, dawn); Victor's food truck and the tour van drive up
 // for their events; guests of note (a critic, a star, the inspector) dress the part. Couriers ride out of the bay's
 // garage door on their motors (the courier game's scooters); tables left dirty carry the plates until cleared; managers
@@ -668,6 +669,7 @@ export async function createWorld(game, markerEl) {
     const k = room === 'kitchen' ? 0.18 : 0.3;
     return [R.x0 + (R.x1 - R.x0) * k + 0.6, 2.2, R.z0 + (R.z1 - R.z0) * 0.22 + 0.4];
   }
+  const UP = '<img class="u4" src="assets/ui4/up.webp" alt="" draggable="false">';
   // the little counters on a label: people seated / seats, waiting / bench seats, in line to pay
   function count(g, room) {
     if (room === 'bay') { const out = g.staff.filter((s) => s.role === 'courier' && s.anim === 'ride' && s.st === 'work').length; return S.nCouriers(g) ? `${g.online.length} order${g.online.length === 1 ? '' : 's'}${out ? ` · ${out} out` : ''}` : ''; }
@@ -690,23 +692,18 @@ export async function createWorld(game, markerEl) {
       const ruin = lv === 0, soon = !!R.soon;
       const up = !soon && !b && S.affordable(g, room);
       const block = S.upBlock(g, room);
+      const reno = up && !ruin && !block && S.upCost(g, room) <= g.cash; // (the renovation itself is within reach)
       const cnt = count(g, room);
-      const key = [lv, ruin, soon, !!b, up, block, ruin ? S.upCost(g, room) : 0, cnt].join('|');
+      const key = [lv, ruin, soon, !!b, up, reno, block, ruin ? S.upCost(g, room) : 0, cnt].join('|');
       if (m.key !== key) {
         m.key = key;
         const name = `<span class="rname">${R.name}</span>`;
         if (soon) m.el.innerHTML = `<span class="rl soon">${name}<small>Coming soon</small></span>`;
-        else if (b) m.el.innerHTML = `<span class="rl busy"><span class="rbadge prog"><i class="ring"></i><b>${b.to}</b></span>${name}<small class="eta"></small></span>`;
+        else if (b) m.el.innerHTML = `<span class="rl busy"><span class="rbadge prog"><i class="ring"></i><b>${b.to}</b></span>${name}</span>`;
         else if (ruin) m.el.innerHTML = `<span class="rl ruin">${name}<span class="rfix ${block === 'gate' ? 'locked' : up ? 'can' : ''}">${block === 'gate' ? `Restaurant Lv ${R.gate}` : `Repair ${S.money(S.upCost(g, room))}`}</span></span>`;
-        else m.el.innerHTML = `<span class="rl"><span class="rbadge"><b>${lv}</b></span>${name}${cnt ? `<small class="cnt">${cnt}</small>` : ''}${up ? '<i class="uparrow"></i>' : ''}</span>`;
+        else m.el.innerHTML = `<span class="rl"><span class="rbadge"><b>${lv}</b></span>${name}${cnt ? `<small class="cnt">${cnt}</small>` : ''}${reno ? `<i class="lvup">${UP}<b>Lv ${lv + 1}</b></i>` : up ? UP.replace('u4', 'u4 upa') : ''}</span>`;
       }
-      if (b) {
-        const f = Math.min(1, (g.t - b.t0) / Math.max(0.01, b.dur));
-        m.el.style.setProperty('--p', f.toFixed(3));
-        const eta = m.el.querySelector('.eta'); const left = Math.max(0, Math.ceil(b.t0 + b.dur - g.t));
-        const txt = left >= 60 ? `${Math.floor(left / 60)}m ${left % 60}s` : `${left}s`;
-        if (eta && eta.textContent !== txt) eta.textContent = txt;
-      }
+      if (b) m.el.style.setProperty('--p', Math.min(1, (g.t - b.t0) / Math.max(0.01, b.dur)).toFixed(3));
     }
   }
 
@@ -894,12 +891,109 @@ export async function createWorld(game, markerEl) {
   let puffT = 0;
   function dust(dt, R) {
     puffT -= dt;
-    if (puffT <= 0 && puffs.length < 14) {
-      puffT = 0.25;
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), puffMat.clone());
-      m.position.set(R.x0 + 0.8 + Math.random() * (R.x1 - R.x0 - 1.6), 0.2, R.z0 + 0.8 + Math.random() * (R.z1 - R.z0 - 1.6));
-      dyn.add(m); puffs.push({ m, t: 0 });
+    if (puffT <= 0 && puffs.length < 14) { puffT = 0.25; puff(R); }
+  }
+  function puff(R, y = 0.2) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), puffMat.clone());
+    m.position.set(R.x0 + 0.8 + Math.random() * (R.x1 - R.x0 - 1.6), y, R.z0 + 0.8 + Math.random() * (R.z1 - R.z0 - 1.6));
+    dyn.add(m); puffs.push({ m, t: 0 });
+  }
+
+  // ---------- the scaffolding over the room being worked on, the timer over it ----------
+  // Orange tubes: posts round the edge, a rail half way up, a grid of beams on top with hazard tape round it. It rises
+  // out of the floor when the work starts and drops away when it's done. The timer (a hammer, the time left) floats
+  // in the middle of it, under the room's label: a tap lends the builder a hand (sim.js hurry).
+  const SCAF = { h: 2.5, step: 2.2, in: 0.35, t: 0.16 };
+  const scafMat = M('#f07a22', { roughness: 0.6 }), scafDark = M('#c95a12', { roughness: 0.6 });
+  const tapeTex = (len) => canvasTex(64, 16, (c, w, h) => {
+    c.fillStyle = '#f2c230'; c.fillRect(0, 0, w, h); c.fillStyle = '#1f2329';
+    for (let x = -16; x < w + 16; x += 16) { c.beginPath(); c.moveTo(x, h); c.lineTo(x + 8, h); c.lineTo(x + 16, 0); c.lineTo(x + 8, 0); c.fill(); }
+  }, [Math.max(1, Math.round(len / 0.6)), 1]);
+  function scaffold(room) {
+    const R = P.ROOMS[room], g = new THREE.Group(), t = SCAF.t, h = SCAF.h;
+    const x0 = R.x0 + SCAF.in, x1 = R.x1 - SCAF.in, z0 = R.z0 + SCAF.in, z1 = R.z1 - SCAF.in;
+    const nx = Math.max(2, Math.round((x1 - x0) / SCAF.step)), nz = Math.max(2, Math.round((z1 - z0) / SCAF.step));
+    const xs = Array.from({ length: nx + 1 }, (_, i) => x0 + (x1 - x0) * i / nx), zs = Array.from({ length: nz + 1 }, (_, i) => z0 + (z1 - z0) * i / nz);
+    for (const x of xs) for (const z of [z0, z1]) box(t, h, t, scafMat, x, 0, z, g);
+    for (const z of zs.slice(1, -1)) for (const x of [x0, x1]) box(t, h, t, scafMat, x, 0, z, g);
+    for (const z of zs) box(x1 - x0 + t, t, t, z === z0 || z === z1 ? scafMat : scafDark, (x0 + x1) / 2, h, z, g);
+    for (const x of xs) box(t, t * 0.9, z1 - z0, x === x0 || x === x1 ? scafMat : scafDark, x, h + 0.01, (z0 + z1) / 2, g);
+    for (const z of [z0, z1]) box(x1 - x0, t * 0.6, t * 0.6, scafMat, (x0 + x1) / 2, 1.1, z, g, false);
+    for (const x of [x0, x1]) box(t * 0.6, t * 0.6, z1 - z0, scafMat, x, 1.1, (z0 + z1) / 2, g, false);
+    const own = [];
+    const tape = (len, x, z, ry) => {
+      const mat = new THREE.MeshStandardMaterial({ map: tapeTex(len), side: THREE.DoubleSide, roughness: 0.7 }), geo = new THREE.PlaneGeometry(len, 0.26);
+      const m = new THREE.Mesh(geo, mat); m.position.set(x, h - 0.22, z); m.rotation.y = ry; g.add(m); own.push(mat.map, mat, geo);
+    };
+    for (const z of [z0, z1]) tape(x1 - x0, (x0 + x1) / 2, z + (z === z1 ? 1 : -1) * (t / 2 + 0.01), 0);
+    for (const x of [x0, x1]) tape(z1 - z0, x + (x === x1 ? 1 : -1) * (t / 2 + 0.01), (z0 + z1) / 2, Math.PI / 2);
+    g.userData.dispose = () => { for (const o of own) o.dispose(); };
+    return g;
+  }
+  let scaf = null; // { room, g, t, out }
+  function syncScaffold(dt) {
+    const b = G().build;
+    if (scaf && !scaf.out && (!b || b.room !== scaf.room)) { scaf.out = true; scaf.t = 0; }
+    if (!scaf && b) { scaf = { room: b.room, g: scaffold(b.room), t: 0 }; scaf.g.scale.y = 0.001; dyn.add(scaf.g); }
+    if (!scaf) return;
+    scaf.t += dt;
+    const k = scaf.out ? Math.max(0, 1 - scaf.t / 0.35) : Math.min(1, scaf.t / 0.45);
+    scaf.g.scale.y = Math.max(0.001, scaf.out ? k * k : 1 - Math.pow(1 - k, 3) + Math.sin(k * Math.PI) * 0.12);
+    if (scaf.out && k <= 0) { scaf.g.removeFromParent(); scaf.g.userData.dispose(); scaf = null; }
+  }
+  const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60, p = (n) => String(n).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(ss)}` : `${p(m)}:${p(ss)}`; };
+  let bmk = null; // the timer
+  function syncTimer() {
+    const g = G(), b = g.build;
+    if (bmk && (!b || bmk.room !== b.room)) { dropMk(bmk); bmk = null; }
+    if (!b) return;
+    if (!bmk) {
+      const R = P.ROOMS[b.room];
+      bmk = markers.add({ x: (R.x0 + R.x1) / 2, y: 0.9, z: (R.z0 + R.z1) / 2 + 0.6, cls: 'mk bmk', html: `<span class="bchip"><i class="bham"><img class="u4" src="assets/ui4/hammer.webp" alt="" draggable="false"></i><b class="bt"></b></span><small class="bhelp">Tap to help!</small>`, onTap: () => game.hurry() });
+      bmk.room = b.room;
     }
+    const txt = clock(Math.max(0, Math.ceil(b.t0 + b.dur - g.t - 1e-6)));
+    if (txt !== bmk.txt) { bmk.txt = txt; bmk.el.querySelector('.bt').textContent = txt; }
+    const can = S.canHurry(g);
+    if (can !== bmk.can) { bmk.can = can; bmk.el.classList.toggle('maxed', !can); }
+  }
+  // a tap on the timer: a whack, dust, the seconds it took off
+  function hurried(x) {
+    if (!bmk) return;
+    const R = P.ROOMS[bmk.room];
+    const ch = bmk.el.querySelector('.bchip'); ch.classList.remove('whack'); void ch.offsetWidth; ch.classList.add('whack');
+    if (x > 0) { pop(bmk.pos.x + 0.8, bmk.pos.z, `<b>-${Math.round(x)}s</b>`, 'hurry', bmk.pos.y + 0.6); for (let i = 0; i < 2 && puffs.length < 18; i++) puff(R, 0.4 + Math.random()); }
+  }
+  // a picture of a room for the cards: the camera on it for one render, then back where it was (rendered again at once,
+  // so no frame of it is ever shown) → a canvas, or null
+  const snapV = new THREE.Vector3();
+  function snapRoom(room, w = 480, h = 300) {
+    const r = game.renderer, R = P.ROOMS[room];
+    if (!r || !R) return null;
+    const keep = { ...cam }, cv = r.domElement;
+    const frame = () => {
+      let a = [1, 1, -1, -1];
+      for (const x of [R.x0, R.x1]) for (const y of [0, WALL.back]) for (const z of [R.z0, R.z1]) {
+        snapV.set(x, y, z).project(camera);
+        a = [Math.min(a[0], snapV.x), Math.min(a[1], snapV.y), Math.max(a[2], snapV.x), Math.max(a[3], snapV.y)];
+      }
+      // (the part of the canvas to cut out, px: the room's box, widened to the picture's shape)
+      let bw = (a[2] - a[0]) / 2 * cv.width, bh = (a[3] - a[1]) / 2 * cv.height;
+      if (bw / bh < w / h) bw = bh * w / h; else bh = bw * h / w;
+      const cx = ((a[0] + a[2]) / 2 + 1) / 2 * cv.width, cy = (1 - (a[1] + a[3]) / 2) / 2 * cv.height;
+      return { bw: bw * 1.04, bh: bh * 1.04, cx, cy };
+    };
+    try {
+      cam.x = (R.x0 + R.x1) / 2; cam.z = (R.z0 + R.z1) / 2; cam.shift = 0; cam.vh = 20; applyCam();
+      let f = frame();
+      cam.vh *= Math.max(f.bw / cv.width, f.bh / cv.height) / 0.96; applyCam();
+      f = frame();
+      r.render(scene, camera);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(cv, Math.max(0, f.cx - f.bw / 2), Math.max(0, f.cy - f.bh / 2), Math.min(cv.width, f.bw), Math.min(cv.height, f.bh), 0, 0, w, h);
+      return c;
+    } catch (e) { console.warn('idle4 snapRoom', e); return null; }
+    finally { Object.assign(cam, keep); applyCam(); r.render(scene, camera); }
   }
   function puffTick(dt) {
     for (let i = puffs.length - 1; i >= 0; i--) {
@@ -1279,6 +1373,7 @@ export async function createWorld(game, markerEl) {
     lightTick();
     vehiclesTick(dt);
     syncLabels();
+    syncScaffold(dt); syncTimer();
     fullT -= dt;
     popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt); tipsTick(dt);
     camTick(dt);
@@ -1292,12 +1387,12 @@ export async function createWorld(game, markerEl) {
   cam.vh = cam.tvh = defaultVh();
   applyCam();
   return {
-    scene, camera, update, event, focus, focusEvent, snap, markers,
+    scene, camera, update, event, focus, focusEvent, snap, markers, hurried, snapRoom,
     lookAt(x, z, zoom) { cam.aim = [x, z]; if (zoom) cam.tvh = zoom; cam.vx = cam.vz = 0; },
     setShift(px) { cam.tshift = px; },
     resize(w, h) { W = w; Hh = h; applyCam(); },
     rebuildWalls: buildWalls,
-    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size, bikes: [...bikes.values()].map((w) => ({ on: !!w.b?.root.visible, x: +(w.b?.root.position.x || 0).toFixed(1), z: +(w.b?.root.position.z || 0).toFixed(1), tier: w.tier })), dirty: dirtyViews.size, managers: mgrViews.size, cars: cars.map((c) => ({ x: +c.x.toFixed(1), tx: c.tx, z: c.z, on: c.g.visible, kids: c.g.children.length })) }),
+    peek: () => ({ views: views.size, cam: { ...cam }, rooms: Object.fromEntries(Object.entries(roomGroups).map(([k, v]) => [k, v.sig])), pass: passPlates.size, tips: tipViews.size, bikes: [...bikes.values()].map((w) => ({ on: !!w.b?.root.visible, x: +(w.b?.root.position.x || 0).toFixed(1), z: +(w.b?.root.position.z || 0).toFixed(1), tier: w.tier })), dirty: dirtyViews.size, managers: mgrViews.size, scaffold: scaf && !scaf.out ? scaf.room : null, cars: cars.map((c) => ({ x: +c.x.toFixed(1), tx: c.tx, z: c.z, on: c.g.visible, kids: c.g.children.length })) }),
     // where a thing is on screen (px), for the tests: a tip, the mailbox
     screenOf(what) { const p = what === 'mailbox' ? [MAILBOX.x, 1.2, MAILBOX.z] : (() => { const v = tipViews.get(what); return v ? [v.x, 0.1, v.z] : null; })(); if (!p) return null; const v = new THREE.Vector3(...p).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * Hh]; },
   };

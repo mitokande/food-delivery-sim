@@ -1226,3 +1226,55 @@ paketinin sayfası artık seçilebilir: `mobile/scripts/build-web.mjs` `APP_PAGE
 ile derler: `build` dalından TestFlight'a giden iOS sürümleri Ferdi's'tir (ana ekran adı ve ikon yine Idle Restaurant
 Manager). Android ve Mac'te elle `npm run ios` Idle Restaurant Manager'ı paketlemeye devam eder. Geri almak için
 `ci_post_clone.sh`'taki satır çıkarılır. Paket sunucuda çevrimdışı denendi (dışarıya istek yok, hata yok).
+
+### 14.5 5. faz: inşaat hissi (12 Kasım 2026)
+
+Kullanıcı rakip oyundan beş ekran görüntüsü daha gönderdi (iskeleli inşaat ve sayaç, posta ve halk memnuniyeti,
+günlük memnuniyet grafiği, "yükseltme tamamlandı" ekranı, rehber karakter). Yol haritası buna göre değişti: 5. inşaat
+hissi, 6. itibar (yorumlar, memnuniyet, günlük ödüller), 7. kabuk ve karakterler (alt menü, portre, rehber), 8. ekip ve
+işler, 9. şehir haritası ve şubeler, 10. elmas, mağaza, reklam, Adapty, analitik. Kullanıcı "faz 5 e başla" dedi. Dal
+`idle-phase5`.
+
+- **İskele:** tadilat (ve tamir) süresince odanın üstünde turuncu borulardan iskele durur: kenarlarda direkler, yarı
+  yükseklikte korkuluk, üstte kiriş ızgarası, çevresinde sarı-siyah şerit. İşe başlarken yerden yükselir, iş bitince
+  düşer, ardından konfeti ve oda yeni haliyle belirir (`world.js` `scaffold`, `syncScaffold`).
+- **Sayaç:** odanın ortasında çekiçli büyük yeşil sayaç (`mm:ss`). Ona dokunmak ustaya yardım eder: her dokunuş 1 sn
+  düşer, en çok işin üçte biri kadar (`sim.js` `HURRY`, `hurry`, `canHurry`); kalanı ileride elmas ya da reklamla
+  kısaltılacak. Sınıra gelince "Tap to help!" yazısı kaybolur. Oda etiketindeki süre kalktı (halka ve hedef seviye
+  duruyor).
+- **"Yükseltme tamamlandı" kartı:** iş bittikten 0,9 sn sonra çıkar, her yere dokununca kapanır (ilk 0,7 sn
+  dokunuşları saymaz: sayaca basılı kalan parmak kapatmasın). Üstte odanın o anki canlı fotoğrafı (kamera bir kare
+  için odaya gider, `world.snapRoom`; gece ise gece), köşede yeni seviye rozeti, kurdele ("Open again!" /
+  "Upgrade complete!" / ofiste "Restaurant Lv N!"), altında seviyenin getirdikleri: sınırlar önce → sonra (masalar 4 → 6,
+  garsonlar 2 → 3, yeni ocak, yükseltmeler Lv 5 → Lv 10). Ofiste ayrıca restoran seviyesi, odaların çıkabileceği
+  seviye ve "Unlocked": o seviyede açılan odalar (fotoğraflarıyla, harabe halde) ve özellikler (Lv 2 Events, Lv 3
+  Managers). Başka bir pencere açıksa kart sırada bekler. Eski bildirimler (tamir edildi, Lv N oldu) kalktı.
+- **Rozetler:** tadilatı hemen yapılabilecek odanın etiketinde yeşil ok yerine altın "Lv N" oku zıplar. Etiketteki
+  oturan/koltuk sayacı artık okun üstüne binmiyor.
+- **Kayıt:** `G.build.help` (dokunuşlarla düşülen saniye). Bot dokunmaz, denge değişmedi.
+
+Tarayıcı testi 95 kontrol (yeni: iskele, sayaç, iki dokunuş 2 sn, üçte bir sınırı, giriş kartı, kartın fotoğrafı,
+iskelenin kalkması, dokununca kapanma, ofis kartı ve açılan personel odası, altın ok, salon kartı, ofis Lv 2 kartı:
+teras, kurye rampası, olaylar).
+
+### 14.6 Boyalı oyun arayüzü: ana ekran (13 Kasım 2026)
+
+Kullanıcı arayüzü "ham" buldu ve Police Chief yönünde öneriler istedi. İlk iki öneri turunu beğenmedi: tuvalde A/B/C,
+sonra D/E. İkincisi için "çok websitesi gibi" dedi. Varılan sonuç şu: aranan his CSS'ten değil, aynı tarzda boyanmış
+görsellerden geliyor (ikonlar, portreler). Kullanıcı "başla" dedi. Dal `idle-ui-kit`.
+
+- **Görseller (`assets/ui4`, kaynak notu `assets/ui4/CREDITS.md`):** GPT Image 2.6 (Higgsfield) ile iki sayfa üretildi,
+  ikisi de orta kalite, 2K ve saydam zeminli; bir script ile kesildi.
+  - 16 ikon: para, elmas, altın para, güneş, şef şapkası, zarf, hediye, takvim, şehir adası, kilit, çekiç, kupa, görev
+    panosu, servis kapağı, yeşil ok, kronometre.
+  - 9 portre (`faces/`): oyuncu, rehber olacak baş garson ve 7 yönetici. Ferdi ve Victor'un resimleri stil referansı
+    olarak verildi. `victor.webp` rakibin resminden kesildi.
+- **Üst çubuk:** oyuncunun portresi ve mavi seviye rozeti, yanında iki koyu yarı saydam plaka. İlkinde saat, ekip ve
+  para; ikincisinde dakikalık gelir ve yoğun saat. Ayarlar sağ üstte.
+- **Olay bandı:** sol kenara yapışık. Tehditte kırmızıdır ve Victor'un yüzü bandın üstüne taşar; diğer olaylarda boyalı
+  bir ikon durur.
+- **Alt çubuk:** Events, Managers ve Shop (kilitli), sağda büyük City düğmesi (kilitli). Posta bunun üstünde yüzen bir
+  düğme. Görev çubuğu solunda görev panosu olan koyu bir şerit. Oda paneli açıkken alt çubuk ve posta düğmesi gizlenir.
+- **Oda etiketleri:** koyu plakalar, mavi seviye rozetleri, boyalı ok ve çekiç.
+- **Para gösterimi:** $999.999 artık "$1M" görünür, "$1000K" değil.
+- **Henüz eski görünümde:** oda paneli, kartlar ve pencereler.
