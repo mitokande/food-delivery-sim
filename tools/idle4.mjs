@@ -286,6 +286,10 @@ await page.click('.modal.offer [data-x="no"]'); await wait(500);
 await ev('game.ui.guideOff = true');
 check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'he walks in with a tag over his head');
 check(await ev('game.S.miniOf(game.G) === "critic" && document.querySelector(".evbar").classList.contains("play") && /cook/i.test(document.querySelector(".evbar small").textContent)'), '"Leave it to the kitchen": the banner still offers it');
+// (what the stove is asked to sound like: the names played, and the sizzle's level as the needle runs)
+await ev(`(() => { const a = game.audio, play = a.play, voice = a.voice, log = window.__snd = { play: [], loop: [], live: 0, sets: 0, top: 0, stops: 0 };
+  a.play = (n, o) => { log.play.push(n); return play(n, o); };
+  a.voice = (n, o) => { const v = voice(n, o); log.loop.push(n); if (v) log.live++; return { set(x) { log.sets++; log.top = Math.max(log.top, x?.vol ?? 0); v?.set(x); }, stop(f) { log.stops++; v?.stop(f); } }; }; })()`);
 await page.click('.evbar');
 check(await until('!!document.querySelector(".modal.minim.k-critic .mstage .cook")', 8000) && await ev('game.paused && document.querySelector(".mstage .msurf").naturalWidth > 0'), 'a tap on the banner: the stove, the restaurant waits');
 {
@@ -295,6 +299,11 @@ check(await until('!!document.querySelector(".modal.minim.k-critic .mstage .cook
   const ck = await ev('(() => { const e = game.G.event, S = game.S; return { mini: e?.mini, tier: S.miniTier("critic", e?.mini ?? 0), stars: document.querySelectorAll(".modal.mres .mstars .on").length, text: document.querySelector(".modal.mres").innerText, can: S.miniOf(game.G), paused: game.paused }; })()');
   check(taps === 5 && ck.mini >= 0.65 && ck.tier >= 2 && ck.stars === ck.tier && /perfect/.test(ck.text) && !ck.can && ck.paused, `five things off the heat in the green (${ck.text.match(/\d+ perfect · \d+ good/)?.[0]}): ${ck.tier} stars; once a critic`);
   await shot('8e-cook-stars');
+  const snd = await ev(`(async () => { const l = window.__snd, n = (k) => l.play.filter((x) => x === k).length, m = await (await fetch('assets/audio/manifest.json')).json(), ac = new AudioContext();
+    const len = await Promise.all(['sizzle', 'drop', 'flip', 'take', 'burnt', 'ignite', 'bell'].map(async (f) => (m['cook-' + f] ? (await ac.decodeAudioData(await (await fetch('assets/audio/cook-' + f + '.mp3')).arrayBuffer())).duration : 0)));
+    return { loop: l.loop.join(), live: l.live, sets: l.sets, top: l.top, stops: l.stops, ignite: n('cook-ignite'), drop: n('cook-drop'), flip: n('cook-flip'), take: n('cook-take'), bell: n('cook-bell'), hop: n('hop'), len, ready: game.audio.ready }; })()`);
+  check(snd.ready && snd.loop === 'cook-sizzle' && snd.live === 1 && snd.sets > 50 && snd.top > 0.6 && snd.top <= 1.2 && snd.stops === 1, `the skillet sizzles with the needle (a recorded loop, steered ${snd.sets} times, up to ${snd.top.toFixed(2)}) and goes quiet with the plate`);
+  check(snd.ignite === 1 && snd.drop === 4 && snd.flip === 1 && snd.take === 5 && snd.bell === 1 && snd.hop === 1 && snd.len.every((d) => d > 0.3) && snd.len[0] >= 6, `and around it: the burner, ${snd.drop} things landing, a flip, ${snd.take} off with the spatula, the bell (seven recordings, all decode)`);
   await page.click('.modal.mres [data-x="close"]'); await wait(400);
   check(await until('!!document.querySelector(".modal.review.in")', 150000), 'he has eaten: the review gets a card');
   await wait(900);

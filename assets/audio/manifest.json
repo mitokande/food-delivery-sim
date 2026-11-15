@@ -542,5 +542,82 @@
   "peak": -2.7,
   "ch": 1,
   "kb": 33.1
+ },
+ "cook-sizzle": {
+  "file": "cook-sizzle.mp3",
+  "loop": true,
+  "gain": 0.8,
+  "dur": 6.0,
+  "src": "freesound:235537",
+  "lufs": -20.3,
+  "peak": -1.6,
+  "ch": 1,
+  "kb": 72.2
+ },
+ "cook-drop": {
+  "file": "cook-drop.mp3",
+  "loop": false,
+  "gain": 0.75,
+  "dur": 1.65,
+  "src": "freesound:45579",
+  "lufs": -16.4,
+  "peak": -2.3,
+  "ch": 1,
+  "kb": 20.2
+ },
+ "cook-flip": {
+  "file": "cook-flip.mp3",
+  "loop": false,
+  "gain": 0.75,
+  "dur": 2.036,
+  "src": "freesound:546452+freesound:45579",
+  "lufs": -16.4,
+  "peak": -1.8,
+  "ch": 1,
+  "kb": 24.5
+ },
+ "cook-take": {
+  "file": "cook-take.mp3",
+  "loop": false,
+  "gain": 0.7,
+  "dur": 0.371,
+  "src": "freesound:546452",
+  "lufs": -18.3,
+  "peak": -1.7,
+  "ch": 1,
+  "kb": 5.2
+ },
+ "cook-burnt": {
+  "file": "cook-burnt.mp3",
+  "loop": false,
+  "gain": 0.7,
+  "dur": 1.6,
+  "src": "freesound:587050",
+  "lufs": -16.4,
+  "peak": -2.0,
+  "ch": 1,
+  "kb": 19.6
+ },
+ "cook-ignite": {
+  "file": "cook-ignite.mp3",
+  "loop": false,
+  "gain": 0.7,
+  "dur": 1.68,
+  "src": "freesound:262582",
+  "lufs": -21.9,
+  "peak": -1.4,
+  "ch": 1,
+  "kb": 20.5
+ },
+ "cook-bell": {
+  "file": "cook-bell.mp3",
+  "loop": false,
+  "gain": 0.8,
+  "dur": 2.65,
+  "src": "freesound:221515",
+  "lufs": -16.5,
+  "peak": -2.8,
+  "ch": 1,
+  "kb": 31.8
  }
 }

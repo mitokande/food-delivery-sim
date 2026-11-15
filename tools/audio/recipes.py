@@ -464,3 +464,32 @@ def _order_late():
         parts.append((n, pos))
         pos += len(n) / SR - 0.015
     return place(parts, n=int((pos + 0.1) * SR))
+
+# =====================================================================================
+#  COOKING  (the cook mini game of Ferdi's: a skillet's sizzle the game steers, and what happens around it)
+# =====================================================================================
+@rec("cook-sizzle", "amb", [("fs", "235537", "steadiest 6 s of the first 13 s")],
+     "picked the steadiest 6 s of a steak frying in a pan, high-passed at 120 Hz, cross-faded a 1 s pre-roll (equal-power) for a seamless loop; mono (the game sets its level and pitch).", 0.8,
+     stereo=False, lufs=-20.0, kbps=96)
+def _cook_sizzle():
+    return amb_loop(hp(seg(fs(235537), 0.3, 13.2), 120), 6.0, 1.0, (0, 6), step=0.25)
+
+@rec("cook-drop", "oneshot", [("fs", "45579", "first hiss, 0.05-1.7 s")], "cut the first hiss of something landing in a hot pan, long fade-out.", 0.75, fade_out=500, trim_db=-60)
+def _cook_drop(): return seg(fs(45579), 0.05, 1.7)
+
+@rec("cook-flip", "oneshot", [("fs", "546452", "one stroke, 1.15-1.5 s"), ("fs", "45579", "second hiss, 6.65-8.6 s")],
+     "one stroke of a spatula across the pan, then 0.14 s later the longer second hiss (the other side landing), long fade-out.", 0.75, fade_out=600, trim_db=-60)
+def _cook_flip():
+    return place([(fade(seg(fs(546452), 1.15, 1.5), 2, 60), 0.0), (seg(fs(45579), 6.65, 8.6), 0.14, -4.0)])
+
+@rec("cook-take", "oneshot", [("fs", "546452", "one stroke, 4.85-5.3 s")], "cut one stroke of a spatula across a pan, short fade-out.", 0.7, fade_out=80, lufs=-18.0)
+def _cook_take(): return seg(fs(546452), 4.85, 5.3)
+
+@rec("cook-burnt", "oneshot", [("fs", "587050", "the flare-up, 2.1-3.7 s")], "cut the flare-up of a very hot pan (1.6 s), low-passed at 9 kHz, fades in and out.", 0.7, fade_in=8, fade_out=900, trim=False)
+def _cook_burnt(): return lp(seg(fs(587050), 2.1, 3.7), 9000)
+
+@rec("cook-ignite", "oneshot", [("fs", "262582", "0.62-2.3 s")], "kept the last clicks of the igniter and the burner catching, fade-out.", 0.7, fade_out=600, trim=False)
+def _cook_ignite(): return seg(fs(262582), 0.62, 2.3)
+
+@rec("cook-bell", "oneshot", [("fs", "221515", "the ring, 0.15-2.8 s")], "kept the ring of a counter bell and its ring-out, long fade-out.", 0.8, fade_out=1200, trim_db=-60)
+def _cook_bell(): return seg(fs(221515), 0.15, 2.8)

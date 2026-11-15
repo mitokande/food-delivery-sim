@@ -237,23 +237,27 @@ export function scrubGame({ surface = SURFACES[Math.floor(Math.random() * SURFAC
 // ---------------------------------------------------------------- cooking the critic's plate
 // One thing after another in the skillet. The needle runs from raw to burnt; a tap takes the thing off, and how near
 // the needle was to the middle of the green is what it's worth. Left alone it burns.
-const COOK = [ // (t: s from raw to burnt; hw: half the green's width, of the meter)
-  { item: 'patty', say: 'Sear the patty!', t: 2.6, hw: 0.1 },
-  { item: 'patty', flip: true, say: 'Flip!', t: 2.3, hw: 0.09 },
-  { item: 'bun', say: 'Toast the bun!', t: 2.1, hw: 0.085 },
-  { item: 'bacon', say: 'Bacon!', t: 1.9, hw: 0.075 },
-  { item: 'onion', say: 'Onions!', t: 1.7, hw: 0.07 },
+// The skillet is heard as well: a recorded sizzle that rises with the needle and spits when the thing burns.
+const COOK = [ // (t: s from raw to burnt; hw: half the green's width, of the meter; siz: how loud it fries, and how high)
+  { item: 'patty', say: 'Sear the patty!', t: 2.6, hw: 0.1, siz: [1, 1] },
+  { item: 'patty', flip: true, say: 'Flip!', t: 2.3, hw: 0.09, siz: [1, 1.03] },
+  { item: 'bun', say: 'Toast the bun!', t: 2.1, hw: 0.085, siz: [0.5, 1.14] },
+  { item: 'bacon', say: 'Bacon!', t: 1.9, hw: 0.075, siz: [1.1, 1.08] },
+  { item: 'onion', say: 'Onions!', t: 1.7, hw: 0.07, siz: [0.85, 0.95] },
 ];
 const DONE = { core: 0.45, near: 2.2, rest: 0.55 }; // (the perfect middle and the near miss, in half widths; s between two things)
+const SIZZLE = { raw: 0.3, heat: 0.55, burn: 0.35, max: 1.2, hold: 0.3, idle: 0.1, bend: [0.94, 0.1, 0.14] }; // (its level raw, + at the green, + burning; with a patty waiting, with nothing in; its pitch the same way)
+const COOK_SFX = ['cook-sizzle', 'cook-drop', 'cook-flip', 'cook-take', 'cook-burnt', 'cook-ignite', 'cook-bell'];
 const clamp = (x) => Math.max(0, Math.min(1, x));
 
-export function cookGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, pan, zone, needle, word, dots, imgs;
+// (loop: a looping sound to steer, → { set({ vol, rate }), stop() } or null; warm: sounds to have ready)
+export function cookGame({ sfx = () => {}, buzz = () => {}, loop = () => null, warm = () => {} } = {}) {
+  let stage, el, pan, zone, needle, word, dots, imgs, siz = null;
   let on = false, i = -1, p = 0, z = 0.7, phase = 'rest', restT = 0.3, total = 0;
   const got = [];
 
   async function setup(s) {
-    stage = s;
+    stage = s; warm(...COOK_SFX);
     const names = [...new Set(COOK.map((c) => c.item))].flatMap((n) => [0, 1, 2].map((k) => `cook/${n}${k}`));
     const [bg] = await Promise.all([load(IMG('cook/stove')), ...names.map((n) => load(IMG(n))), load(IMG('cook/burger'))]);
     if (bg) { bg.className = 'msurf'; bg.alt = ''; bg.draggable = false; stage.prepend(bg); }
@@ -268,12 +272,17 @@ export function cookGame({ sfx = () => {}, buzz = () => {} } = {}) {
     pan = el.querySelector('.cpan'); zone = el.querySelector('.czone'); needle = el.querySelector('.cneedle'); word = el.querySelector('.cword');
     dots = [...el.querySelectorAll('.csteps i')]; imgs = [0, 1, 2].map((k) => pan.querySelector(`.c${k}`));
     el.classList.add('wait');
+    sfx('cook-ignite', { vol: 0.6 }); // (the burner catches while the frame counts in)
   }
   const say = (t, cls) => { word.hidden = false; word.textContent = t; word.className = `cword ${cls}`; word.style.animation = 'none'; void word.offsetWidth; word.style.animation = ''; };
   // the next thing into the skillet (or, after the last, the plate)
   function next() {
     i++;
-    if (i >= COOK.length) { phase = 'over'; el.classList.add('wait'); pan.className = 'cpan'; word.hidden = true; el.querySelector('.cplate').hidden = false; return; }
+    if (i >= COOK.length) {
+      phase = 'over'; el.classList.add('wait'); pan.className = 'cpan'; word.hidden = true; el.querySelector('.cplate').hidden = false;
+      siz?.stop(0.2); siz = null; sfx('cook-bell', { vol: 0.55 });
+      return;
+    }
     const c = COOK[i];
     z = rnd(0.5, 0.82); p = 0; phase = 'cook';
     imgs.forEach((im, k) => { im.src = IMG(`cook/${c.item}${k}`); });
@@ -281,7 +290,7 @@ export function cookGame({ sfx = () => {}, buzz = () => {} } = {}) {
     zone.firstElementChild.style.width = `${DONE.core * 100}%`;
     el.classList.remove('wait'); pan.className = `cpan in ${c.flip ? 'flip' : ''}`;
     dots[i].className = 'now';
-    say(c.say, 'call'); sfx('hop', { vol: 0.35 });
+    say(c.say, 'call'); sfx(c.flip ? 'cook-flip' : 'cook-drop', { vol: 0.75 * Math.min(1, 0.4 + c.siz[0] * 0.6) });
     look();
   }
   function look() {
@@ -289,7 +298,9 @@ export function cookGame({ sfx = () => {}, buzz = () => {} } = {}) {
     needle.style.left = `${clamp(p) * 100}%`;
     imgs[1].style.opacity = clamp((p - 0.08) / Math.max(0.05, z - c.hw - 0.08));
     imgs[2].style.opacity = clamp((p - z - c.hw) / Math.max(0.05, 1 - z - c.hw) * 1.25);
-    pan.style.setProperty('--heat', clamp(p / z).toFixed(2)); pan.style.setProperty('--burn', imgs[2].style.opacity);
+    const heat = clamp(p / z), burn = +imgs[2].style.opacity;
+    pan.style.setProperty('--heat', heat.toFixed(2)); pan.style.setProperty('--burn', burn);
+    siz?.set({ vol: Math.min(SIZZLE.max, c.siz[0] * (SIZZLE.raw + SIZZLE.heat * heat + SIZZLE.burn * burn)), rate: c.siz[1] * (SIZZLE.bend[0] + SIZZLE.bend[1] * heat + SIZZLE.bend[2] * burn) });
   }
   // off the heat: how well done it was
   function take(burnt) {
@@ -300,11 +311,15 @@ export function cookGame({ sfx = () => {}, buzz = () => {} } = {}) {
     pan.className = `cpan ${a && COOK[i + 1]?.flip ? 'hold' : a ? 'out' : 'lost'}`; el.classList.add('wait'); // (a patty to flip stays in the skillet)
     if (a) { const sp = el.querySelector('.cspat'); sp.classList.remove('go'); void sp.offsetWidth; sp.classList.add('go'); }
     say(t, cls);
-    if (a >= 0.7) { sfx('qte-good', { vol: a === 1 ? 0.7 : 0.4 }); buzz(a === 1 ? 25 : 12); } else if (a) sfx('ui-tap', { vol: 0.5 }); else { sfx('qte-bad', { vol: 0.5 }); buzz(30); }
+    // the spatula under it; a thing left too long flares up; the skillet hisses on, low (lower with nothing in it)
+    const held = a && COOK[i + 1]?.flip;
+    siz?.set({ vol: held ? SIZZLE.hold * c.siz[0] : SIZZLE.idle, rate: SIZZLE.bend[0] });
+    if (burnt || (!a && !raw)) sfx('cook-burnt', { vol: 0.7 }); else sfx('cook-take', { vol: 0.6 });
+    if (a >= 0.7) { sfx('qte-good', { vol: a === 1 ? 0.5 : 0.3 }); buzz(a === 1 ? 25 : 12); } else if (!a) { sfx('qte-bad', { vol: 0.4 }); buzz(30); }
   }
   function onDown(e) { if (!on || phase !== 'cook') return; e.preventDefault(); take(false); }
-  function start() { on = true; stage.addEventListener('pointerdown', onDown); }
-  function stop() { on = false; stage?.removeEventListener('pointerdown', onDown); }
+  function start() { on = true; stage.addEventListener('pointerdown', onDown); siz = loop('cook-sizzle', { vol: SIZZLE.idle, rate: SIZZLE.bend[0] }); }
+  function stop() { on = false; stage?.removeEventListener('pointerdown', onDown); siz?.stop(); siz = null; }
   function tick(dt) {
     if (phase === 'cook') { p += dt / COOK[i].t; look(); if (p >= 1) take(true); }
     else if (phase === 'rest') { restT -= dt; if (restT <= 0) next(); }

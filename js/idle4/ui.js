@@ -129,6 +129,7 @@ export function createUI(game) {
   <div id="toasts"></div>`;
   const hud = $('#hud'), sheet = $('#sheet'), head = $('.sh-head', sheet), body = $('.sh-body', sheet), modals = $('#modals'), toasts = $('#toasts'), questEl = $('.quest', hud);
   const sfx = (n, o) => game.audio?.play(n, o);
+  const sfxLoop = (n, o) => game.audio?.voice?.(n, o) ?? null, sfxWarm = (...n) => game.audio?.warm?.(...n); // (for the mini games)
   let room = null; // the open room
   let questGo = null; // where a tap on the quest bar takes you
   const api = {};
@@ -396,7 +397,7 @@ export function createUI(game) {
   }
   // the game in its window: → { score (0..1), tally (the result in a few words) }, or null if it was left before it began
   function mini(kind) {
-    const d = MG[kind], cfg = S.MINI[kind], g = d.make({ sfx, buzz });
+    const d = MG[kind], cfg = S.MINI[kind], g = d.make({ sfx, buzz, loop: sfxLoop, warm: sfxWarm });
     const m = modal(`<h2>${UI(d.icon)} ${d.play}</h2><div class="mhost"></div>`, { cls: `minim k-${kind}`, pause: true });
     const frame = Mini.play($('.mhost', m.card), g, { dur: cfg.dur, tiers: cfg.tiers, sfx, buzz });
     const x = document.createElement('button'); x.className = 'xr'; x.type = 'button'; x.setAttribute('aria-label', 'Stop'); x.innerHTML = X;
