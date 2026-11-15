@@ -4,7 +4,8 @@
 //   OPENAI_API_KEY=… node tools/genart.mjs <outdir> [name …]
 // Writes <outdir>/<name>.png (raw, 1536×1024 or 1024×1024); tools/genart-webp.py makes the small webp copies.
 // Also the art of Ferdi's mini games: the scrub-* names (tools/genart-scrub.py cuts those into assets/ui4/scrub), and
-// the cook-*, flyers-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers and faces/critic.webp).
+// the cook-*, flyers-*, jobs-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers, jobs and
+// faces/critic.webp).
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -139,6 +140,14 @@ export const ART = {
     + 'a paper flyer, cream with an orange border, with a picture of a burger and a gold star on it and no writing; a hand holding a fanned stack of the same flyers; '
     + 'a white thought bubble with a burger and a red heart in it; a red angry scribble cloud with a lightning bolt; '
     + `a red and black food truck with a striped awning, seen from a three-quarter view; an orange megaphone. ${SHEET}` },
+  // the catering jobs of the crew card
+  'jobs-icons': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, six icons in a neat grid of 3 columns and 2 rows: `
+    + 'a stack of three kraft-paper lunch boxes tied with red string, a burger peeking out of the open top one; '
+    + 'a round birthday cake with pink frosting, sprinkles and three lit striped candles; '
+    + 'a black and white film clapperboard with a small bucket of popcorn beside it and no writing on it; '
+    + 'a tall white three-tier wedding cake with pink roses and two little golden hearts on top; '
+    + 'a shining golden cloche on a golden tray over a rolled-out red carpet, with a black bow tie in front of it; '
+    + `a round orange badge with a strong flexed cartoon arm in a white chef sleeve on it. ${SHEET}` },
 };
 
 async function gen(name, outdir) {

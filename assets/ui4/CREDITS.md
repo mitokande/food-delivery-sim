@@ -33,3 +33,6 @@ shares one style and one light.
   what's cooked, a column each, raw / done / burnt: `patty0`…`2`, `bun0`…`2`, `bacon0`…`2`, `onion0`…`2`. One 3×2
   sheet: `spatula`, `bell`, `burger`, `steam`, `smoke`, `flame`. One 4×2 sheet of people: `p1`…`p6` (townspeople),
   `v1`, `v2` (Victor's crew, in red). One 3×2 sheet: `flyer`, `hand`, `love`, `angry`, `truck`, `megaphone`.
+- `jobs/*.webp` (the catering jobs of the crew card): made on 2026-11-15 the same way, the prompt in
+  `tools/genart.mjs` (`jobs-icons`), cut by `tools/genart-mini.py`. One 3×2 sheet: `lunch`, `birthday`, `film`,
+  `wedding`, `gala`, `power`.

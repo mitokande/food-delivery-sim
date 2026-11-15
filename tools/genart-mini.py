@@ -1,4 +1,5 @@
-# Cuts the art of Ferdi's cook and flyers mini games (tools/genart.mjs, the cook-*, flyers-* and face-critic names)
+# Cuts the art of Ferdi's cook and flyers mini games and of the catering jobs (tools/genart.mjs, the cook-*, flyers-*,
+# jobs-* and face-critic names)
 # into assets/ui4/cook, assets/ui4/flyers and assets/ui4/faces: the sheets by their grid (cut in the empty gaps between
 # the pictures), each cell trimmed to what is painted in it; the two backgrounds scaled down; the critic's head cut
 # square.
@@ -32,6 +33,7 @@ cells('cook-food', 4, 3, [f'{n}{s}' for s in range(3) for n in ['patty', 'bun', 
 cells('cook-tools', 3, 2, ['spatula', 'bell', 'burger', 'steam', 'smoke', 'flame'], 192)
 cells('flyers-people', 4, 2, ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'v1', 'v2'], 256)
 cells('flyers-tools', 3, 2, ['flyer', 'hand', 'love', 'angry', 'truck', 'megaphone'], 192)
+cells('jobs-icons', 3, 2, ['lunch', 'birthday', 'film', 'wedding', 'gala', 'power'], 192)
 for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street')]:
     Image.open(f'{raw}/{n}.png').convert('RGB').resize((720, 1080), Image.LANCZOS).save(f'{out}/{f}.webp', quality=80, method=6)
 face = Image.open(f'{raw}/face-critic.png').convert('RGBA').crop((290, 0, 930, 640))

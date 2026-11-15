@@ -10,6 +10,9 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 8: the crew card's two tabs, a catering job (who goes, sent, its clock, no second one without a slot, brought
+// back for gems, collected: cash and chef's hats), the nav badge and the toast when one is back, training a manager
+// with hats (the bonus grows), a save from before the new quests keeping its place.
 // Phase 10: gems in the top bar, the shop (packs, prices, cash for gems, free gems for the stand-in ad, ?iap=test
 // purchases, the starter pack once), finishing building work with gems.
 // Phase 6: reviews and the mood (the mailbox's Reviews tab), each day's rewards, the daily gift.
@@ -93,7 +96,7 @@ check(/^0[89]:\d\d$/.test(await ev('document.querySelector(".clk").textContent')
 await page.click('.slot.events'); await wait(300);
 check(await ev('document.querySelector(".slot.events").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Events: opens at restaurant level 2"))'), 'events: locked before restaurant level 2');
 await page.click('.slot.managers'); await wait(300);
-check(await ev('document.querySelector(".slot.managers").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Managers: opens at restaurant level 3"))'), 'managers: locked before restaurant level 3');
+check(await ev('document.querySelector(".slot.managers").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Crew: opens at restaurant level 3"))'), 'managers: locked before restaurant level 3');
 // you do everything: cook, carry, bring the bill
 check(await until('game.G.staff[0].job && game.G.staff[0].job.kind === "cook"', 60000), 'you cook the first order yourself');
 check(await until('game.G.stats.served > 0', 90000), 'and serve it and bring the bill: the first customer paid');
@@ -429,6 +432,37 @@ check(await ev('!!document.querySelector("#sheet .mgrrow.on")'), 'the kitchen pa
 await page.click('#sheet [data-act="mgrauto"]'); await wait(300);
 check(await ev('game.G.mgr.kitchen.auto === false'), 'the switch: no more buying');
 await ev('game.ui.closeRoom()');
+// the crew: catering jobs and training
+await ev('(() => { const g = game.G; g.jobs = []; g.hats = 0; g.gems = Math.max(g.gems, 20); g.rooms.office.lv = 3; })()'); await wait(600);
+await page.click('.slot.managers'); await wait(500);
+await page.click('.modal.managerscard .mtab[data-tab="jobs"]'); await wait(300);
+check(await ev('document.querySelectorAll(".modal.managerscard .jobrow").length === 5 && document.querySelectorAll(".modal.managerscard .jobrow.locked").length === 3 && !!document.querySelector(\'[data-x="pick"][data-kind="lunch"]\')'), 'the catering tab: five jobs, three locked at level 3, the lunch can be sent');
+await page.click('.modal.managerscard [data-x="pick"][data-kind="lunch"]'); await wait(300);
+check(await ev('document.querySelectorAll(".cchip.on").length === 1 && document.querySelector(".cchip.on").dataset.crew === "kitchen" && document.querySelector(".pmeter").classList.contains("ok") && !document.querySelector(\'[data-x="go"]\').disabled'), 'who goes: the head chef is picked, enough power');
+await shot('9c-crew-pick');
+await page.click('.cchip.on'); await wait(200);
+check(await ev('document.querySelector(\'[data-x="go"]\').disabled && !document.querySelector(".pmeter").classList.contains("ok")'), 'nobody picked: it can\'t be sent');
+await page.click('.cchip'); await wait(200);
+const jc0 = await ev('game.G.cash');
+await page.click('.modal.managerscard [data-x="go"]'); await wait(400);
+check(await ev('game.G.jobs.length === 1 && game.G.jobs[0].kind === "lunch" && game.S.crewBusy(game.G, "kitchen") && !!document.querySelector(".jobrow.run .jbar") && !document.querySelector(\'[data-x="pick"]\')'), 'the job is out with its clock, and the only slot is taken');
+check(await ev('game.S.cookTime(game.G, "burger") < game.S.stTime("burger", game.G.rooms.kitchen.it["st:burger"]) / game.S.trainK(game.G) - 1e-9'), 'the head chef still helps the kitchen while away');
+await shot('9d-crew-job');
+const jg0 = await ev('game.G.gems');
+await page.click('.modal.managerscard [data-x="rush"]'); await wait(400);
+check(await ev('game.G.gems') === jg0 - 2 && await ev('!!document.querySelector(".jobrow.run.back [data-x=\\"collect\\"]")'), 'finishing it costs 2 gems (3 minutes): it is back');
+check(await ev('document.querySelector(".slot.managers .badge").textContent === "1" && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("back from the office lunch"))'), 'the nav badge and a toast say so');
+await page.click('.modal.managerscard [data-x="collect"]'); await wait(400);
+check(await ev('game.G.jobs.length === 0 && game.G.hats === 2 && game.G.stats.jobs === 1') && await ev('game.G.cash') > jc0, 'collected: cash and 2 chef\'s hats');
+await page.click('.modal.managerscard .mtab[data-tab="crew"]'); await wait(300);
+check(await ev('document.querySelector(\'[data-act="train"][data-room="kitchen"]\').disabled && document.querySelector(".hbal b").textContent === "2"'), 'training costs 4 hats: not yet');
+await ev('game.G.hats = 4'); await page.click('.modal.managerscard .mtab[data-tab="jobs"]'); await page.click('.modal.managerscard .mtab[data-tab="crew"]'); await wait(300);
+const ct0 = await ev('game.S.cookTime(game.G, "burger")');
+await page.click('.modal.managerscard [data-act="train"][data-room="kitchen"]'); await wait(400);
+check(await ev('game.G.mgr.kitchen.lv === 2 && game.G.hats === 0') && await ev('game.S.cookTime(game.G, "burger")') < ct0 && await ev('document.querySelector(".modal.managerscard .mgrrow.on .mt small").textContent.includes("15%")'), 'the head chef is level 2: cooks work 15% faster');
+await shot('9e-crew-trained');
+await page.click('.modal.managerscard [data-x="close"]'); await wait(300);
+check(await ev('import("./js/idle4/quests.js").then((Q) => { const a = { quest: { i: 34 } }, b = { quest: { i: 33 } }, c = { quest: { i: 5, v: 2 } }; Q.migrate(a); Q.migrate(b); Q.migrate(c); return a.quest.i === 35 && Q.questAt(35).text === "Have a team of 10" && b.quest.i === 33 && Q.questAt(33).k === "jobs" && c.quest.i === 5; })'), 'an older save keeps its place in the longer quest chain');
 // the night
 await ev('(() => { const g = game.G, h = game.S.hourOf(g); g.t += ((23 - h + 24) % 24) / 24 * game.S.DAY.len; })()'); await wait(800);
 check(await ev('game.world.scene.background.getHSL({}).l < 0.25 && document.querySelector(".clk").textContent.startsWith("23")'), 'at 23:00 it is night');

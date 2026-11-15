@@ -758,3 +758,44 @@
 .fhand { position: absolute; right: 1%; bottom: 1%; width: 27%; z-index: 200; transform: rotate(-8deg); filter: drop-shadow(0 6px 4px rgba(0,0,0,.4)); animation: fhand 1s ease-in-out infinite alternate; }
 @keyframes fhand { to { transform: rotate(-3deg) translateY(-4%); } }
 .ffly { position: absolute; left: 0; top: 0; width: 20%; margin: -10% 0 0 -10%; z-index: 300; }
+
+/* ---------- the crew card: the managers' levels, chef's hats, catering jobs ---------- */
+.toast img.face { display: inline-block; width: 26px; height: 26px; margin: -6px 2px -6px 0; vertical-align: middle; border-radius: 50%; object-fit: cover; }
+.cstars { display: inline-flex; gap: 0; vertical-align: middle; } .cstars .u4 { width: 14px; height: 14px; } .cstars .u4.off { filter: grayscale(1) brightness(1.25); opacity: .45; }
+.clv { display: flex; align-items: center; gap: 6px; margin: 1px 0; }
+.clv .pw, .jchips i, .cchip small { display: inline-flex; align-items: center; gap: 2px; font: var(--dw) 12px/1 var(--display); font-style: normal; color: var(--navy-ink); }
+.clv .pw .u4, .cchip small .u4 { width: 16px; height: 16px; }
+.cbtns { flex: none; display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.cbtns .btn { min-height: 30px; } .cbtns .btn b { display: inline-flex; align-items: center; justify-content: center; gap: 2px; } .cbtns .btn .u4 { width: 18px; height: 18px; margin: -3px 0; }
+.cbtns .why.top { max-width: none; text-align: center; color: #2f7a18; }
+.gbal.hbal { margin: 0 auto 2px; } .gbal.hbal b { color: #b4462a; }
+.modal.managerscard .mtabs { margin: 2px 0 0; }
+.modal.managerscard p.small { margin: 0; }
+.crewbody { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.jobrow { position: relative; display: flex; align-items: center; gap: 9px; margin: 0 0 7px; padding: 7px 8px 7px 7px; border-radius: 14px; background: #fff; box-shadow: var(--row); }
+.jobrow.run { background: linear-gradient(180deg, #eaf3ff, #d3e4fb); box-shadow: inset 0 0 0 2px #8fb4ea, 0 3px 0 #6f97d2; }
+.jobrow.run.back { background: linear-gradient(180deg, #eefbe6, #d4f0c4); box-shadow: inset 0 0 0 2px #8fd06f, 0 3px 0 #6fb04f; }
+.jobrow.head { background: linear-gradient(180deg, #fff8e2, #ffeab0); box-shadow: inset 0 0 0 2px #e6b54d, 0 3px 0 #c99632; margin: 0; }
+.jobrow .ji { position: relative; flex: none; display: grid; place-items: center; width: 52px; height: 52px; } .jobrow .ji > .u4 { width: 52px; height: 52px; filter: drop-shadow(0 2px 0 rgba(27,45,82,.25)); }
+.jobrow.locked .ji > .u4 { filter: grayscale(.9); opacity: .55; } .jobrow .ji .lock { position: absolute; right: -4px; bottom: -4px; } .jobrow .ji .lock .u4 { width: 24px; height: 24px; }
+.jobrow .jt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.jobrow .jt > b { font: var(--dw) 15px/1.1 var(--display); color: var(--navy-ink); } .jobrow .jt > small { font-size: 12px; font-weight: 600; line-height: 1.2; color: #55678c; }
+.jchips { display: flex; flex-wrap: wrap; gap: 3px 5px; margin-top: 2px; }
+.jchips i { padding: 2px 6px 2px 3px; border-radius: 9px; background: #e7eefb; box-shadow: inset 0 0 0 1.5px #c3d3ec; } .jchips i .u4 { width: 16px; height: 16px; } .jchips i:not(:has(.u4)) { padding-left: 6px; color: #1f7a2e; }
+.jobrow .btn { flex: none; min-width: 74px; flex-direction: column; gap: 0; min-height: 44px; padding: 3px 8px; line-height: 1; }
+.jobrow .btn small { font: 600 11px/1.1 var(--font); } .jobrow .btn b { display: inline-flex; align-items: center; gap: 2px; font: var(--dw) 15px/1.1 var(--display); } .jobrow .btn .u4 { width: 20px; height: 20px; margin: -3px 0; } .jobrow .btn u { text-decoration: none; }
+.jobrow .why { flex: none; max-width: 30%; font-size: 11.5px; font-weight: 700; color: #55678c; text-align: right; }
+.jcrew { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; } .jcrew .jchips { margin: 0 0 0 2px; }
+.jcrew .mi, .cchip .mi { flex: none; display: block; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 30%, #9fd0ff, #3f73c8 78%); box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--frame-in); }
+.jcrew .mi .face, .cchip .mi .face { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.12) translateY(2px); }
+.jbar, .pmeter { position: relative; display: block; height: 18px; border-radius: 9px; overflow: hidden; background: #b9c9e6; box-shadow: inset 0 2px 0 rgba(27,45,82,.18); }
+.jbar i, .pmeter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; background: linear-gradient(180deg, #6fd0ff, #2f8fe0); transition: width .4s linear; }
+.jbar em, .pmeter em { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 3px; font: var(--dw) 12px/1 var(--display); font-style: normal; color: #fff; -webkit-text-stroke: 2.5px #101828; paint-order: stroke fill; }
+.pmeter { height: 26px; border-radius: 13px; } .pmeter i { border-radius: 13px; background: linear-gradient(180deg, #ffb24d, #f07a1c); } .pmeter.ok i { background: linear-gradient(180deg, #8be05c, #46ad25); } .pmeter em { font-size: 14px; } .pmeter em .u4 { width: 20px; height: 20px; }
+.jobpick { display: flex; flex-direction: column; gap: 9px; }
+.cchips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cchip { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px 5px; border: 0; border-radius: 12px; background: #fff; box-shadow: var(--row); font-family: var(--font); }
+.cchip .mi { width: 40px; height: 40px; } .cchip b { font: var(--dw) 12px/1 var(--display); color: var(--navy-ink); white-space: nowrap; }
+.cchip.on { background: linear-gradient(180deg, #eefbe6, #c9eeb4); box-shadow: inset 0 0 0 2.5px #46ad25, 0 3px 0 #3b8f1f; }
+.cchip:disabled { opacity: .5; } .cchip:disabled small { color: #8a96ad; }
+.jbtns { display: flex; gap: 8px; } .jbtns .btn { flex: 1; } .jbtns .btn.green { flex: 1.6; }

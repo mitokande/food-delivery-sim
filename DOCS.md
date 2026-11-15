@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), ekip ve catering işleri `sim.js` + `ui.js` içinde (§14.13), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1548,3 +1548,46 @@ aldı: eleştirmen (zamanlama) ve Victor'un kamyonu (dokunma). Dal `idle-minigam
   yedi kaydın çalınması ve çözülmesi). Bu turun öbür yeni kontrolleri: kamyonun bandındaki oyun çağrısı, sokak, yayalara dokunuş
   (biri bilerek kırmızılıya), sayılan müşteriler; eleştirmenin teklif kartı, ocak, beş şeyin yeşilde alınması, yorum
   kartı; eleştirmen ve kamyon için beş puan değerinde kurallar. Test oyunları `game.ui.playing.peek()` ile oynar.
+
+### 14.13 8. faz: ekip ve catering işleri (15 Kasım 2026)
+
+Müdürler artık bir "ekip": seviye atlarlar ve dışarıdaki catering işlerine giderler. Alt çubuktaki "Managers" düğmesi
+"Crew" oldu; kartın iki sekmesi var (Managers, Catering).
+
+- **Yeni para birimi: aşçı şapkası** (`G.hats`). Yalnızca catering işlerinden gelir, yalnızca müdür eğitimine
+  harcanır.
+- **Ekip seviyesi** (`sim.js` `CREW`). Her müdür 1–5 seviye (`G.mgr[oda].lv`). Bir seviye, müdürün odasına verdiği
+  bonusun yarısını ekler (`gain: 0.5`): Aiko %10 → %15 → %20 → %25 → %30. Greta her seviyede ekibe bir kişilik yer
+  daha açar (2 → 6). Eğitim bedeli şapkayla: 4, 10, 22, 45 (bir müdür için toplam 81). Seviye ayrıca müdürün
+  işlerdeki gücünü belirler (`power`: 10, 16, 24, 34, 46) ve şöhrete 100 ekler (`FAME.crew`). Müdürlerin açıklama
+  metni artık seviyenin sayısını yazar (`mgrWhat(oda, seviye)`).
+- **Catering işleri** (`JOBS`, `JOB`). Restoran 3. seviyede müdürlerle birlikte açılır.
+
+  | İş | Süre | Gereken güç | Kişi | Nakit (gelir dakikası) | Şapka | Elmas | Restoran sev. |
+  |---|---|---|---|---|---|---|---|
+  | Office lunch | 3 dk | 10 | 1 | 2 | 2 | – | 3 |
+  | Birthday party | 10 dk | 20 | 2 | 5 | 4 | – | 3 |
+  | Film set | 30 dk | 40 | 2 | 12 | 8 | – | 4 |
+  | Wedding | 90 dk | 72 | 3 | 30 | 14 | 3 | 4 |
+  | Mayor's gala | 4 sa | 110 | 3 | 60 | 24 | 8 | 5 |
+
+  - Kimin gideceğini oyuncu seçer (kart en güçlü boştakileri önerir). Toplam güç gerekeni aşarsa nakit artar
+    (en çok +%50, `JOB.over`). Nakit, iş gönderilirken o anki gelire göre sabitlenir.
+  - İşteki müdür odasına yardım etmeye ve eşya almaya devam eder; yalnızca başka bir işe gidemez.
+  - Aynı anda çıkabilecek iş sayısı restoran seviyesine bağlı: 3. seviyede 1, 4'te 2, 5'te 3 (`JOB.slots`).
+  - İşler **gerçek saatle** ilerler (oyun kapalıyken de). Kuralların saati yok: `sendJob`, `jobLeft`, `rushJob`,
+    `collectJob` şimdiki zamanı (`now`, ms) dışarıdan alır. Saat geri alınırsa kalan süre işin süresini aşamaz.
+  - Elmasla hemen bitirme: kalan her 2 dakika için 1 elmas (`JOB.rush`).
+  - İş dönünce alt çubuktaki düğmede sayı çıkar ve bir bildirim görünür; ödül "Collect" ile alınır. İş nakdi
+    `stats.earned`'e yazılmaz (ortalama hesabı ve dakikalık gelir şişmesin diye).
+- **Görevler.** Zincire dört görev eklendi (`quests.js`): bir catering işi, bir eğitim, 10 iş, 6 eğitim. Eski
+  kayıtlar yerini korur (`Q.migrate`, `G.quest.v = 2`); tam eklenen yerde duran oyuncu yeni görevi alır.
+- **Rehber.** İlk müdür işe alınınca Rita catering'i anlatır (`jobs` adımı).
+- **Görseller.** `assets/ui4/jobs/`: beş iş ikonu ve güç rozeti (tek sayfa, `tools/genart.mjs` `jobs-icons`,
+  `tools/genart-mini.py` keser). Şapka için var olan `chef` ikonu kullanılıyor.
+- **Denge.** Bot müdür almadığı ve iş göndermediği için bot dengesi değişmedi. Sayılar tahmindir, gerçek oyunla
+  denenmedi. Ayar yerleri: `CREW` (bedeller, bonus payı, güç), `JOBS` (süre, güç, ödül), `JOB` (yuvalar, bonus
+  tavanı, elmas hızı).
+- **Test.** Tarayıcı testi 161 kontrol. Yeni 11 kontrol: catering sekmesi, kimin gideceği, gönderme ve tek yuva,
+  işteki şefin mutfağa yardımı, elmasla bitirme, düğmedeki sayı ve bildirim, ödülün alınması, şapkayla eğitim ve
+  büyüyen bonus, eski kaydın görev zincirindeki yeri.

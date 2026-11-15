@@ -1,6 +1,6 @@
 // Ferdi's (idle4.html): the interface. The top bar (you, the restaurant's level; the clock, the team, cash; income and
 // the rush), settings, the event on now in a banner under it, the mailbox button, the bar along the bottom (the
-// events card, the managers card, the features still to come, locked; the city map), the quest bar above it (one
+// events card, the crew card (managers and catering), the features still to come, locked; the city map), the quest bar above it (one
 // quest at a time: where it takes you, what holds it up, its reward to claim), the room panel that slides up when a
 // room is tapped (what it holds, what to buy, its renovation), the card when a renovation is done, the mailbox and its
 // letters, the story cards, the "while you were away" card, settings, toasts. The painted art (icons, faces) is in
@@ -135,6 +135,7 @@ export function createUI(game) {
   const sfxLoop = (n, o) => game.audio?.voice?.(n, o) ?? null, sfxWarm = (...n) => game.audio?.warm?.(...n); // (for the mini games)
   let room = null; // the open room
   let questGo = null; // where a tap on the quest bar takes you
+  const toldBack = new Set(); // (the catering jobs whose return was announced)
   const api = {};
 
   // ---------- generic ----------
@@ -235,32 +236,114 @@ export function createUI(game) {
 
   // ---------- managers ----------
   const MGR_IC = (room) => `<img class="face" src="${FACE(MGR_FACE[room])}" alt="" draggable="false">`;
+  const crewStars = (lv) => `<i class="cstars">${UI('star').repeat(lv)}${UI('star', 'off').repeat(S.CREW.max - lv)}</i>`;
+  const jobTime = (t) => (t >= 3600 ? `${Math.floor(t / 3600)}h ${String(Math.floor(t % 3600 / 60)).padStart(2, '0')}m` : mmss(Math.ceil(t)));
+  const jobMin = (m) => (m >= 60 ? `${m / 60} h` : `${m} min`);
+  const jobPays = (j) => `<i>${M(j.cash)}</i><i>${UI('chef')}${j.hats}</i>${j.gems ? `<i>${UI('gems')}${j.gems}</i>` : ''}`;
   // the manager's line in a room's panel: hire, or what they do and their switch
   function mgrRow(g, room) {
     const m = S.MANAGERS[room], on = S.hasMgr(g, room);
-    if (on) return `<div class="mgrrow on"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b><small>${m.what}${g.mgr[room].auto ? '. Buys things here for you' : ''}</small></span>
+    if (on) return `<div class="mgrrow on"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b>${crewStars(S.crewLv(g, room))}<small>${S.mgrWhat(room, S.crewLv(g, room))}${g.mgr[room].auto ? '. Buys things here for you' : ''}</small></span>
       <button class="btn sm ${g.mgr[room].auto ? 'green' : 'ghost'} auto" data-act="mgrauto" data-room="${room}"><small>Buys for you</small><b>${g.mgr[room].auto ? 'ON' : 'OFF'}</b></button></div>`;
     if (S.restaurantLv(g) < S.MGR_LV) return `<div class="mgrrow locked"><span class="mi">${UI('lock')}</span><span class="mt"><b>A manager</b><small>Managers come at restaurant level ${S.MGR_LV}</small></span></div>`;
-    return `<div class="mgrrow"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>Hire ${m.name}, ${m.title.toLowerCase()}</b><small>${m.what}, and buys things here for you</small></span>
+    return `<div class="mgrrow"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>Hire ${m.name}, ${m.title.toLowerCase()}</b><small>${S.mgrWhat(room)}, and buys things here for you</small></span>
       <button class="btn gold sm buy" data-act="mgr" data-room="${room}" data-cost="${m.cost}"><small>Hire</small><b>${M(m.cost)}</b></button></div>`;
   }
-  function managersCard() {
+  // the crew card: the managers (hire, train with chef's hats, the buying switch) and the catering jobs they go on
+  // (who goes is picked in the card; the jobs run on the real clock, so the card ticks while it's open)
+  function managersCard(tab = 'crew') {
     const g = G();
-    if (S.restaurantLv(g) < S.MGR_LV) { toast(`${UI('lock')} Managers: opens at restaurant level ${S.MGR_LV}`); sfx('ui-error', { vol: 0.4 }); return; }
-    const rows = Object.keys(S.MANAGERS).map((room) => {
-      const m = S.MANAGERS[room], R = S.ROOMS[room], on = S.hasMgr(g, room), open = S.lvOf(g, room) > 0;
-      const act = on ? `<button class="btn sm ${g.mgr[room].auto ? 'green' : 'ghost'} auto" data-act="mgrauto" data-room="${room}"><small>Buys for you</small><b>${g.mgr[room].auto ? 'ON' : 'OFF'}</b></button>`
-        : open ? `<button class="btn gold sm buy" data-act="mgr" data-room="${room}" data-cost="${m.cost}" ${g.cash >= m.cost ? '' : 'disabled'}><small>Hire</small><b>${M(m.cost)}</b></button>`
-        : `<span class="why">Repair the ${R.name} first</span>`;
-      return `<div class="mgrrow ${on ? 'on' : ''}"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b><small>${R.name}: ${m.what}</small></span>${act}</div>`;
-    }).join('');
-    const mm = modal(`<h2>${UI('chef')} Managers</h2><p class="small">One for each room. Each one helps the room, and buys its things for you when they cost at most half your cash (switch it off to save up).</p>
-      <div class="mgrlist">${rows}</div><button class="btn big" data-x="close">Close</button>`, { cls: 'managerscard', dismiss: true });
+    if (S.restaurantLv(g) < S.MGR_LV) { toast(`${UI('lock')} Crew: opens at restaurant level ${S.MGR_LV}`); sfx('ui-error', { vol: 0.4 }); return; }
+    let pick = null, backN = -1; // (pick: { kind, crew } while choosing who goes; backN: the jobs back when last drawn)
+    const crewHtml = () => `<p class="small">One for each room. They help it, and buy its things when those cost at most half your cash. Chef's hats from catering train them.</p>
+      <div class="mgrlist">${Object.keys(S.MANAGERS).map((room) => {
+    const m = S.MANAGERS[room], R = S.ROOMS[room], on = S.hasMgr(g, room), open = S.lvOf(g, room) > 0, lv = S.crewLv(g, room), tc = S.trainCost(g, room);
+    const act = on ? `<span class="cbtns">${tc == null ? '<span class="why top">Top level</span>' : `<button class="btn gold sm" data-act="train" data-room="${room}" ${g.hats >= tc ? '' : 'disabled'}><small>Train</small><b>${UI('chef')}${tc}</b></button>`}
+          <button class="btn sm ${g.mgr[room].auto ? 'green' : 'ghost'} auto" data-act="mgrauto" data-room="${room}"><small>Buys for you</small><b>${g.mgr[room].auto ? 'ON' : 'OFF'}</b></button></span>`
+      : open ? `<button class="btn gold sm buy" data-act="mgr" data-room="${room}" data-cost="${m.cost}" ${g.cash >= m.cost ? '' : 'disabled'}><small>Hire</small><b>${M(m.cost)}</b></button>`
+      : `<span class="why">Repair the ${R.name} first</span>`;
+    return `<div class="mgrrow ${on ? 'on' : ''}"><span class="mi">${MGR_IC(room)}</span><span class="mt"><b>${m.name} · ${m.title}</b>${on ? `<span class="clv">${crewStars(lv)}<i class="pw">${UI('jobs/power')}${S.crewPower(g, room)}</i></span>` : ''}<small>${R.name}: ${S.mgrWhat(room, lv || 1)}</small></span>${act}</div>`;
+  }).join('')}</div>`;
+    const pickHtml = () => {
+      const J = S.JOBS[pick.kind], pw = S.powerOf(g, pick.crew), ok = !S.jobBlock(g, pick.kind, pick.crew), more = Math.round(S.jobBonus(pick.kind, pw) * 100);
+      const chips = Object.keys(S.MANAGERS).filter((r) => S.hasMgr(g, r)).map((r) => {
+        const busy = S.crewBusy(g, r);
+        return `<button class="cchip ${pick.crew.includes(r) ? 'on' : ''}" data-crew="${r}" ${busy ? 'disabled' : ''}><span class="mi">${MGR_IC(r)}</span><b>${S.MANAGERS[r].name}</b><small>${busy ? 'Out' : `${UI('jobs/power')}${S.crewPower(g, r)}`}</small></button>`;
+      }).join('');
+      return `<div class="jobpick"><div class="jobrow head"><span class="ji">${UI(`jobs/${pick.kind}`)}</span><span class="jt"><b>${J.name}</b><small>${J.what}</small><span class="jchips"><i>${UI('stopwatch')}${jobMin(J.min)}</i>${jobPays({ cash: S.jobCash(g, pick.kind, Math.max(pw, J.need)), hats: J.hats, gems: J.gems })}</span></span></div>
+        <p class="small">Who goes? ${J.crew > 1 ? `Up to ${J.crew} of the crew` : 'One of the crew'}. More power than it needs pays more cash.</p>
+        <div class="cchips">${chips}</div>
+        <div class="pmeter ${ok ? 'ok' : ''}"><i style="width:${Math.min(100, pw / J.need * 100)}%"></i><em>${UI('jobs/power')}${pw} / ${J.need}${more ? ` · +${more}% cash` : ''}</em></div>
+        <div class="jbtns"><button class="btn ghost" data-x="back">Back</button><button class="btn green" data-x="go" ${ok ? '' : 'disabled'}>Send them</button></div></div>`;
+    };
+    const jobsHtml = () => {
+      if (pick) return pickHtml();
+      const now = Date.now(), slots = S.jobSlots(g), free = S.freeCrew(g), nextSlot = S.JOB.slots[slots];
+      const out = g.jobs.map((j) => {
+        const J = S.JOBS[j.kind], left = S.jobLeft(j, now), back = left <= 0;
+        return `<div class="jobrow run ${back ? 'back' : ''}" data-job="${j.id}"><span class="ji">${UI(`jobs/${j.kind}`)}</span><span class="jt"><b>${J.name}</b><span class="jcrew">${j.crew.map((r) => `<span class="mi">${MGR_IC(r)}</span>`).join('')}<span class="jchips">${jobPays(j)}</span></span>
+          ${back ? '' : `<span class="jbar"><i style="width:${(1 - left / (J.min * 60)) * 100}%"></i><em>${jobTime(left)}</em></span>`}</span>
+          ${back ? '<button class="btn green sm" data-x="collect"><small>They\'re back</small><b>Collect</b></button>' : `<button class="btn blue sm" data-x="rush"><small>Finish</small><b>${UI('gems')}<u>${S.rushGems(j, now)}</u></b></button>`}</div>`;
+      }).join('');
+      const list = Object.keys(S.JOBS).map((kind) => {
+        const J = S.JOBS[kind], lock = S.restaurantLv(g) < J.lv;
+        const why = lock ? `Restaurant Lv ${J.lv}` : g.jobs.length >= slots ? 'No free job slot' : !Object.keys(g.mgr).length ? 'Hire a manager first' : !free.length ? 'Everyone is out' : S.powerOf(g, S.bestCrew(g, kind)) < J.need ? 'Not enough power: train the crew' : null;
+        return `<div class="jobrow ${lock ? 'locked' : ''}"><span class="ji">${UI(`jobs/${kind}`)}${lock ? `<i class="lock">${UI('lock')}</i>` : ''}</span><span class="jt"><b>${J.name}</b><small>${J.what}</small>
+          <span class="jchips"><i>${UI('stopwatch')}${jobMin(J.min)}</i><i>${UI('jobs/power')}${J.need}</i>${jobPays({ cash: S.jobCash(g, kind), hats: J.hats, gems: J.gems })}</span></span>
+          ${why ? `<span class="why">${why}</span>` : `<button class="btn gold sm" data-x="pick" data-kind="${kind}"><small>Crew of ${J.crew}</small><b>Send</b></button>`}</div>`;
+      }).join('');
+      return `<p class="small">Send managers out to cater. They keep helping their room while they're away, and bring back cash and chef's hats. Jobs out: <b>${g.jobs.length}/${slots}</b>${nextSlot ? ` (one more at restaurant Lv ${nextSlot})` : ''}</p>
+        <div class="mgrlist joblist">${out}${list}</div>`;
+    };
+    const mm = modal(`<h2>${UI('chef')} Crew</h2><div class="gbal hbal">${UI('chef')}<b></b><small>chef's hats</small></div>
+      <div class="mtabs"><button class="mtab" data-tab="crew">Managers</button><button class="mtab" data-tab="jobs">Catering</button></div>
+      <div class="crewbody"></div><button class="btn big" data-x="close">Close</button>`, { cls: 'managerscard', dismiss: true, onClose: () => clearInterval(timer) });
+    const body = $('.crewbody', mm.card);
+    const draw = () => {
+      backN = S.jobsBack(g, Date.now());
+      $('.hbal b', mm.card).textContent = g.hats.toLocaleString('en-US');
+      for (const b of mm.card.querySelectorAll('.mtab')) { b.classList.toggle('on', b.dataset.tab === tab); if (b.dataset.tab === 'jobs') b.innerHTML = `Catering${backN ? `<i>${backN}</i>` : ''}`; }
+      const top = $('.mgrlist', body)?.scrollTop || 0;
+      body.innerHTML = tab === 'jobs' ? jobsHtml() : crewHtml();
+      if ($('.mgrlist', body)) $('.mgrlist', body).scrollTop = top;
+    };
+    // the clocks of the jobs out (a job that came back: draw again, unless the crew is being picked)
+    const timer = setInterval(() => {
+      const now = Date.now();
+      if (S.jobsBack(g, now) !== backN && !pick) { draw(); return; }
+      for (const row of body.querySelectorAll('.jobrow.run:not(.back)')) {
+        const j = g.jobs.find((x) => x.id === +row.dataset.job); if (!j) continue;
+        const left = S.jobLeft(j, now);
+        $('.jbar i', row).style.width = `${(1 - left / (S.JOBS[j.kind].min * 60)) * 100}%`; $('.jbar em', row).textContent = jobTime(left); $('[data-x="rush"] u', row).textContent = S.rushGems(j, now);
+      }
+    }, 500);
     mm.card.addEventListener('click', (e) => {
+      const t = e.target.closest('.mtab');
+      if (t) { if (tab !== t.dataset.tab || pick) { tab = t.dataset.tab; pick = null; sfx('ui-tap', { vol: 0.5 }); draw(); } return; }
       const b = e.target.closest('[data-act]');
-      if (b && (b.dataset.act === 'mgr' || b.dataset.act === 'mgrauto')) { e.stopPropagation(); if (game.act(b.dataset.act === 'mgr' ? 'mgr' : 'auto', b.dataset.room)) { mm.close(); managersCard(); } return; }
-      if (e.target.closest('[data-x="close"]')) mm.close();
+      if (b) {
+        e.stopPropagation();
+        const room = b.dataset.room;
+        if (b.dataset.act === 'train') { const lv = game.trainCrew(room); if (lv) toast(`${MGR_IC(room)} ${S.MANAGERS[room].name} is level ${lv}: ${S.mgrWhat(room, lv).toLowerCase()}`, 'good'); }
+        else game.act(b.dataset.act === 'mgr' ? 'mgr' : 'auto', room);
+        draw(); return;
+      }
+      const c = e.target.closest('[data-crew]');
+      if (c && pick) { // (one more than the job takes: the first one picked steps out)
+        const r = c.dataset.crew;
+        if (pick.crew.includes(r)) pick.crew = pick.crew.filter((x) => x !== r);
+        else { pick.crew.push(r); if (pick.crew.length > S.JOBS[pick.kind].crew) pick.crew.shift(); }
+        sfx('ui-tap', { vol: 0.5 }); draw(); return;
+      }
+      const xb = e.target.closest('[data-x]'), x = xb?.dataset.x, id = +(e.target.closest('[data-job]')?.dataset.job || 0);
+      if (x === 'close') mm.close();
+      else if (x === 'pick') { pick = { kind: xb.dataset.kind, crew: S.bestCrew(g, xb.dataset.kind) }; sfx('ui-tap', { vol: 0.5 }); draw(); }
+      else if (x === 'back') { pick = null; sfx('ui-back', { vol: 0.4 }); draw(); }
+      else if (x === 'go') { if (game.sendJob(pick.kind, pick.crew)) { toast(`${UI(`jobs/${pick.kind}`)} Off they go: ${S.JOBS[pick.kind].name.toLowerCase()}`, 'good'); pick = null; } draw(); }
+      else if (x === 'rush') { game.rushJob(id); draw(); }
+      else if (x === 'collect') { const j = game.collectJob(id); if (j) toast(`${UI(`jobs/${j.kind}`)} ${S.JOBS[j.kind].name}: +${M(j.cash)}, +${j.hats} chef's hats${j.gems ? `, +${j.gems} gems` : ''}`, 'good'); draw(); }
     });
+    draw();
   }
 
   // ---------- the day, the events ----------
@@ -299,8 +382,11 @@ export function createUI(game) {
     eb.classList.toggle('locked', !on); $('.lock', eb).hidden = on; $('small', eb).textContent = on ? 'Events' : `Lv ${S.EVENT_LV}`;
     $('.badge', eb).hidden = !g.event;
     const mon = S.restaurantLv(g) >= S.MGR_LV, mb = $('.slot.managers', hud), canHire = mon && Object.keys(S.MANAGERS).some((r) => S.mgrOpen(g, r) && g.cash >= S.MANAGERS[r].cost);
-    mb.classList.toggle('locked', !mon); $('.lock', mb).hidden = mon; $('small', mb).textContent = mon ? 'Managers' : `Lv ${S.MGR_LV}`;
-    $('.badge', mb).hidden = !canHire; $('.badge', mb).textContent = canHire ? '!' : '';
+    mb.classList.toggle('locked', !mon); $('.lock', mb).hidden = mon; $('small', mb).textContent = mon ? 'Crew' : `Lv ${S.MGR_LV}`;
+    // (its badge: the catering jobs that are back, else a manager you can hire; a job just back says so once)
+    const backs = g.jobs.filter((j) => S.jobLeft(j, Date.now()) <= 0);
+    for (const j of backs) if (!toldBack.has(j.id)) { toldBack.add(j.id); toast(`${UI(`jobs/${j.kind}`)} The crew is back from the ${S.JOBS[j.kind].name.toLowerCase()}!`, 'good'); sfx('ui-levelup', { vol: 0.5 }); }
+    $('.badge', mb).hidden = !backs.length && !canHire; $('.badge', mb).textContent = backs.length || (canHire ? '!' : '');
     // the banner: the event on now, else a boost or a slump
     const bar = $('.evbar', hud), e = g.event, mod = g.mods.find((m) => g.t < m.until);
     if (e) {
@@ -495,7 +581,9 @@ export function createUI(game) {
     if (q.k === 'letters') return S.unread(g) ? ['mail', 'Tap the mailbox by the front door'] : null;
     if (q.k === 'served') return advice(g);
     if (q.k === 'threats') return S.restaurantLv(g) < S.EVENT_LV ? ['office', `Events start at restaurant level ${S.EVENT_LV}`] : g.event?.kind === 'threat' ? ['events', 'Serve fast: the truck is coming!'] : ['events', 'Victor\'s truck comes now and then: be ready'];
-    if (q.k === 'managers') return S.restaurantLv(g) < S.MGR_LV ? ['office', `Managers come at restaurant level ${S.MGR_LV}`] : ['managers', 'Hire them in the Managers card'];
+    if (q.k === 'managers') return S.restaurantLv(g) < S.MGR_LV ? ['office', `Managers come at restaurant level ${S.MGR_LV}`] : ['managers', 'Hire them in the Crew card'];
+    if (q.k === 'jobs') return S.restaurantLv(g) < S.MGR_LV ? ['office', `Catering comes at restaurant level ${S.MGR_LV}`] : !Object.keys(g.mgr).length ? ['managers', 'Hire a manager first: they go on the jobs'] : S.jobsBack(g, Date.now()) ? ['jobs', 'The crew is back: collect the job'] : g.jobs.length ? ['jobs', 'The crew is out on a job'] : ['jobs', 'Crew card, Catering: send them out'];
+    if (q.k === 'trained') return !Object.keys(g.mgr).length ? ['managers', 'Hire a manager first'] : ['managers', 'Catering jobs pay chef\'s hats: train with them'];
     if (q.k === 'delivered') return !S.lvOf(g, 'bay') ? ['bay', 'Open the Courier Bay first'] : !S.nCouriers(g) ? ['bay', 'Hire a courier'] : null;
     if (q.k === 'stars') return g.event?.kind === 'critic' ? ['events', 'The critic is here: serve them fast!'] : ['events', 'Critics come now and then: fast food, more stars'];
     return null;
@@ -603,7 +691,7 @@ export function createUI(game) {
   function opens(lv) {
     const out = S.ROOM_IDS.filter((x) => S.ROOMS[x].gate === lv && lv > 0).map((x) => ({ room: x, name: S.ROOMS[x].name }));
     if (lv === S.EVENT_LV) out.push({ icon: 'calendar', name: 'Events' });
-    if (lv === S.MGR_LV) out.push({ icon: 'chef', name: 'Managers' });
+    if (lv === S.MGR_LV) out.push({ icon: 'chef', name: 'Managers' }, { icon: 'jobs/lunch', name: 'Catering jobs' });
     return out;
   }
   function upCard(r, lv) {
@@ -663,6 +751,8 @@ export function createUI(game) {
     { key: 'events', when: (g) => S.restaurantLv(g) >= S.EVENT_LV, point: '.nav4 .slot.events', lines: ['We\'re getting noticed. Critics, celebrities, tour vans... and trouble. Keep an eye on Events.'] },
     { key: 'threat', when: (g) => g.event?.kind === 'threat', point: '.evbar', lines: ['That\'s Victor\'s truck! Serve enough people before it parks, or it steals our customers. Or pay to have it moved on.'] },
     { key: 'managers', when: (g) => S.restaurantLv(g) >= S.MGR_LV, point: '.nav4 .slot.managers', lines: ['We can afford managers now. Each one looks after a room, and buys its things while you\'re busy.'] },
+    { key: 'jobs', when: (g) => Object.keys(g.mgr).length > 0, point: '.nav4 .slot.managers', lines: [
+      'Your managers can cater, too! Send them out from the Crew card: they bring back cash and chef\'s hats, and hats train them.'] },
     { key: 'gems', when: (g) => g.stats.gems > 0, point: '.nav4 .slot.shop', lines: [
       'Gems! Keep them safe, love. They finish building work at once, or buy a pile of cash in the Shop.'] },
     { key: 'reviews', when: (g) => g.rep.reviews.length > 0, point: '.slot.mail', lines: [
@@ -905,7 +995,7 @@ export function createUI(game) {
       if (Q.done(G())) game.claimQuest();
       else if (questGo === 'mail') mailbox(Q.current(G()).k === 'mood' ? 'reviews' : 'letters');
       else if (questGo === 'events') eventsCard();
-      else if (questGo === 'managers') managersCard();
+      else if (questGo === 'managers' || questGo === 'jobs') managersCard(questGo === 'jobs' ? 'jobs' : 'crew');
       else if (questGo) game.openRoom(questGo);
     }
     else if (a === 'mail') mailbox();
@@ -914,7 +1004,7 @@ export function createUI(game) {
     else if (a === 'finish') { if (game.finishNow()) renderRoom(); }
     else if (a === 'adbuild') game.watchAd('build').then((r) => { if (r) { toast(`${UI('hammer')} The builders hurried up!`, 'good'); renderRoom(); } });
     else if (a === 'events') eventsCard();
-    else if (a === 'managers') managersCard();
+    else if (a === 'managers') managersCard(G().jobs.some((j) => S.jobLeft(j, Date.now()) <= 0) ? 'jobs' : 'crew');
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
     else if (a === 'evfocus') { if (S.miniOf(G())) game.mini(); else if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'locked') {

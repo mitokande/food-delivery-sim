@@ -30,7 +30,7 @@ try {
   const raw = q.has('fresh') ? null : localStorage.getItem(S.KEY);
   if (raw) {
     const d = JSON.parse(raw);
-    if (d && d.v === 1) { const f = S.fresh(); G = S.migrate({ ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }); fresh = false; }
+    if (d && d.v === 1) { const f = S.fresh(); G = S.migrate({ ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }); Q.migrate(G); fresh = false; }
   }
 } catch (e) { console.warn('idle4 save load failed', e); }
 let wiped = false;
@@ -107,6 +107,31 @@ const game = {
     const r = S.claimSignin(G, game.today(), times);
     if (r) { audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live(); }
     return r;
+  },
+  // the crew: a manager trained with chef's hats; a catering job sent out, brought back at once for gems, collected
+  trainCrew(room) {
+    const lv = S.train(G, room);
+    if (!lv) { audio.play('ui-error'); ui.toast('Not enough chef\'s hats', 'bad'); return 0; }
+    audio.play('ui-levelup'); buzz(30); save(); ui.live(); ui.renderRoom();
+    return lv;
+  },
+  sendJob(kind, crew) {
+    const j = S.sendJob(G, kind, crew, Date.now());
+    if (!j) { audio.play('ui-error'); return null; }
+    audio.play('ui-purchase', { vol: 0.7 }); setTimeout(() => audio.play('hop', { vol: 0.4 }), 150); buzz(20); save(); ui.live();
+    return j;
+  },
+  rushJob(id) {
+    const c = S.rushJob(G, id, Date.now());
+    if (!c) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return 0; }
+    audio.play('ui-purchase'); buzz(20); save(); ui.live();
+    return c;
+  },
+  collectJob(id) {
+    const j = S.collectJob(G, id, Date.now());
+    if (!j) return null;
+    audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live();
+    return j;
   },
   // gems: finish the building work at once; cash for gems; a pack bought in the shop (real money: store.js)
   finishNow() {
