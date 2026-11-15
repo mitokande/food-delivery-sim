@@ -590,3 +590,66 @@
 .stile.today { background: linear-gradient(180deg, #fffbe9, #ffe58a); box-shadow: inset 0 0 0 2.5px #f2a531, 0 3px 0 #c97a10, 0 0 14px rgba(255,200,60,.8); animation: gdpulse 1.3s ease-in-out infinite; }
 .stile.done { opacity: .55; }
 .stile .tick { position: absolute; right: 6px; top: 8px; width: 16px; height: 9px; border: solid #3fae25; border-width: 0 0 3.5px 3.5px; transform: rotate(-45deg); }
+/* the mini games (js/idle4/mini.js): the frame they share, then the scrub */
+.modal.minim { padding: 16px 10px; }
+.modal.minim .card { width: min(calc(100vw - 24px), 420px); }
+.modal.minim .cin { overflow: visible; max-height: none; padding: 32px 7px 9px; }
+.mini { display: flex; flex-direction: column; align-items: center; gap: 8px; user-select: none; -webkit-user-select: none; }
+.mtop { display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 4px; box-sizing: border-box; }
+.mclock { flex: none; display: inline-flex; align-items: center; gap: 2px; min-width: 64px; height: 34px; padding: 0 10px 0 2px; box-sizing: border-box; border-radius: 12px; background: linear-gradient(180deg, #4a6fb8, #2b4780); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), inset 0 0 0 2px #16213a, 0 3px 0 rgba(0,0,0,.25); }
+.mclock img { width: 34px; height: 34px; margin: -4px 0; }
+.mclock b { flex: 1; text-align: center; font: var(--dw) 19px/1 var(--display); color: #fff; -webkit-text-stroke: 3.5px #16213a; paint-order: stroke fill; font-variant-numeric: tabular-nums; }
+.mini.hurry .mclock { background: linear-gradient(180deg, #ff6a57, #d0281c); animation: bump .5s ease-in-out infinite; }
+.mbar { position: relative; flex: 1; height: 20px; margin-right: 12px; border-radius: 10px; background: #1d2b4d; box-shadow: inset 0 0 0 2.5px #16213a, inset 0 4px 0 rgba(0,0,0,.25), 0 2px 0 rgba(255,255,255,.6); }
+.mbar u { position: absolute; left: 3px; top: 3px; bottom: 3px; max-width: calc(100% - 6px); min-width: 0; border-radius: 7px; background: linear-gradient(180deg, #a6f27e, #46b82a); box-shadow: inset 0 2px 0 rgba(255,255,255,.45); transition: width .15s; }
+.mbar i { position: absolute; top: 50%; width: 30px; height: 30px; margin: -16px 0 0 -15px; filter: grayscale(1) brightness(.55); transition: filter .2s; }
+.mbar i img { display: block; width: 100%; height: 100%; }
+.mbar i.on { filter: drop-shadow(0 0 5px rgba(255,220,90,.9)); animation: starpop .45s cubic-bezier(.3,1.7,.5,1); }
+@keyframes starpop { 0% { transform: scale(.5) rotate(-25deg); } 60% { transform: scale(1.5); } }
+.mstage { position: relative; width: min(100%, calc((100dvh - 250px) * 2 / 3)); aspect-ratio: 2 / 3; border-radius: 16px; overflow: hidden; background: #b9c4d6; box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px var(--frame-in), 0 5px 0 5px rgba(0,0,0,.18); touch-action: none; cursor: pointer; -webkit-touch-callout: none; }
+.mstage > :is(.msurf, canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.mstage .msurf { object-fit: cover; }
+.mstage .mstain { filter: drop-shadow(0 2px 1px rgba(40,20,0,.3)); }
+.msponge { position: absolute; left: 0; top: 0; width: 26%; margin: -13% 0 0 -13%; pointer-events: none; filter: drop-shadow(0 6px 4px rgba(0,0,0,.35)); will-change: transform; }
+.msponge.idle { animation: spongeidle 1s ease-in-out infinite; }
+.msponge.on { filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
+@keyframes spongeidle { 50% { margin-top: calc(-13% - 10px); } }
+.mcount { position: absolute; left: 0; right: 0; top: 38%; z-index: 2; text-align: center; pointer-events: none; font: var(--dw) 46px/1 var(--display); color: #fff; -webkit-text-stroke: 9px #7a2a08; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(90,20,0,.6); animation: popin .3s cubic-bezier(.3,1.7,.5,1); }
+.mcount[hidden] { display: none; }
+.mini.won .mstage::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%); background-size: 300% 100%; animation: shine 1s ease-out both; pointer-events: none; }
+@keyframes shine { from { background-position: 120% 0; } to { background-position: -60% 0; } }
+.modal .cin .mhint { margin: 0; font-size: 13px; font-weight: 700; color: #4d6290; text-align: center; }
+/* the stars; the offer, the result and the grade's card */
+.mstars { display: flex; justify-content: center; gap: 4px; }
+.mstars span { width: 54px; height: 54px; filter: grayscale(1) brightness(.6) opacity(.5); }
+.mstars span:nth-child(2) { width: 68px; height: 68px; margin-top: -10px; }
+.mstars span .u4 { display: block; width: 100%; height: 100%; }
+.mstars span.on { filter: drop-shadow(0 3px 0 rgba(0,0,0,.2)); animation: starpop .5s calc(var(--i) * .25s) cubic-bezier(.3,1.7,.5,1) both; }
+.modal.offer .cin, .modal.mres .cin, .modal.grade .cin { text-align: center; }
+.modal.offer .rsay img { background: radial-gradient(circle at 50% 30%, #c8f2e8, #2f9a8a 78%); }
+.modal.offer .btn .u4 { width: 34px; height: 34px; margin: -8px 2px -8px -4px; vertical-align: middle; }
+.modal.offer .btn + .btn { margin-top: 8px; width: 100%; min-height: 40px; }
+.mtiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 12px; }
+.mtiers > span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; padding: 8px 2px 7px; border-radius: 12px; background: #fff; box-shadow: var(--row); }
+.mtiers .mstars { gap: 0; } .mtiers .mstars span, .mtiers .mstars span:nth-child(2) { width: 22px; height: 22px; margin: 0; animation: none; }
+.mtiers small { font: var(--dw) 12px/1.1 var(--display); color: var(--navy-ink); }
+.modal.mres .mstars { margin: 12px 0 4px; }
+.modal .cin .mpct { margin: 0 0 4px; font: var(--dw) 15px/1 var(--display); color: #4d6290; }
+.modal .cin .mpct b { font-size: 26px; color: var(--navy-ink); }
+.modal.mres .btn, .modal.grade .btn { margin-top: 12px; }
+.gstamp { width: 150px; height: 150px; margin: 4px auto 0; animation: stamp .45s .15s cubic-bezier(.3,1.5,.5,1) both; }
+.gstamp .u4 { display: block; width: 100%; height: 100%; filter: drop-shadow(0 5px 0 rgba(0,0,0,.18)); }
+@keyframes stamp { 0% { transform: scale(2.6) rotate(-24deg); opacity: 0; } 70% { transform: scale(.92) rotate(-6deg); opacity: 1; } 100% { transform: rotate(-6deg); } }
+.modal .cin .gtitle { margin: 6px 0 8px; font: var(--dw) 22px/1.1 var(--display); color: var(--navy-ink); }
+.modal .cin .gup { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; padding: 6px 10px; border-radius: 12px; background: linear-gradient(180deg, #fff8e2, #ffeab0); box-shadow: inset 0 0 0 2px #e6b54d; font-size: 13px; font-weight: 700; color: #7a4a00; text-align: left; }
+.gup .mstars { flex: none; gap: 0; } .gup .mstars span, .gup .mstars span:nth-child(2) { width: 20px; height: 20px; margin: 0; animation: none; }
+.gwin { display: flex; justify-content: center; gap: 10px; }
+.gwin > span { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 12px 0 4px; border-radius: 12px; background: #fff; box-shadow: var(--row); }
+.gwin .u4 { width: 36px; height: 36px; margin: -4px 0; }
+.gwin b { font: var(--dw) 18px/1 var(--display); color: #2f9a1f; }
+.gwin small { margin-left: 5px; font-size: 11.5px; font-weight: 700; line-height: 1.1; color: #6a7b9c; text-align: left; }
+/* the banner while the kitchen can still be scrubbed; its button on the events card */
+.evbar.scrub { animation: scrubcall 1.1s ease-in-out infinite; }
+.evbar.scrub .ei .u4 { animation: shake .6s ease-in-out infinite; }
+@keyframes scrubcall { 50% { box-shadow: inset 0 2px 0 rgba(255,255,255,.35), 0 4px 0 rgba(0,0,0,.3), 0 0 0 2.5px #ffe27a, 0 0 22px rgba(255,226,122,.85); } }
+.evcard .btn .u4 { width: 28px; height: 28px; margin: -6px 2px -6px -4px; vertical-align: middle; }

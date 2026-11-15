@@ -3,12 +3,20 @@
 // stages are edits of the picture before them (images/edits), so they stay the same building.
 //   OPENAI_API_KEY=… node tools/genart.mjs <outdir> [name …]
 // Writes <outdir>/<name>.png (raw, 1536×1024 or 1024×1024); tools/genart-webp.py makes the small webp copies.
+// Also the art of Ferdi's scrub mini game (the scrub-* names; tools/genart-scrub.py cuts those into assets/ui4/scrub).
 import fs from 'node:fs';
 import path from 'node:path';
 
 const MODEL = 'gpt-image-2.6-flare';
 const STYLE = 'Stylized 3D cartoon illustration for a cozy mobile tycoon game. Chunky rounded shapes, soft shadows, warm light, '
   + 'bright saturated palette, clean plain white background. No text, no letters, no numbers, no logos.';
+// (Ferdi's interface art: its look; a surface seen from above; a sheet of things to cut apart)
+const UI4 = 'Premium casual mobile game art, stylized 3D with soft painted shading, chunky rounded toy-like shapes, glossy highlights, '
+  + 'warm key light from the top-left, bright saturated palette.';
+const TOP = 'Seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge with no border and no background around it. '
+  + 'Perfectly clean, freshly polished and shiny. The large middle of the picture is empty surface. Portrait. No text, no letters, no people, no hands, no dirt.';
+const SHEET = 'Transparent background, no ground shadows, no text, no outline frames. Each one separate, centered in its cell, the same size, '
+  + 'with generous empty space between them so that none touch.';
 export const ART = {
   letter: { size: '1536x1024', prompt: `${STYLE} On an old wooden desk: a cream envelope opened with a broken red wax seal, a folded letter, `
     + 'a heavy brass key on a ring with a little burger-shaped keychain, and a faded instant photo of a smiling round old man with a big grey moustache '
@@ -73,6 +81,26 @@ export const ART = {
     + 'under a small red and cream striped diner awning, a few golden sparkles around it. One bold, simple shape that reads at a tiny size. '
     + 'Centered, fills most of the frame, nothing cut off at the edges, transparent background, no text, no letters, no outline frame, '
     + 'no shadow on the ground.' },
+  // Ferdi's (idle4.html), the scrub mini game: four surfaces to clean (portrait, from above), a sheet of stains, a sheet
+  // of tools and one of grade badges. tools/genart-scrub.py cuts them into assets/ui4/scrub.
+  'scrub-counter': { size: '1024x1536', prompt: `${UI4} A stainless steel prep counter in a diner kitchen: brushed steel with soft reflections. ${TOP} `
+    + 'Only small props at the very edges, cut off by the frame: the corner of a wooden cutting board at the top-left, a steel bowl at the top-right, a red salt shaker at the bottom-right corner.' },
+  'scrub-grill': { size: '1024x1536', prompt: `${UI4} A flat-top griddle in a diner kitchen: a wide dark shiny steel hotplate inside a brushed steel rim, a narrow grease gutter along the bottom. ${TOP} `
+    + 'Only at the very edges, cut off by the frame: three red control knobs along the bottom edge, the tip of a metal spatula at the top-right corner.' },
+  'scrub-floor': { size: '1024x1536', prompt: `${UI4} A diner kitchen floor: big cream and terracotta-red checkered tiles with thin pale grout, glossy and spotless. ${TOP} `
+    + 'Only at the very edges, cut off by the frame: the corner of a black rubber mat at the top-left, one steel table leg at the top-right corner.' },
+  'scrub-tiles': { size: '1024x1536', prompt: `${UI4} The white tiled wall behind a diner stove (the splashback): glossy square white ceramic tiles with thin pale grey grout, seen flat, front on. ${TOP} `
+    + 'Only at the very edges, cut off by the frame: a steel shelf edge with two hanging ladles along the top, a strip of steel worktop along the bottom.' },
+  'scrub-dirt': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: twelve kitchen stains seen straight from above, each lying flat like a decal, `
+    + 'in a neat grid of 4 columns and 3 rows: a brown greasy puddle, a black burnt-on crust patch, a red ketchup splat, a yellow mustard splat, '
+    + 'a brown coffee ring with drips, a scatter of bread crumbs, a sticky orange sauce smear, a fuzzy green mold patch, a muddy shoe print, '
+    + `a spilled egg with a broken yolk, a dark soot smudge, a purple jam blob. Thick, opaque, a little glossy and gross but cute. ${SHEET}` },
+  'scrub-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, six icons in a neat grid of 3 columns and 2 rows: `
+    + 'a yellow kitchen sponge with a green scouring pad and soap suds on it; a blue spray bottle of cleaner; a fluffy white blob of soap foam with a few bubbles; '
+    + `a big four-pointed white and gold sparkle star; a yellow rubber glove giving a thumbs up; a brown clipboard with a checklist of green ticks and a pencil. ${SHEET}` },
+  'scrub-stamps': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI sheet, three round rubber-stamp grade badges side by side in one row, each tilted a few degrees, `
+    + 'a thick ring with small stars around a single big bold capital letter: a green one with the letter A, an amber-yellow one with the letter B, a red one with the letter C. '
+    + 'Chunky, glossy enamel badges with a darker edge line. No other text. Transparent background, no ground shadows, evenly spaced so that none touch.' },
 };
 
 async function gen(name, outdir) {
