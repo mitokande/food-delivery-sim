@@ -27,3 +27,9 @@ shares one style and one light.
   `d2` burnt crust, `d3` ketchup, `d4` mustard, `d5` coffee ring, `d6` crumbs, `d7` sauce, `d8` mold, `d9` shoe print,
   `d10` egg, `d11` soot, `d12` jam. One 3×2 sheet: `sponge`, `spray`, `foam`, `sparkle`, `glove`, `clipboard`. One row
   of grade badges: `a`, `b`, `c`.
+- `cook/*.webp`, `flyers/*.webp` and `faces/critic.webp` (the cook and flyers mini games): made on 2026-11-15 the same
+  way, the prompts in `tools/genart.mjs` (the `cook-*`, `flyers-*` and `face-critic` names), cut by
+  `tools/genart-mini.py`. `cook/stove` and `flyers/street` are one picture each (the backgrounds). One 4×3 sheet of
+  what's cooked, a column each, raw / done / burnt: `patty0`…`2`, `bun0`…`2`, `bacon0`…`2`, `onion0`…`2`. One 3×2
+  sheet: `spatula`, `bell`, `burger`, `steam`, `smoke`, `flame`. One 4×2 sheet of people: `p1`…`p6` (townspeople),
+  `v1`, `v2` (Victor's crew, in red). One 3×2 sheet: `flyer`, `hand`, `love`, `angry`, `truck`, `megaphone`.

@@ -3,7 +3,8 @@
 // stages are edits of the picture before them (images/edits), so they stay the same building.
 //   OPENAI_API_KEY=… node tools/genart.mjs <outdir> [name …]
 // Writes <outdir>/<name>.png (raw, 1536×1024 or 1024×1024); tools/genart-webp.py makes the small webp copies.
-// Also the art of Ferdi's scrub mini game (the scrub-* names; tools/genart-scrub.py cuts those into assets/ui4/scrub).
+// Also the art of Ferdi's mini games: the scrub-* names (tools/genart-scrub.py cuts those into assets/ui4/scrub), and
+// the cook-*, flyers-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers and faces/critic.webp).
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -101,6 +102,43 @@ export const ART = {
   'scrub-stamps': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI sheet, three round rubber-stamp grade badges side by side in one row, each tilted a few degrees, `
     + 'a thick ring with small stars around a single big bold capital letter: a green one with the letter A, an amber-yellow one with the letter B, a red one with the letter C. '
     + 'Chunky, glossy enamel badges with a darker edge line. No other text. Transparent background, no ground shadows, evenly spaced so that none touch.' },
+  // Ferdi's cook and flyers mini games: the stove and the street they're played on (portrait), sheets of what's cooked
+  // (raw, done, burnt), of the people walking by and of the tools, and the critic's face. tools/genart-mini.py cuts
+  // them into assets/ui4/cook, assets/ui4/flyers and assets/ui4/faces/critic.webp.
+  'cook-stove': { size: '1024x1536', prompt: `${UI4} A diner stove seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge with no border, portrait. `
+    + 'A brushed steel stove top with one big round black cast-iron skillet on a gas burner: the skillet is empty, with a thin shine of hot oil, and a ring of small blue flames shows round its rim. '
+    + 'The skillet sits a little below the middle of the picture and is about three quarters of the picture wide; its short handle points to the bottom-right corner. '
+    + 'Above the skillet there is a wide empty strip of clean steel. Only small props at the very edges, cut off by the frame: two red control knobs at the bottom-left corner, a pepper mill at the top-left corner. '
+    + 'No food, no text, no letters, no people, no hands.' },
+  'cook-food': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet of burger ingredients seen straight from above, in a neat grid of 4 columns and 3 rows. `
+    + 'Each column is one ingredient at three stages of cooking: top row raw, middle row perfectly cooked, bottom row burnt. '
+    + 'Column 1: a round thick beef burger patty (top: raw pink-red minced beef; middle: juicy golden-brown with grill marks; bottom: charred black and cracked). '
+    + 'Column 2: the two halves of a burger bun side by side, cut side up (top: pale soft bread; middle: golden toasted; bottom: burnt dark brown and black). '
+    + 'Column 3: three strips of bacon side by side (top: raw pink with white fat; middle: crisp golden red-brown; bottom: shrivelled and black). '
+    + 'Column 4: a small heap of sliced onion rings (top: raw white; middle: caramelised golden; bottom: burnt dark brown). '
+    + `The same shape and the same size down each column. ${SHEET}` },
+  'cook-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, six icons in a neat grid of 3 columns and 2 rows: `
+    + 'a steel kitchen spatula with a red handle; a silver service bell (an order-up desk bell); a finished cheeseburger on a white plate with a small paper flag pick in it; '
+    + `a fluffy white puff of steam; a dark grey puff of smoke with a few orange sparks; an orange and yellow cartoon flame. ${SHEET}` },
+  'face-critic': { size: '1024x1024', background: 'transparent', prompt: `${UI4} Character portrait for a game dialogue, head and shoulders, facing the viewer and turned a little to one side: `
+    + 'a snooty but lovable food critic, a thin middle-aged man with a long nose, a thin curled pencil moustache, slicked dark hair with a grey streak and a round gold monocle; '
+    + 'a burgundy velvet jacket, a cream shirt and a spotted bow tie; one eyebrow raised, lips pursed, holding up a silver fork. Big expressive animated-film face. '
+    + 'Transparent background, no text, no frame.' },
+  'flyers-street': { size: '1024x1536', prompt: `${UI4} A wide city pavement seen from high above at a steep angle (almost top-down), running from the top of the picture to the bottom and filling it edge to edge, portrait. `
+    + 'Pale warm stone paving slabs. Along the left edge: the bottoms of shop fronts with potted plants and a bench. Along the right edge: a kerb, a strip of asphalt road and a street lamp. '
+    + 'At the very bottom edge, cut off by the frame: the roof and the red and black striped serving awning of a food truck parked across the pavement. '
+    + 'At the very top edge, cut off by the frame: the orange and cream striped awning of a diner door with a doormat. '
+    + 'The large middle of the picture is empty pavement in soft afternoon light. No people, no text, no letters, no signs with writing.' },
+  'flyers-people': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: eight full-body cartoon townspeople in a neat grid of 4 columns and 2 rows, `
+    + 'each seen from the front and a little from above, in mid-stride walking toward the viewer, cheerful: '
+    + 'a young woman with headphones and a yellow jacket; an old man with a walking stick and a green cardigan; a businesswoman in a blue suit with a coffee cup; '
+    + 'a boy with a skateboard and a striped shirt; a mother in a purple coat carrying a shopping bag; a bearded man in a teal hoodie with a backpack; '
+    + 'and last, two workers of a rival burger truck, both in the same bright red cap, red polo shirt and black apron, with a smug grin: a tall thin one carrying a red megaphone, a short round one carrying a red paper bag. '
+    + `Big heads, short legs, the same height. ${SHEET}` },
+  'flyers-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, six icons in a neat grid of 3 columns and 2 rows: `
+    + 'a paper flyer, cream with an orange border, with a picture of a burger and a gold star on it and no writing; a hand holding a fanned stack of the same flyers; '
+    + 'a white thought bubble with a burger and a red heart in it; a red angry scribble cloud with a lightning bolt; '
+    + `a red and black food truck with a striped awning, seen from a three-quarter view; an orange megaphone. ${SHEET}` },
 };
 
 async function gen(name, outdir) {
