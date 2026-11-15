@@ -64,7 +64,7 @@ await shot('1b-rita');
 for (let i = 0; i < 8 && await ev('!!document.querySelector(".modal.talkm")'); i++) { await ev('document.querySelector(".modal.talkm").click()'); await wait(450); }
 check(await ev('!document.querySelector(".modal.talkm") && !game.paused && game.G.seen["g:hello"]'), 'taps take her through her lines and away');
 check(await until('!!document.querySelector(".pointer") && document.querySelector(".pointer").dataset.sel === ".quest"', 2000), 'an arrow points at the quest bar');
-await ev('game.ui.skipGuide()'); // (the rest of her lines would only be in the way)
+await ev('game.ui.skipGuide(); game.ui.guideOff = true'); // (the rest of her lines would only be in the way; nor the inspector's offer, till its turn)
 check(await ev('+document.querySelector(".famev").textContent.replace(/,/g, "") === game.S.fame(game.G) && game.S.fame(game.G) > 0'), 'the top bar shows the fame');
 
 // the building: labels on every room, the ruins, the hint
@@ -251,6 +251,57 @@ await page.click('.modal.eventscard [data-x="repel"]'); await wait(500);
 check(await ev('!game.G.event && game.G.evLog[0].kind === "threat" && game.G.evLog[0].paid > 0'), 'paid: the truck moves on');
 await ev('game.S.startEvent(game.G, "critic")');
 check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'a critic walks in with a tag over his head');
+// the mini game: the health inspector comes, the offer to scrub the kitchen first; the banner offers it too; rubbing
+// wipes the dirt away (the bar, its stars); the stars' card; the grade's card when he has looked
+await ev('(() => { const g = game.G; g.event = null; g.cust = g.cust.filter((c) => !c.vip); game.S.SCRUB.dur = 8; game.ui.guideOff = false; game.S.startEvent(g, "inspector"); })()');
+check(await until('!!document.querySelector(".modal.offer.in [data-x=go]")', 5000) && await ev('game.paused && document.querySelector(".modal.offer .rsay img").naturalWidth > 0'), 'the inspector comes: an offer to scrub the kitchen first, the restaurant waits');
+await shot('9-offer');
+await page.click('.modal.offer [data-x="no"]'); await wait(600);
+check(await ev('!game.paused && game.S.canScrub(game.G) && document.querySelector(".evbar").classList.contains("scrub") && /scrub/i.test(document.querySelector(".evbar small").textContent)'), '"Let him look": the game goes on, the banner still offers it');
+await ev('game.ui.guideOff = true');
+await page.click('.evbar');
+check(await until('!!document.querySelector(".modal.minim .mstage .msponge")', 8000) && await ev('game.paused'), 'a tap on the banner: the mini game, the restaurant waits');
+await wait(1300);
+{
+  const [L, T, W, H] = await ev('(() => { const r = document.querySelector(".mstage").getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()');
+  // (what's left of the stains, the bar, the stars lit: read while the game is still on screen)
+  const look = () => ev('(() => { const c = document.querySelector(".mstage .mstain"); if (!c) return null; const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i]; return { a, bar: parseFloat(document.querySelector(".mbar u").style.width) || 0, stars: document.querySelectorAll(".mbar i.on").length, won: !!document.querySelector(".mini.won") }; })()');
+  const first = await look(); let last = first;
+  await page.mouse.move(L + W * 0.1, T + H * 0.06); await page.mouse.down();
+  rub: for (let pass = 0, i = 0; pass < 3; pass++) {
+    for (let r = 0; r < 10; r++, i++) {
+      await page.mouse.move(L + W * (i % 2 ? 0.92 : 0.08), T + H * (0.06 + 0.88 * r / 9), { steps: 8 });
+      const now = await look();
+      if (!now) break rub;
+      last = now;
+      if (now.won) break rub;
+      if (pass === 0 && r === 5) await shot('9b-scrub');
+    }
+  }
+  await page.mouse.up();
+  check(first.a > 0 && last.a < first.a * 0.6 && last.bar >= 35 && last.stars >= 1, `rubbing wipes the stains away (${Math.round(100 - 100 * last.a / first.a)}% gone), the bar fills (${last.bar}%), ${last.stars} star${last.stars > 1 ? 's' : ''} lit`);
+}
+check(await until('!!document.querySelector(".modal.mres.in")', 15000), 'time is up: the card with the stars');
+await wait(900);
+const sc = await ev('({ clean: game.G.event?.clean, tier: game.S.scrubTier(game.G.event?.clean ?? 0), stars: document.querySelectorAll(".modal.mres .mstars .on").length, can: game.S.canScrub(game.G), paused: game.paused })');
+check(sc.clean >= 0.35 && sc.tier >= 1 && sc.stars === sc.tier && !sc.can && sc.paused, `the kitchen is ${Math.round(sc.clean * 100)}% clean: ${sc.tier} star${sc.tier > 1 ? 's' : ''}; once an inspection`);
+await shot('9c-stars');
+await page.click('.modal.mres [data-x="close"]'); await wait(400);
+check(await ev('!game.paused'), 'the game goes on: he takes his look');
+check(await until('!!document.querySelector(".modal.grade.in")', 90000), 'he has looked: the grade gets a card');
+await wait(900);
+const gr = await ev('({ log: game.G.evLog[0], src: document.querySelector(".modal.grade .gstamp img").getAttribute("src"), ok: document.querySelector(".modal.grade .gstamp img").naturalWidth > 0, text: document.querySelector(".modal.grade").innerText })');
+check(gr.log.kind === 'inspector' && gr.log.scrub === sc.tier && gr.ok && gr.src.endsWith(`/${gr.log.grade.toLowerCase()}.webp`) && (sc.tier < 2 || gr.log.grade !== 'C') && (!gr.log.cash || /\$/.test(gr.text)), `grade ${gr.log.grade} on its badge, what it pays`);
+await shot('9d-grade');
+await page.click('.modal.grade [data-x="close"]'); await wait(400);
+// what a scrub is worth (the same inspection, five ways: left alone, then cleaner and cleaner)
+const five = await ev(`(() => { const S = game.S, run = (clean) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip); S.startEvent(g, 'inspector'); const t = clean == null ? null : S.scrub(g, clean); for (let i = 0; i < 6000 && g.event; i++) S.tick(g, 0.1, 1); return { ...g.evLog[0], t, again: S.scrub(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
+{
+  const [no, t0, t1, t2, t3] = five, gi = (r) => 'ABC'.indexOf(r.grade);
+  check(five.every((r) => r.kind === 'inspector' && gi(r) >= 0 && r.again == null) && no.scrub === undefined && t0.t === 0 && t1.t === 1 && t2.t === 2 && t3.t === 3, `the inspection alone: grade ${no.grade}; the tiers 0…3`);
+  check(t0.grade === no.grade && t0.cash === no.cash && t1.grade === no.grade && t1.cash > no.cash, 'too little changes nothing; one star: a tip');
+  check(gi(t2) === Math.min(1, gi(no)) && t2.cash > t1.cash - 0.01 && gi(t3) === Math.max(0, gi(no) - 1) && t3.cash > t2.cash && (gi(no) > 0 || t3.mod.dur > no.mod.dur), `two stars: never a C (${t2.grade}); three: a grade better (${t3.grade})`);
+}
 // the courier bay: repair it, hire a courier; an order from the app is cooked, bagged, ridden out on a motor and paid
 await ev('(() => { const g = game.G; g.event = null; g.evNext = g.t + 9999; g.cash = Math.max(g.cash, 1e7); })()');
 // (the busy restaurant above may have done it already)

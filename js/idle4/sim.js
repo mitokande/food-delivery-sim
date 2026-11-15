@@ -816,8 +816,23 @@ function inspected(G, c, ev) {
   const [a, o] = readiness(G, 'kitchen');
   const seats = 2 * (nTables(G, 'dining') + nTables(G, 'terrace')), dirty = Object.keys(G.dirty).length;
   const score = 0.5 * (o ? a / o : 0) + 0.3 * (1 - Math.min(1, G.ema.food * 1.5)) + 0.2 * (1 - (seats ? dirty / seats : 0));
-  const grade = score >= 0.7 ? 'A' : score >= 0.45 ? 'B' : 'C';
-  endEvent(G, e, { ok: grade !== 'C', grade, cash: Math.round(avgBill(G) * { A: 12, B: 5, C: 0 }[grade]), mod: grade === 'A' ? { k: 'walk', x: 1.2, dur: 180, why: 'grade' } : null }, ev);
+  // (scrubbed before he looked: spotless is a grade better, clean is never a C; an A that shines pays half as much again)
+  const tier = e.clean == null ? null : scrubTier(e.clean), base = score >= 0.7 ? 0 : score >= 0.45 ? 1 : 2;
+  const gi = tier === 3 ? Math.max(0, base - 1) : tier === 2 ? Math.min(1, base) : base, grade = 'ABC'[gi];
+  const shine = tier === 3 && base === 0, bills = { A: 12, B: 5, C: 0 }[grade] * (shine ? 1.5 : 1) + (tier ? SCRUB.tip[tier] : 0);
+  const res = { ok: grade !== 'C', grade, cash: Math.round(avgBill(G) * bills), mod: grade === 'A' ? { k: 'walk', x: 1.2, dur: shine ? 300 : 180, why: 'grade' } : null };
+  if (tier != null) { res.scrub = tier; res.up = gi < base || shine; }
+  endEvent(G, e, res, ev);
+}
+// The mini game: the kitchen scrubbed before the inspector looks. `clean` is how much of the dirt went (0..1), and
+// the tiers are its stars: 1 a tip for the effort, 2 never a C, 3 a grade better. Not playing changes nothing.
+export const SCRUB = { dur: 12, tiers: [0.35, 0.65, 0.9], tip: [0, 2, 4, 8] }; // (tip: in bills)
+export const scrubTier = (clean) => SCRUB.tiers.filter((x) => clean >= x).length;
+export const canScrub = (G) => G.event?.kind === 'inspector' && G.event.clean == null && G.cust.some((c) => c.id === G.event.cust);
+export function scrub(G, clean) {
+  if (!canScrub(G)) return null;
+  G.event.clean = Math.max(0, Math.min(1, clean));
+  return scrubTier(G.event.clean);
 }
 // have Victor's truck moved on (it costs) → true
 export function repel(G, ev = []) {

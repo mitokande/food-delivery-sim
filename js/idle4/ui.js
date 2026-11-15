@@ -8,6 +8,8 @@
 import * as S from './sim.js';
 import * as Q from './quests.js';
 import { app } from '../native.js';
+import { buzz } from '../haptics.js';
+import * as Mini from './mini.js';
 
 const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 const ART = (n) => `assets/story/${n}.webp`;
@@ -267,11 +269,12 @@ export function createUI(game) {
     if (e.kind === 'threat') { const n = Math.min(e.need, g.stats.served - e.base); return [`Serve ${e.need} before it gets here: <b>${n}/${e.need}</b>`, n / e.need, Math.max(0, e.t0 + e.dur - g.t)]; }
     const c = g.cust.find((x) => x.id === e.cust);
     if (e.kind === 'van') return [`${S.EVENTS.van} tourists, all hungry at once`, Math.min(1, (g.t - e.t0) / e.dur), null];
+    if (e.kind === 'inspector' && S.canScrub(g)) return ['<b>Tap to scrub the kitchen</b> before he looks!', c?.st === 'inspect' ? Math.min(1, (g.t - c.t0) / c.dur) : 0, null];
     if (e.kind === 'inspector') return [c?.st === 'inspect' ? 'Looking round the kitchen…' : 'On the way to the kitchen', c?.st === 'inspect' ? Math.min(1, (g.t - c.t0) / c.dur) : 0, null];
     const st = !c ? '' : c.st === 'wait' ? `Waiting for the food: ${Math.round(g.t - c.t0)}s` : c.st === 'eat' ? 'Eating…' : c.st === 'bench' ? 'Waiting for a table!' : c.st === 'go' && !c.seat ? 'At the door' : '';
     return [`${e.kind === 'critic' ? 'Serve them fast: the stars count the seconds' : `Pays ${S.STAR_PAYS}× and tips big; fans follow`}${st ? ` · ${st}` : ''}`, c?.st === 'wait' ? Math.min(1, (g.t - c.t0) / 45) : 0, null];
   }
-  let evKey = '';
+  let evKey = '', offered = -1;
   function updateEvents(g) {
     // the clock
     const h = S.hourOf(g), rush = S.rushOf(g), night = h < 6 || h >= 20.5;
@@ -287,10 +290,12 @@ export function createUI(game) {
     // the banner: the event on now, else a boost or a slump
     const bar = $('.evbar', hud), e = g.event, mod = g.mods.find((m) => g.t < m.until);
     if (e) {
-      const [line, f, left] = evLine(g, e), d = EV[e.kind];
+      const [line, f, left] = evLine(g, e), d = EV[e.kind], can = S.canScrub(g);
       const k = `${e.id}|${line}|${left == null ? '' : Math.ceil(left)}`;
-      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls}`; bar.innerHTML = `${d.art ? `<span class="ei">${UI(d.art)}</span>` : `<img class="eface" src="${FACE('victor')}" alt="">`}<span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
+      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls} ${can ? 'scrub' : ''}`; bar.innerHTML = `${d.art ? `<span class="ei">${UI(can ? 'scrub/sponge' : d.art)}</span>` : `<img class="eface" src="${FACE('victor')}" alt="">`}<span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
       bar.hidden = !!room;
+      // (the inspector, once: scrub first?)
+      if (can && offered !== e.id && !talking && !room && !upQ.length && !modals.children.length && !api.guideOff) { offered = e.id; scrubOffer(); }
     } else if (mod) {
       const k = `m|${mod.why}|${Math.ceil(mod.until - g.t)}`;
       if (k !== evKey) { evKey = k; bar.className = `evbar mod ${mod.x >= 1 ? 'up' : 'down'}`; bar.innerHTML = `<span class="ei">${UI('up', mod.x >= 1 ? '' : 'down')}</span><span class="et"><b>${MOD[mod.why] || 'Boost'} <i>${mmss(mod.until - g.t)}</i></b><small>${pctMod(mod.x)}</small></span>`; }
@@ -307,7 +312,8 @@ export function createUI(game) {
     if (e) {
       const [line] = evLine(g, e), d = EV[e.kind];
       now = `<div class="evcard ${d.cls}"><b>${d.icon} ${d.title}</b><small>${line}</small>
-        ${e.kind === 'threat' ? `<button class="btn ${g.cash >= e.cost ? 'gold' : ''}" data-x="repel" ${g.cash >= e.cost ? '' : 'disabled'}>Pay to move it on · ${M(e.cost)}</button>` : ''}</div>`;
+        ${e.kind === 'threat' ? `<button class="btn ${g.cash >= e.cost ? 'gold' : ''}" data-x="repel" ${g.cash >= e.cost ? '' : 'disabled'}>Pay to move it on · ${M(e.cost)}</button>` : ''}
+        ${S.canScrub(g) ? `<button class="btn gold" data-x="scrub">${UI('scrub/sponge')} Scrub the kitchen</button>` : ''}</div>`;
     }
     const mods = g.mods.filter((m) => g.t < m.until).map((m) => `<li class="${m.x >= 1 ? 'up' : 'down'}">${MOD[m.why] || 'Boost'}: ${pctMod(m.x)} · ${mmss(m.until - g.t)}</li>`).join('');
     const RES = (r) => r.kind === 'threat' ? (r.paid ? `Victor's truck moved on (paid ${M(r.paid)})` : r.ok ? `Victor's truck turned round${r.cash ? ` · +${M(r.cash)}` : ''}` : 'Victor\'s truck parked outside')
@@ -322,6 +328,7 @@ export function createUI(game) {
       <button class="btn big" data-x="close">Close</button>`, { cls: 'eventscard', dismiss: true });
     m.card.addEventListener('click', (ev) => {
       if (ev.target.closest('[data-x="repel"]')) { m.close(); game.repel(); }
+      else if (ev.target.closest('[data-x="scrub"]')) { m.close(); game.scrub(); }
       else if (ev.target.closest('[data-x="close"]')) m.close();
     });
     sfx('ui-open', { vol: 0.5 });
@@ -335,11 +342,68 @@ export function createUI(game) {
       return;
     }
     const r = x.res;
+    if (x.e.kind === 'inspector' && r.scrub != null) { gradeCard(r); return; } // (scrubbed for it: the grade gets a card)
     const t = x.e.kind === 'threat' ? (r.paid ? 'The truck moved on' : r.ok ? `Victor's truck turned round! +${M(r.cash)}` : 'Victor\'s truck parked across the street…')
       : x.e.kind === 'critic' ? `The review: ${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}${r.cash ? ` +${M(r.cash)}` : ''}`
       : x.e.kind === 'star' ? (r.ok ? 'The celebrity loved it: fans are on their way!' : 'The celebrity walked out…')
       : x.e.kind === 'inspector' ? `Inspection: grade ${r.grade}${r.cash ? ` +${M(r.cash)}` : ''}` : 'The tourists are back on their van';
     if (x.e.kind !== 'van') toast(`<b class="evi">${d.icon}</b> ${t}`, r.ok ? 'good' : 'bad');
+  }
+
+  // ---------- the mini games ----------
+  // Scrubbing the kitchen before the inspector looks. The offer (once an inspection, when nothing else is open; the
+  // banner and the events card offer it too), the window round the game (mini.js), the stars, and the grade's card.
+  const STARS = (n) => `<div class="mstars">${[1, 2, 3].map((i) => `<span class="${i <= n ? 'on' : ''}" style="--i:${i}">${UI('star')}</span>`).join('')}</div>`;
+  const TIER = [
+    ['Still filthy…', 'Too little to change his mind.'],
+    ['Could be worse', 'He leaves a tip for the effort.'],
+    ['Nice and clean', 'A clean kitchen never gets a C.'],
+    ['Spotless!', 'A spotless kitchen is graded one better.'],
+  ];
+  function scrubOffer() {
+    const m = modal(`<h2>${UI('scrub/clipboard')} Inspection!</h2>
+      <div class="rsay"><img src="${FACE('inspector')}" alt="The inspector"><p>I'll take a look round your kitchen. I grade what I see: <b>A</b>, <b>B</b> or <b>C</b>.</p></div>
+      <p class="small">Quick, scrub it before he gets there! ${S.SCRUB.dur} seconds: the cleaner, the better the grade.</p>
+      <div class="mtiers">${TIER.slice(1).map(([, t], i) => `<span>${STARS(i + 1)}<small>${['A tip', 'Never a C', 'A grade better'][i]}</small></span>`).join('')}</div>
+      <button class="btn gold big" data-x="go">${UI('scrub/sponge')} Scrub!</button>
+      <button class="btn ghost" data-x="no">Let him look</button>`, { cls: 'offer', pause: true });
+    m.card.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-x="go"]')) { m.close(); game.scrub(); }
+      else if (ev.target.closest('[data-x="no"]')) { m.close(); sfx('ui-back', { vol: 0.4 }); }
+    });
+    sfx('ui-open', { vol: 0.5 });
+  }
+  // the game in its window: → how clean the kitchen got (0..1), or null if it was left before it began
+  function scrub() {
+    const m = modal(`<h2>${UI('scrub/sponge')} Scrub time!</h2><div class="mhost"></div>`, { cls: 'minim', pause: true });
+    const frame = Mini.play($('.mhost', m.card), Mini.scrubGame({ sfx, buzz }), { dur: S.SCRUB.dur, tiers: S.SCRUB.tiers, sfx, buzz });
+    const x = document.createElement('button'); x.className = 'xr'; x.type = 'button'; x.setAttribute('aria-label', 'Stop'); x.innerHTML = X;
+    x.addEventListener('click', () => { frame.leave(); sfx('ui-back', { vol: 0.4 }); }); m.card.append(x);
+    return frame.done.then((clean) => { m.close(); return clean; });
+  }
+  // the stars it was worth (a tier of S.SCRUB; `practice`: nobody was looking)
+  function scrubbed(tier, clean, practice) {
+    const [title, what] = TIER[tier];
+    const m = modal(`<h2>${UI('scrub/sponge')} ${title}</h2>
+      ${STARS(tier)}
+      <p class="mpct"><b>${Math.round(clean * 100)}%</b> clean</p>
+      <p class="small">${practice ? 'Just practice: the inspector wasn\'t looking.' : `${what} Now he takes his look…`}</p>
+      <button class="btn big ${tier ? 'gold' : ''}" data-x="close">${practice ? 'Done' : 'Let him in'}</button>`, { cls: 'mres', pause: true });
+    m.card.addEventListener('click', (ev) => { if (ev.target.closest('[data-x="close"]')) m.close(); });
+    [1, 2, 3].forEach((i) => { if (i <= tier) setTimeout(() => sfx('qte-good', { vol: 0.5 }), 250 * i); });
+    if (!tier) sfx('order-late', { vol: 0.4 });
+  }
+  // the grade on the door, after a scrub
+  function gradeCard(r) {
+    const m = modal(`<h2>${UI('scrub/clipboard')} Inspection</h2>
+      <div class="gstamp g${r.grade}">${UI(`scrub/${r.grade.toLowerCase()}`)}</div>
+      <p class="gtitle">${{ A: 'Grade A on the door!', B: 'Grade B: it will do', C: 'Grade C…' }[r.grade]}</p>
+      ${r.up ? `<p class="gup">${STARS(r.scrub)}<span>${r.grade === 'A' && r.mod?.dur > 180 ? 'A spotless A: a bigger bonus, a longer boost' : 'Your scrubbing: a grade better!'}</span></p>` : ''}
+      <div class="gwin">${r.cash ? `<span>${UI('cash')}<b>+${M(r.cash)}</b></span>` : ''}${r.mod ? `<span>${UI('up')}<b>${pctMod(r.mod.x).replace(' walk-ins', '')}</b><small>walk-ins<br>${Math.round(r.mod.dur / 60)} min</small></span>` : ''}</div>
+      ${r.cash || r.mod ? '' : '<p class="small">Nothing this time. A cleaner, readier kitchen does better.</p>'}
+      <button class="btn big ${r.ok ? 'gold' : ''}" data-x="close">${r.cash ? 'Collect' : 'OK'}</button>`, { cls: `grade ${r.ok ? 'ok' : 'no'}`, pause: true });
+    m.card.addEventListener('click', (ev) => { if (ev.target.closest('[data-x="close"]')) { m.close(); if (r.cash) sfx('ui-coins', { vol: 0.6 }); } });
+    setTimeout(() => { sfx(r.ok ? 'ui-levelup' : 'order-late', { vol: 0.6 }); buzz(r.ok ? 35 : 15); }, 380);
   }
 
   // ---------- advice: what holds the restaurant back now → [room, text] ----------
@@ -726,7 +790,7 @@ export function createUI(game) {
     else if (a === 'events') eventsCard();
     else if (a === 'managers') managersCard();
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
-    else if (a === 'evfocus') { if (!game.world?.focusEvent()) eventsCard(); }
+    else if (a === 'evfocus') { if (S.canScrub(G())) game.scrub(); else if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'locked') {
       const f = FEATURES.find((x) => x.f === el.dataset.f);
       toast(`${UI('lock')} ${f.name}: ${S.restaurantLv(G()) < f.lv ? `opens at restaurant level ${f.lv}` : 'coming in a later update'}`);
@@ -740,7 +804,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, eventsCard, eventNote, scrub, scrubbed, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${UI('quest')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${IT({ cook: 'pan', waiter: 'tray', courier: 'helmet' }[s.role] || 'register')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },

@@ -21,3 +21,9 @@ shares one style and one light.
   `faces/guide.webp` (Rita) was cut again from its sheet at 384 px for her dialogue box.
 - `mood/m0`…`m4` (furious → delighted), `thumbup`, `thumbdown`, `star`, `daily`: one 3×3 sheet, made the same way on
   2026-11-13, for the reviews, each day's mood and the daily gift.
+- `scrub/*.webp` (the scrub mini game): made on 2026-11-15 with OpenAI's image API (model `gpt-image-2.6-flare`, quality
+  medium), the prompts in `tools/genart.mjs` (the `scrub-*` names), cut by `tools/genart-scrub.py`. Four surfaces seen
+  from above, one picture each: `counter`, `grill`, `floor`, `tiles`. One 4×3 sheet of stains, in order: `d1` grease,
+  `d2` burnt crust, `d3` ketchup, `d4` mustard, `d5` coffee ring, `d6` crumbs, `d7` sauce, `d8` mold, `d9` shoe print,
+  `d10` egg, `d11` soot, `d12` jam. One 3×2 sheet: `sponge`, `spray`, `foam`, `sparkle`, `glove`, `clipboard`. One row
+  of grade badges: `a`, `b`, `c`.

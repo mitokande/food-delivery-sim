@@ -63,6 +63,7 @@ applyVolumes();
 addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); applyVolumes(); audio.loop('music', 'music-hub'); } }, { capture: true });
 
 // ---------------------------------------------------------------- the game object (what ui.js and world.js call)
+let scrubbing = false;
 const game = {
   G, S, audio, save, canvas, paused: false,
   act(a, room, id) {
@@ -118,6 +119,17 @@ const game = {
     if (!S.repel(G, ev)) { audio.play('ui-error'); ui.toast('Not enough cash', 'bad'); return; }
     audio.play('ui-purchase'); buzz(20);
     for (const e of ev) ui.eventNote(e);
+    save(); ui.live();
+  },
+  // the mini game: scrub the kitchen before the inspector looks (`practice`: with nobody looking, for a try)
+  async scrub(practice = false) {
+    if (scrubbing || (!practice && !S.canScrub(G))) return;
+    scrubbing = true; ui.closeRoom();
+    const clean = await ui.scrub();
+    scrubbing = false;
+    if (clean == null) return;
+    const tier = practice ? null : S.scrub(G, clean); // (null: he was gone before it was over)
+    ui.scrubbed(tier ?? S.scrubTier(clean), clean, tier == null);
     save(); ui.live();
   },
   openRoom(room) {
@@ -199,3 +211,7 @@ window.game = Object.assign(game, { renderer, world, catchUp, speed: (v) => (v =
 window.ready = true;
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }
 else if (gone > 2) catchUp(gone);
+// (for a try: ?mini=scrub plays the mini game with nobody looking, ?ev=inspector sends the inspector round now)
+const idle = (f) => (document.querySelector('#modals').children.length ? setTimeout(() => idle(f), 400) : f());
+if (q.get('mini') === 'scrub') idle(() => game.scrub(true));
+if (['threat', 'critic', 'star', 'inspector', 'van'].includes(q.get('ev'))) idle(() => { if (G.event) return; const ev = []; S.startEvent(G, q.get('ev'), ev); for (const e of ev) { world.event(e); ui.eventNote(e); } });

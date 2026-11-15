@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma oyunu (§14.11), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1367,3 +1367,52 @@ başparmaklar, yıldız ve günlük hediye takvimi tek bir sayfadan üretildi (1
   kamyonunu da kovamadığı için o görevde takıldı; bu rastlantıya bağlı ve faz 6'dan önce de vardı.
 - **Test.** Tarayıcı testi 108 kontrol. Yeni kontroller: yorumlar ve memnuniyet; Reviews sekmesi; okundu sayılması; günler
   kartı; yeni günün postayla gelen ödülü; günlük hediye kartı, alınması ve aynı gün tekrar alınamaması.
+
+### 14.11 Mini oyunlar: mutfak ovma (15 Kasım 2026)
+
+Kullanıcı yeni bir konu açtı: mini oyunlar. İlk önerisi, sağlık müfettişi geldiğinde oynanan bir temizlik oyunuydu.
+Beyin fırtınasından B yolunu seçti (yakın plan ovma: kirli bir yüzeyi parmakla silmek) ve görseller için OpenAI
+anahtarını verdi. Dal `idle-minigames`.
+
+- **Akış.** Müfettiş kapıdan girince "Inspection!" kartı açılır ve restoran durur.
+  - "Scrub!" mini oyunu başlatır. "Let him look" kartı kapatır; o zaman olay bandı süngere döner ve "Tap to scrub the
+    kitchen" yazar. Banda ya da Events kartındaki düğmeye dokunmak da oyunu açar.
+  - Müfettiş notunu verene kadar oynanabilir (`canScrub`), bir denetimde bir kez.
+  - Oyun bitince yıldızlı sonuç kartı gelir ("NN% clean"). Müfettiş bakışını bitirince eski bildirim yerine not kartı
+    çıkar: A, B ya da C damgası, kazanılan para ve yürüyen müşteri artışı.
+  - Oynamayan oyuncu için hiçbir şey değişmez: not, para ve bildirim eskisi gibidir.
+- **Oyun (`js/idle4/mini.js` `scrubGame`).** 2:3 oranında boyalı bir yüzey (tezgâh, ızgara, yer ya da fayans; rastgele).
+  Üstünde bir kir tabakası ve 8 leke vardır.
+  - Parmak süngeri sürükler. Tabaka fırçanın geçtiği yerde silinir; lekeler birkaç geçişte çıkar ve çıkarken köpük ve
+    pırıltı bırakır.
+  - Temizlik oranı: tabaka %25, lekeler %75 (`FILM_W`). Üstteki çubuk oranı ve üç yıldızın eşiklerini gösterir.
+  - Süre 12 saniye. Son 3 saniyede saat kırmızı yanar. %100 olursa oyun erken biter.
+  - Fırça ayarları `BRUSH` içinde: yarıçap sahnenin %12'si, bir geçişte tabakadan ve lekeden ne kadar sildiği.
+- **Kurallar (`sim.js` `SCRUB`, `scrub`, `scrubTier`, `canScrub`).** Eşikler %35, %65 ve %90.
+
+  | Yıldız | Temizlik | Etkisi | Bahşiş |
+  |---|---|---|---|
+  | 0 | %35'in altı | yok | yok |
+  | 1 | %35 | yok | 2 hesap |
+  | 2 | %65 | not C olamaz | 4 hesap |
+  | 3 | %90 | not bir kademe yükselir | 8 hesap |
+
+  - Not zaten A ise 3 yıldız "pırıl pırıl A" verir: ödül 1,5 katı, yürüyen müşteri artışı 180 yerine 300 saniye.
+  - Bahşiş, o anki ortalama hesap üzerinden nota eklenen paradır.
+  - Müfettiş oyun bitmeden giderse sonuç sayılmaz, kart "Just practice" der.
+- **Ortak çerçeve (`mini.js` `play`).** Sonraki mini oyunlar için: saat, ilerleme çubuğu, yıldızlar, "Ready?" geri
+  sayımı ve bitiş. Bir oyun `{ hint, go, won, setup(stage), start(), tick(dt), score(), over(), stop() }` verir, çerçeve 0–1 arası
+  bir puan döndürür. Mini oyun
+  açıkken restoran durur.
+- **Görseller (`assets/ui4/scrub/`, 25 dosya).** OpenAI `gpt-image-2.6-flare` ile 7 görsel üretildi: dört yüzey, bir leke
+  sayfası (12 leke), bir alet sayfası (sünger, sprey, köpük, pırıltı, eldiven, pano) ve A/B/C damgaları.
+  - İstemler `tools/genart.mjs` içinde (`scrub-*`). Sayfaları `python3 tools/genart-scrub.py <ham klasör>` keser.
+  - Anahtar depoya ve belleğe yazılmadı.
+- **Denemek için.** `idle4.html?mini=scrub` oyunu kimse bakmadan açar (alıştırma, sonuç sayılmaz).
+  `idle4.html?ev=inspector` müfettişi hemen yollar; `?ev=` öbür olayları da kabul eder (`threat`, `critic`, `star`,
+  `van`).
+- **Denge.** Bot oynamadığı için bot dengesi değişmedi. Zorluk gerçek parmakla henüz denenmedi: başsız tarayıcıdaki
+  zikzak %67–75'e (2 yıldız) ulaştı. Ayar yerleri: `SCRUB` (süre, eşikler, bahşiş), `BRUSH` ve `stains`.
+- **Test.** Tarayıcı testi 120 kontrol. Yeni kontroller: teklif kartı ve duran restoran; süngerli bant; banttan açılan
+  oyun; ovmanın lekeleri silmesi, çubuğu ve yıldızları doldurması; yıldız kartı; not kartı; beş temizlik değeri için
+  not, para ve artış kuralları. Otomatik kartlar test boyunca `game.ui.guideOff` ile kapalıdır.
