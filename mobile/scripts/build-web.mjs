@@ -25,7 +25,7 @@ const PAGES = {
 };
 const PAGE = process.env.APP_PAGE || 'idle3.html';
 if (!PAGES[PAGE]) { console.error(`build-web: APP_PAGE must be one of ${Object.keys(PAGES).join(', ')}`); process.exit(1); }
-const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'assets/story'];
+const GAME = ['css', 'js', 'assets/audio', 'assets/icons', 'assets/models', 'assets/story', 'assets/ui4'];
 // the site's other games (the courier game's page, the earlier idle prototypes): not in the apps. The courier game's
 // modules stay, both idle games are built on them (the city, the sky, the audio, the bikes)
 // (the balance labs and playtest bars are tools for the web)

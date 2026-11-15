@@ -17,16 +17,9 @@ window.__started = true;
 const q = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 let SPEED = Math.max(0.25, Math.min(20, +(q.get('speed') || 1)));
-// trying another size or font for the interface (?ui=1&font=lilita): the CSS variables in idle4.css
-const FONTS = { lilita: ["'Lilita One'", 400, 'Lilita+One'], baloo: ["'Baloo 2'", 800, 'Baloo+2:wght@800'], fredoka: ["'Fredoka'", 700], nunito: ["'Nunito'", 900, 'Nunito:wght@900'],
-  rubik: ["'Rubik'", 800, 'Rubik:wght@800'], titan: ["'Titan One'", 400, 'Titan+One'], luckiest: ["'Luckiest Guy'", 400, 'Luckiest+Guy'], bungee: ["'Bungee'", 400, 'Bungee'] };
+// trying another size for the interface (?ui=1): the CSS variable in idle4.css. (The fonts tried for it came from
+// Google Fonts, which the store apps can't load: the pick, Rubik, ships with the game.)
 if (q.has('ui')) document.documentElement.style.setProperty('--ui', String(Math.max(0.5, Math.min(1.3, +q.get('ui') || 1))));
-const font = FONTS[q.get('font')];
-if (font) {
-  const r = document.documentElement.style;
-  r.setProperty('--display', `${font[0]}, 'Fredoka', system-ui, sans-serif`); r.setProperty('--dw', String(font[1]));
-  if (font[2]) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?family=${font[2]}&display=swap`; document.head.append(l); }
-}
 
 // ---------------------------------------------------------------- the save (its own key)
 await restore(S.KEY);
