@@ -1469,11 +1469,38 @@ aldı: eleştirmen (zamanlama) ve Victor'un kamyonu (dokunma). Dal `idle-minigam
   - İstemler `tools/genart.mjs` içinde (`cook-*`, `flyers-*`, `face-critic`). Sayfaları
     `python3 tools/genart-mini.py <ham klasör>` keser; kesim çizgisini resimler arasındaki boşluktan seçer.
   - Anahtar depoya ve belleğe yazılmadı.
+- **Tabak pişirmenin sesleri (gerçek kayıtlar).** Kullanıcı istedi: "realistic cooking sesleri kullanalım internette
+  tarayıp, sizzle sesi özellikle". Yedi ses, hepsi Freesound'dan CC0 kayıt; `tools/audio/recipes.py` sonundaki
+  "COOKING" bölümü keser ve `assets/audio/cook-*.mp3` olarak yazar (toplam 194 KB).
+
+  | Ses | Ne zaman | Kaynak (Freesound) |
+  |---|---|---|
+  | `cook-sizzle` (6 sn döngü) | oyun boyunca; ibreyle yükselir | #235537 "frying steak", simosco |
+  | `cook-drop` | tavaya bir şey girince | #45579 "pan_hiss", burriss |
+  | `cook-flip` | "Flip!" adımında | #546452 spatula (miwilson) + #45579 |
+  | `cook-take` | spatulayla alınınca | #546452 |
+  | `cook-burnt` | yanınca (alev parlaması) | #587050 "Sizzling Pan", AntoineRomo |
+  | `cook-ignite` | "Ready?" sırasında ocak yanar | #262582, Squidocto |
+  | `cook-bell` | tabak çıkınca servis zili | #221515, AlaskaRobotics |
+
+  - Cızırtı tek bir döngüdür ve oyun onu yönetir (`mini.js` `SIZZLE`): çiğken alçak, yeşile yaklaştıkça yükselir,
+    yanarken daha da yükselir ve tizleşir. Malzemeye göre de değişir (`COOK` içindeki `siz`: ses ve perde; ekmek
+    kısık ve tiz, pastırma en gürültülü). Alınınca kısılır; çevrilecek köfte tavada kaldığı için arada duyulmaya
+    devam eder.
+  - "Perfect!" ve "Good!" zili (`qte-good`) kısık olarak kaldı; adım başındaki `hop` ve `ui-tap` kalktı.
+  - `js/audio.js` iki yeni işlev verir: `voice(ad, { vol, rate })` yönetilebilen bir döngü başlatır (`set`, `stop`),
+    `warm(...adlar)` sesleri önceden yükler. Oyun bunları `ui.js` üzerinden `loop` ve `warm` olarak alır.
+  - Lisans her sesin kendi sayfasında doğrulandı (`tools/audio/fetch.py`); eski 33 kaynak da yeniden doğrulandı.
+    Krediler `assets/audio/CREDITS-audio.md` içinde. Yeniden üretmek için: `python3 tools/audio/fetch.py get`, sonra
+    `python3 tools/audio/build.py cook-sizzle cook-drop …`.
+  - Sesleri dinleyemedim: parçaları ses düzeyi ölçümleri ve spektrogramlarla seçtim. Kulakla onay kullanıcıda.
+    Ayar yerleri: `SIZZLE` (düzeyler ve perde), `COOK[].siz`, `take()` içindeki `vol` değerleri, tarifteki `gain`.
 - **Denemek için.** `idle4.html?mini=cook` ve `?mini=flyers` alıştırma açar (sonuç sayılmaz). `?ev=critic` ve
   `?ev=threat` olayı hemen başlatır.
 - **Denge.** Bot oynamadığı için bot dengesi değişmedi. Zorluk gerçek parmakla henüz denenmedi. Ayar yerleri:
   `MINI` (süre, eşikler, bahşiş, pay), `COOK` (adım süresi `t`, yeşilin yarı genişliği `hw`), `DONE` (sarı ortanın
   payı), `WALK` (şeritler, geçiş süresi, yanlış dokunuşun cezası) ve `flyersGame` içindeki kişi sayıları.
-- **Test.** Tarayıcı testi 135 kontrol. Yeni kontroller: kamyonun bandındaki oyun çağrısı, sokak, yayalara dokunuş
+- **Test.** Tarayıcı testi 137 kontrol (ikisi tabak pişirmenin sesleri: cızırtı döngüsünün ibreyle yönetilmesi,
+  yedi kaydın çalınması ve çözülmesi). Bu turun öbür yeni kontrolleri: kamyonun bandındaki oyun çağrısı, sokak, yayalara dokunuş
   (biri bilerek kırmızılıya), sayılan müşteriler; eleştirmenin teklif kartı, ocak, beş şeyin yeşilde alınması, yorum
   kartı; eleştirmen ve kamyon için beş puan değerinde kurallar. Test oyunları `game.ui.playing.peek()` ile oynar.

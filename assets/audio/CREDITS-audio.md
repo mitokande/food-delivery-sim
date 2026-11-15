@@ -3,7 +3,7 @@
 Everything in `assets/audio/` is either **CC0 1.0 (public domain dedication)** material from the sources below, or sounds
 **synthesised in this repository** (`tools/audio/synth.py`, `tools/audio/recipes.py`, released CC0 as well).
 No attribution is required; credit is given here anyway. The CC0 licence of every downloaded sound was verified on its own
-source page by `tools/audio/fetch.py` (build of 2026-10-20). Freesound items are the site's HQ preview
+source page by `tools/audio/fetch.py` (build of 2026-11-15). Freesound items are the site's HQ preview
 (128 kbps MP3 decoded and re-encoded) because original downloads need a login; Kenney packs and OpenGameArt files are the originals.
 
 Output format: MP3 (LAME via ffmpeg, 44.1 kHz, gapless header). One-shots are mono 96 kbps, engines mono 96 kbps, ambience and music stereo 128 kbps.
@@ -65,6 +65,13 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 | `bag-rustle.mp3` | [Plastic bags rustling.mp3](https://freesound.org/people/Caitlin_100/sounds/365520/) (Freesound #365520; 1.1 s of crinkling) | Caitlin_100 | CC0 1.0 | picked the most active 1.1 s of plastic-bag rustling, fades in/out (food bag handover). |
 | `order-complete.mp3` | synthesised (synth.py, order_complete) | generated in this repo | own work, released CC0 | synthesised: upbeat G-major marimba run (G4 B4 D5 G5) into a bell chord. |
 | `order-late.mp3` | [wah wah sad trombone.wav](https://freesound.org/people/kirbydx/sounds/175409/) (Freesound #175409; four wah notes, tightened) | kirbydx | CC0 1.0 | cut the four 'wah-wah-wah-waaah' notes of a muted-trombone recording, trimmed each note to its sustain, butted them closer together and shortened the last note (about 2.7 s total). |
+| `cook-sizzle.mp3` | [frying steak.wav](https://freesound.org/people/simosco/sounds/235537/) (Freesound #235537; steadiest 6 s of the first 13 s) | simosco | CC0 1.0 | picked the steadiest 6 s of a steak frying in a pan, high-passed at 120 Hz, cross-faded a 1 s pre-roll (equal-power) for a seamless loop; mono (the game sets its level and pitch). |
+| `cook-drop.mp3` | [pan_hiss.wav](https://freesound.org/people/burriss/sounds/45579/) (Freesound #45579; first hiss, 0.05-1.7 s) | burriss | CC0 1.0 | cut the first hiss of something landing in a hot pan, long fade-out. |
+| `cook-flip.mp3` | [Plastic Spatula on Non Stick pan.wav](https://freesound.org/people/miwilson/sounds/546452/) (Freesound #546452; one stroke, 1.15-1.5 s)<br>[pan_hiss.wav](https://freesound.org/people/burriss/sounds/45579/) (Freesound #45579; second hiss, 6.65-8.6 s) | miwilson, burriss | CC0 1.0 | one stroke of a spatula across the pan, then 0.14 s later the longer second hiss (the other side landing), long fade-out. |
+| `cook-take.mp3` | [Plastic Spatula on Non Stick pan.wav](https://freesound.org/people/miwilson/sounds/546452/) (Freesound #546452; one stroke, 4.85-5.3 s) | miwilson | CC0 1.0 | cut one stroke of a spatula across a pan, short fade-out. |
+| `cook-burnt.mp3` | [Sizzling Pan](https://freesound.org/people/AntoineRomo/sounds/587050/) (Freesound #587050; the flare-up, 2.1-3.7 s) | AntoineRomo | CC0 1.0 | cut the flare-up of a very hot pan (1.6 s), low-passed at 9 kHz, fades in and out. |
+| `cook-ignite.mp3` | [electric-gas-stove-ignite.wav](https://freesound.org/people/Squidocto/sounds/262582/) (Freesound #262582; 0.62-2.3 s) | Squidocto | CC0 1.0 | kept the last clicks of the igniter and the burner catching, fade-out. |
+| `cook-bell.mp3` | [service bell ring](https://freesound.org/people/AlaskaRobotics/sounds/221515/) (Freesound #221515; the ring, 0.15-2.8 s) | AlaskaRobotics | CC0 1.0 | kept the ring of a counter bell and its ring-out, long fade-out. |
 
 ## Source pages
 
@@ -74,8 +81,11 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 - **PuddleSplash.wav** - ahill86 - <https://freesound.org/people/ahill86/sounds/207139/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #207139)
 - **Cash Register Purchase** - Zott820 - <https://freesound.org/people/Zott820/sounds/209578/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #209578)
 - **KawasakiZX6RStart.wav** - Sclolex - <https://freesound.org/people/Sclolex/sounds/211668/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #211668)
+- **service bell ring** - AlaskaRobotics - <https://freesound.org/people/AlaskaRobotics/sounds/221515/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #221515)
+- **frying steak.wav** - simosco - <https://freesound.org/people/simosco/sounds/235537/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #235537)
 - **SuburbRain_OutdoorLoop.wav** - PhilllChabbb - <https://freesound.org/people/PhilllChabbb/sounds/238431/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #238431)
 - **Tire Puncture Pop Hit Punch** - JohnsonBrandEditing - <https://freesound.org/people/JohnsonBrandEditing/sounds/243375/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #243375)
+- **electric-gas-stove-ignite.wav** - Squidocto - <https://freesound.org/people/Squidocto/sounds/262582/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #262582)
 - **BerlinGameScene.com Crowd Cheer 1** - BerlinGameScene - <https://freesound.org/people/BerlinGameScene/sounds/267249/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #267249)
 - **Plastic bags rustling.mp3** - Caitlin_100 - <https://freesound.org/people/Caitlin_100/sounds/365520/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #365520)
 - **Camera shutter.wav** - jdaniel1999 - <https://freesound.org/people/jdaniel1999/sounds/376205/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #376205)
@@ -87,11 +97,14 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 - **Braking on gravel (bike)** - prsvl - <https://freesound.org/people/prsvl/sounds/437537/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #437537)
 - **DoorBell Shortened** - jwheeler91 - <https://freesound.org/people/jwheeler91/sounds/442280/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #442280)
 - **whoosh_short_mid.wav** - DJT4NN3R - <https://freesound.org/people/DJT4NN3R/sounds/449996/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #449996)
+- **pan_hiss.wav** - burriss - <https://freesound.org/people/burriss/sounds/45579/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #45579)
 - **Night time crickets, distant dogs and traffic ambience.WAV** - SukritSen - <https://freesound.org/people/SukritSen/sounds/482687/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #482687)
 - **Dog Bark** - aunrea - <https://freesound.org/people/aunrea/sounds/495658/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #495658)
 - **Siren.ogg** - egomassive - <https://freesound.org/people/egomassive/sounds/536773/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #536773)
 - **Boing 2** - magnuswaker - <https://freesound.org/people/magnuswaker/sounds/540790/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #540790)
+- **Plastic Spatula on Non Stick pan.wav** - miwilson - <https://freesound.org/people/miwilson/sounds/546452/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #546452)
 - **Jerry Honda 125 Kickstart & ride off.wav** - 3bagbrew - <https://freesound.org/people/3bagbrew/sounds/574322/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #574322)
+- **Sizzling Pan** - AntoineRomo - <https://freesound.org/people/AntoineRomo/sounds/587050/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #587050)
 - **TukTuk_Drive_Transport.wav** - uniuniversal - <https://freesound.org/people/uniuniversal/sounds/658928/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #658928)
 - **Short_Thunder_Mid.wav** - SholeColtis - <https://freesound.org/people/SholeColtis/sounds/683421/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #683421)
 - **Doudar41 light coin shower** - Sadiquecat - <https://freesound.org/people/Sadiquecat/sounds/728430/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #728430)
