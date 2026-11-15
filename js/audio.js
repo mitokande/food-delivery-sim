@@ -130,6 +130,34 @@ export function createAudio() {
     s.start(0, off);
     if (kind === 'music') music = { s, g }; else amb = { s, g };
   }
+  // a looping sample its caller steers (a skillet's sizzle, which follows the heat): { set({ vol, rate }), stop() }
+  function voice(name, { vol = 0, rate = 1 } = {}) {
+    if (!ctx) return null;
+    const g = ctx.createGain(); g.gain.value = 0; g.connect(sfxBus);
+    let src = null, dead = false, r = rate;
+    const lvl = (v) => Math.max(0, v) * (manifest[name]?.gain ?? 0.6);
+    load(name).then((b) => {
+      if (!b || dead) return;
+      src = ctx.createBufferSource(); src.buffer = b; src.loop = true; src.playbackRate.value = r;
+      src.connect(g); src.start(0, loopTrim(src, name));
+    });
+    const v = {
+      set({ vol: to, rate: rt } = {}) {
+        if (dead) return;
+        if (to != null) g.gain.setTargetAtTime(lvl(to), ctx.currentTime, 0.07);
+        if (rt != null) { r = rt; src?.playbackRate.setTargetAtTime(rt, ctx.currentTime, 0.07); }
+      },
+      stop(fade = 0.12) {
+        if (dead) return; dead = true;
+        g.gain.setTargetAtTime(0, ctx.currentTime, fade);
+        setTimeout(() => { try { src?.stop(); } catch { /* never started */ } g.disconnect(); }, fade * 5000 + 100);
+      },
+    };
+    v.set({ vol });
+    return v;
+  }
+  // fetch and decode ahead of their first play (a no-op until the context exists: a load without it would fail for good)
+  function warm(...names) { if (ctx) for (const n of names) load(n); }
   // A phone speaker plays almost nothing below ~400 Hz, where these engine recordings keep nearly all their energy, so on a
   // phone only the wind noise was left. A soft clip adds the upper harmonics that carry the putt there. (The moped
   // recording is bright already; the electric one is a clean synth.)
@@ -240,5 +268,5 @@ export function createAudio() {
       if (rush.squeal) rush.squeal.g.gain.setTargetAtTime(0.32 * Math.min(1, Math.max(0, (slip - 1.03) / 0.15)), t, 0.05);
     }
   }
-  return { init, play, loop, engine, engineSpeed, apply, get ready() { return !!ctx; } };
+  return { init, play, loop, voice, warm, engine, engineSpeed, apply, get ready() { return !!ctx; } };
 }

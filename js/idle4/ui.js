@@ -9,6 +9,8 @@ import * as S from './sim.js';
 import * as Q from './quests.js';
 import { app } from '../native.js';
 import * as St from './store.js';
+import { buzz } from '../haptics.js';
+import * as Mini from './mini.js';
 
 const ICON = (n, cls = '') => `<img class="ic ${cls}" src="assets/icons/${n}.webp" alt="" draggable="false" onerror="this.onerror=null;this.src='assets/icons/${n}.png'">`;
 const ART = (n) => `assets/story/${n}.webp`;
@@ -130,6 +132,7 @@ export function createUI(game) {
   <div id="toasts"></div>`;
   const hud = $('#hud'), sheet = $('#sheet'), head = $('.sh-head', sheet), body = $('.sh-body', sheet), modals = $('#modals'), toasts = $('#toasts'), questEl = $('.quest', hud);
   const sfx = (n, o) => game.audio?.play(n, o);
+  const sfxLoop = (n, o) => game.audio?.voice?.(n, o) ?? null, sfxWarm = (...n) => game.audio?.warm?.(...n); // (for the mini games)
   let room = null; // the open room
   let questGo = null; // where a tap on the quest bar takes you
   const api = {};
@@ -275,14 +278,17 @@ export function createUI(game) {
   const pctMod = (x) => `${x >= 1 ? '+' : '−'}${Math.round(Math.abs(x - 1) * 100)}% walk-ins`;
   // the banner's line under the title, for the event on now
   function evLine(g, e) {
-    if (e.kind === 'threat') { const n = Math.min(e.need, g.stats.served - e.base); return [`Serve ${e.need} before it gets here: <b>${n}/${e.need}</b>`, n / e.need, Math.max(0, e.t0 + e.dur - g.t)]; }
+    const can = S.miniOf(g);
+    if (e.kind === 'threat') { const n = Math.min(e.need, g.stats.served - e.base); return [`Serve ${e.need} before it gets here: <b>${n}/${e.need}</b>${can ? ' · <b>Tap: hand out flyers!</b>' : ''}`, n / e.need, Math.max(0, e.t0 + e.dur - g.t)]; }
     const c = g.cust.find((x) => x.id === e.cust);
     if (e.kind === 'van') return [`${S.EVENTS.van} tourists, all hungry at once`, Math.min(1, (g.t - e.t0) / e.dur), null];
+    if (e.kind === 'inspector' && can) return [MG.inspector.call, c?.st === 'inspect' ? Math.min(1, (g.t - c.t0) / c.dur) : 0, null];
     if (e.kind === 'inspector') return [c?.st === 'inspect' ? 'Looking round the kitchen…' : 'On the way to the kitchen', c?.st === 'inspect' ? Math.min(1, (g.t - c.t0) / c.dur) : 0, null];
     const st = !c ? '' : c.st === 'wait' ? `Waiting for the food: ${Math.round(g.t - c.t0)}s` : c.st === 'eat' ? 'Eating…' : c.st === 'bench' ? 'Waiting for a table!' : c.st === 'go' && !c.seat ? 'At the door' : '';
+    if (e.kind === 'critic' && can) return [MG.critic.call, c?.st === 'wait' ? Math.min(1, (g.t - c.t0) / 45) : 0, null];
     return [`${e.kind === 'critic' ? 'Serve them fast: the stars count the seconds' : `Pays ${S.STAR_PAYS}× and tips big; fans follow`}${st ? ` · ${st}` : ''}`, c?.st === 'wait' ? Math.min(1, (g.t - c.t0) / 45) : 0, null];
   }
-  let evKey = '';
+  let evKey = '', offered = -1;
   function updateEvents(g) {
     // the clock
     const h = S.hourOf(g), rush = S.rushOf(g), night = h < 6 || h >= 20.5;
@@ -298,10 +304,12 @@ export function createUI(game) {
     // the banner: the event on now, else a boost or a slump
     const bar = $('.evbar', hud), e = g.event, mod = g.mods.find((m) => g.t < m.until);
     if (e) {
-      const [line, f, left] = evLine(g, e), d = EV[e.kind];
+      const [line, f, left] = evLine(g, e), d = EV[e.kind], can = S.miniOf(g);
       const k = `${e.id}|${line}|${left == null ? '' : Math.ceil(left)}`;
-      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls}`; bar.innerHTML = `${d.art ? `<span class="ei">${UI(d.art)}</span>` : `<img class="eface" src="${FACE('victor')}" alt="">`}<span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
+      if (k !== evKey) { evKey = k; bar.className = `evbar ${d.cls} ${can ? 'play' : ''}`; bar.innerHTML = `${can || d.art ? `<span class="ei">${UI(can ? MG[can].icon : d.art)}</span>` : `<img class="eface" src="${FACE('victor')}" alt="">`}<span class="et"><b>${d.title}${left != null ? ` <i>${mmss(left)}</i>` : ''}</b><small>${line}</small><span class="ebar"><u style="width:${pct(f)}"></u></span></span>`; }
       bar.hidden = !!room;
+      // (its mini game, offered once)
+      if (can && offered !== e.id && !talking && !room && !upQ.length && !modals.children.length && !api.guideOff) { offered = e.id; miniOffer(can); }
     } else if (mod) {
       const k = `m|${mod.why}|${Math.ceil(mod.until - g.t)}`;
       if (k !== evKey) { evKey = k; bar.className = `evbar mod ${mod.x >= 1 ? 'up' : 'down'}`; bar.innerHTML = `<span class="ei">${UI('up', mod.x >= 1 ? '' : 'down')}</span><span class="et"><b>${MOD[mod.why] || 'Boost'} <i>${mmss(mod.until - g.t)}</i></b><small>${pctMod(mod.x)}</small></span>`; }
@@ -312,13 +320,14 @@ export function createUI(game) {
   function eventsCard() {
     const g = G();
     if (S.restaurantLv(g) < S.EVENT_LV) { toast(`${UI('lock')} Events: opens at restaurant level ${S.EVENT_LV}`); sfx('ui-error', { vol: 0.4 }); return; }
-    const h = S.hourOf(g), e = g.event;
+    const h = S.hourOf(g), e = g.event, can = S.miniOf(g);
     const segs = [[12, 14.5, 'lunch'], [19, 21.5, 'dinner'], [0, 6, 'night'], [20.5, 24, 'night']].map(([a, b, k]) => `<i class="${k}" style="left:${pct(a / 24)};width:${pct((b - a) / 24)}"></i>`).join('');
     let now = '<p class="small">Nothing on right now. Something happens every few minutes.</p>';
     if (e) {
       const [line] = evLine(g, e), d = EV[e.kind];
       now = `<div class="evcard ${d.cls}"><b>${d.icon} ${d.title}</b><small>${line}</small>
-        ${e.kind === 'threat' ? `<button class="btn ${g.cash >= e.cost ? 'gold' : ''}" data-x="repel" ${g.cash >= e.cost ? '' : 'disabled'}>Pay to move it on · ${M(e.cost)}</button>` : ''}</div>`;
+        ${e.kind === 'threat' ? `<button class="btn ${g.cash >= e.cost ? 'gold' : ''}" data-x="repel" ${g.cash >= e.cost ? '' : 'disabled'}>Pay to move it on · ${M(e.cost)}</button>` : ''}
+        ${can ? `<button class="btn gold" data-x="mini">${UI(MG[can].icon)} ${MG[can].btn}</button>` : ''}</div>`;
     }
     const mods = g.mods.filter((m) => g.t < m.until).map((m) => `<li class="${m.x >= 1 ? 'up' : 'down'}">${MOD[m.why] || 'Boost'}: ${pctMod(m.x)} · ${mmss(m.until - g.t)}</li>`).join('');
     const RES = (r) => r.kind === 'threat' ? (r.paid ? `Victor's truck moved on (paid ${M(r.paid)})` : r.ok ? `Victor's truck turned round${r.cash ? ` · +${M(r.cash)}` : ''}` : 'Victor\'s truck parked outside')
@@ -333,6 +342,7 @@ export function createUI(game) {
       <button class="btn big" data-x="close">Close</button>`, { cls: 'eventscard', dismiss: true });
     m.card.addEventListener('click', (ev) => {
       if (ev.target.closest('[data-x="repel"]')) { m.close(); game.repel(); }
+      else if (ev.target.closest('[data-x="mini"]')) { m.close(); game.mini(); }
       else if (ev.target.closest('[data-x="close"]')) m.close();
     });
     sfx('ui-open', { vol: 0.5 });
@@ -346,11 +356,107 @@ export function createUI(game) {
       return;
     }
     const r = x.res;
+    if (r.mini != null && x.e.kind === 'inspector') { gradeCard(r); return; } // (its mini game was played: the result gets a card)
+    if (r.mini != null && x.e.kind === 'critic') { reviewCard(r); return; }
     const t = x.e.kind === 'threat' ? (r.paid ? 'The truck moved on' : r.ok ? `Victor's truck turned round! +${M(r.cash)}` : 'Victor\'s truck parked across the street…')
       : x.e.kind === 'critic' ? `The review: ${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}${r.cash ? ` +${M(r.cash)}` : ''}`
       : x.e.kind === 'star' ? (r.ok ? 'The celebrity loved it: fans are on their way!' : 'The celebrity walked out…')
       : x.e.kind === 'inspector' ? `Inspection: grade ${r.grade}${r.cash ? ` +${M(r.cash)}` : ''}` : 'The tourists are back on their van';
     if (x.e.kind !== 'van') toast(`<b class="evi">${d.icon}</b> ${t}`, r.ok ? 'good' : 'bad');
+  }
+
+  // ---------- the mini games ----------
+  // One to an event (S.MINI): the kitchen scrubbed before the inspector looks, the critic's plate cooked by hand,
+  // flyers handed out while Victor's truck is on its way. The offer (once an event, when nothing else is open; the
+  // banner and the events card offer it too), the window round the game (mini.js), the stars it was worth, and the
+  // card of what came of it (the grade, the review).
+  const STARS = (n, of = 3) => `<div class="mstars ${of > 3 ? 'row' : ''}">${[...Array(of)].map((_, i) => `<span class="${i < n ? 'on' : ''}" style="--i:${i + 1}">${UI('star')}</span>`).join('')}</div>`;
+  const MG = {
+    inspector: { make: Mini.scrubGame, icon: 'scrub/sponge', head: 'scrub/clipboard', face: 'inspector', who: 'The inspector', title: 'Inspection!', play: 'Scrub time!',
+      says: 'I\'ll take a look round your kitchen. I grade what I see: <b>A</b>, <b>B</b> or <b>C</b>.',
+      lead: (d) => `Quick, scrub it before he gets there! ${d} seconds: the cleaner, the better the grade.`,
+      perks: () => ['A tip', 'Never a C', 'A grade better'], go: 'Scrub!', no: 'Let him look', call: '<b>Tap to scrub the kitchen</b> before he looks!', btn: 'Scrub the kitchen',
+      tiers: [['Still filthy…', 'Too little to change his mind.'], ['Could be worse', 'He leaves a tip for the effort.'], ['Nice and clean', 'A clean kitchen never gets a C.'], ['Spotless!', 'A spotless kitchen is graded one better.']],
+      after: () => 'Now he takes his look…', close: 'Let him in', practice: 'Just practice: the inspector wasn\'t looking.' },
+    critic: { make: Mini.cookGame, icon: 'cook/spatula', head: 'trophy', face: 'critic', who: 'The critic', title: 'A food critic!', play: 'Cook the plate!',
+      says: 'I have eaten everywhere. Surprise me. My review is out tonight: <b>one to five stars</b>.',
+      lead: () => 'Cook this plate yourself! Take each thing off the heat when the needle is in the green.',
+      perks: () => ['A tip', 'Never under 3 stars', 'A star more'], go: 'Cook!', no: 'Leave it to the kitchen', call: '<b>Tap to cook the critic\'s plate</b> yourself!', btn: 'Cook the critic\'s plate',
+      tiers: [['A bit of a mess…', 'Too little to change the review.'], ['Edible', 'A tip for the effort.'], ['Nicely done', 'A plate this good never gets under three stars.'], ['Chef\'s kiss!', 'A perfect plate: a star more on the review.']],
+      after: () => 'Now it goes to the table…', close: 'Serve it', practice: 'Just practice: no critic at the table.' },
+    threat: { make: Mini.flyersGame, icon: 'flyers/flyer', head: 'flyers/megaphone', face: 'victor', who: 'Victor', title: 'Victor\'s truck!', play: 'Flyers!',
+      says: 'My truck is on its way, kid. By tonight your customers eat at <b>Gristle Burger</b>.',
+      lead: (d) => `Get out there with flyers before it parks! ${d} seconds: the people you win over count as customers served.`,
+      perks: (e) => [1, 2, 3].map((i) => (e?.need ? `+${Math.ceil(e.need * S.MINI.threat.cut[i])} served` : `+${Math.round(S.MINI.threat.cut[i] * 100)}% served`)),
+      go: 'Hand them out!', no: 'Just serve fast', call: '', btn: 'Hand out flyers',
+      tiers: [['Nobody stopped…', 'No help with the count this time.'], ['A few came over', 'They count as served.'], ['A good crowd', 'They count as served.'], ['Full house!', 'They all count as served.']],
+      after: (g) => (g.event?.won ? `<b>+${g.event.won}</b> on the count. Now serve the rest!` : 'Now serve fast!'), close: 'Back to work', practice: 'Just practice: no truck in sight.' },
+  };
+  function miniOffer(kind) {
+    const d = MG[kind], cfg = S.MINI[kind];
+    const m = modal(`<h2>${UI(d.head)} ${d.title}</h2>
+      <div class="rsay"><img src="${FACE(d.face)}" alt="${d.who}"><p>${d.says}</p></div>
+      <p class="small">${d.lead(cfg.dur)}</p>
+      <div class="mtiers">${d.perks(G().event).map((t, i) => `<span>${STARS(i + 1)}<small>${t}</small></span>`).join('')}</div>
+      <button class="btn gold big" data-x="go">${UI(d.icon)} ${d.go}</button>
+      <button class="btn ghost" data-x="no">${d.no}</button>`, { cls: `offer k-${kind}`, pause: true });
+    m.card.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-x="go"]')) { m.close(); game.mini(kind); }
+      else if (ev.target.closest('[data-x="no"]')) { m.close(); sfx('ui-back', { vol: 0.4 }); }
+    });
+    sfx('ui-open', { vol: 0.5 });
+  }
+  // the game in its window: → { score (0..1), tally (the result in a few words) }, or null if it was left before it began
+  function mini(kind) {
+    const d = MG[kind], cfg = S.MINI[kind], g = d.make({ sfx, buzz, loop: sfxLoop, warm: sfxWarm });
+    const m = modal(`<h2>${UI(d.icon)} ${d.play}</h2><div class="mhost"></div>`, { cls: `minim k-${kind}`, pause: true });
+    const frame = Mini.play($('.mhost', m.card), g, { dur: cfg.dur, tiers: cfg.tiers, sfx, buzz });
+    const x = document.createElement('button'); x.className = 'xr'; x.type = 'button'; x.setAttribute('aria-label', 'Stop'); x.innerHTML = X;
+    x.addEventListener('click', () => { frame.leave(); sfx('ui-back', { vol: 0.4 }); }); m.card.append(x);
+    api.playing = g;
+    return frame.done.then((score) => { m.close(); api.playing = null; return score == null ? null : { score, tally: g.tally() }; });
+  }
+  // the stars it was worth (a tier of S.MINI; `practice`: with no event on)
+  function miniDone(kind, tier, tally, practice) {
+    const d = MG[kind], [title, what] = d.tiers[tier];
+    const m = modal(`<h2>${UI(d.icon)} ${title}</h2>
+      ${STARS(tier)}
+      <p class="mpct">${tally}</p>
+      <p class="small">${practice ? d.practice : `${what} ${d.after(G())}`}</p>
+      <button class="btn big ${tier ? 'gold' : ''}" data-x="close">${practice ? 'Done' : d.close}</button>`, { cls: 'mres', pause: true });
+    m.card.addEventListener('click', (ev) => { if (ev.target.closest('[data-x="close"]')) m.close(); });
+    [1, 2, 3].forEach((i) => { if (i <= tier) setTimeout(() => sfx('qte-good', { vol: 0.5 }), 250 * i); });
+    if (!tier) sfx('order-late', { vol: 0.4 });
+  }
+  // the critic's review, after the plate was cooked by hand
+  const REVIEW = {
+    5: ['Five stars!', 'The best burger in Old Town. I asked for the recipe. They said no.'], 4: ['Four stars', 'Hot, fast and honest. I will be back.'],
+    3: ['Three stars', 'Decent. The fries tried their best.'], 2: ['Two stars…', 'It arrived. Eventually.'], 1: ['One star…', 'I left hungry.'],
+  };
+  function reviewCard(r) {
+    const [title, quote] = REVIEW[r.stars], rave = r.mod?.dur > 240;
+    const m = modal(`<h2>${UI('trophy')} The review</h2>
+      <div class="rsay"><img src="${FACE('critic')}" alt="The critic"><p>${quote}</p></div>
+      ${STARS(r.stars, 5)}
+      <p class="gtitle">${title}</p>
+      ${r.up ? `<p class="gup">${STARS(r.mini)}<span>${rave ? 'A perfect plate, five stars: a rave! A bigger bonus, a longer boost' : r.mini === 3 ? 'Your cooking: a star more!' : 'Your cooking saved the review!'}</span></p>` : ''}
+      <div class="gwin">${r.cash ? `<span>${UI('cash')}<b>+${M(r.cash)}</b></span>` : ''}${r.mod ? `<span>${UI('up', r.mod.x >= 1 ? '' : 'down')}<b class="${r.mod.x >= 1 ? '' : 'down'}">${pctMod(r.mod.x).replace(' walk-ins', '')}</b><small>walk-ins<br>${Math.round(r.mod.dur / 60)} min</small></span>` : ''}</div>
+      ${r.cash || r.mod ? '' : '<p class="small">Nothing this time. Faster food makes a better review.</p>'}
+      <button class="btn big ${r.ok ? 'gold' : ''}" data-x="close">${r.cash ? 'Collect' : 'OK'}</button>`, { cls: `grade review k-critic ${r.ok ? 'ok' : 'no'}`, pause: true });
+    m.card.addEventListener('click', (ev) => { if (ev.target.closest('[data-x="close"]')) { m.close(); if (r.cash) sfx('ui-coins', { vol: 0.6 }); } });
+    setTimeout(() => { sfx(r.ok ? 'ui-levelup' : 'order-late', { vol: 0.6 }); buzz(r.ok ? 35 : 15); }, 380);
+  }
+  // the grade on the door, after a scrub
+  function gradeCard(r) {
+    const m = modal(`<h2>${UI('scrub/clipboard')} Inspection</h2>
+      <div class="gstamp g${r.grade}">${UI(`scrub/${r.grade.toLowerCase()}`)}</div>
+      <p class="gtitle">${{ A: 'Grade A on the door!', B: 'Grade B: it will do', C: 'Grade C…' }[r.grade]}</p>
+      ${r.up ? `<p class="gup">${STARS(r.mini)}<span>${r.grade === 'A' && r.mod?.dur > 180 ? 'A spotless A: a bigger bonus, a longer boost' : 'Your scrubbing: a grade better!'}</span></p>` : ''}
+      <div class="gwin">${r.cash ? `<span>${UI('cash')}<b>+${M(r.cash)}</b></span>` : ''}${r.mod ? `<span>${UI('up')}<b>${pctMod(r.mod.x).replace(' walk-ins', '')}</b><small>walk-ins<br>${Math.round(r.mod.dur / 60)} min</small></span>` : ''}</div>
+      ${r.cash || r.mod ? '' : '<p class="small">Nothing this time. A cleaner, readier kitchen does better.</p>'}
+      <button class="btn big ${r.ok ? 'gold' : ''}" data-x="close">${r.cash ? 'Collect' : 'OK'}</button>`, { cls: `grade ${r.ok ? 'ok' : 'no'}`, pause: true });
+    m.card.addEventListener('click', (ev) => { if (ev.target.closest('[data-x="close"]')) { m.close(); if (r.cash) sfx('ui-coins', { vol: 0.6 }); } });
+    setTimeout(() => { sfx(r.ok ? 'ui-levelup' : 'order-late', { vol: 0.6 }); buzz(r.ok ? 35 : 15); }, 380);
   }
 
   // ---------- advice: what holds the restaurant back now → [room, text] ----------
@@ -810,7 +916,7 @@ export function createUI(game) {
     else if (a === 'events') eventsCard();
     else if (a === 'managers') managersCard();
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
-    else if (a === 'evfocus') { if (!game.world?.focusEvent()) eventsCard(); }
+    else if (a === 'evfocus') { if (S.miniOf(G())) game.mini(); else if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'locked') {
       const f = FEATURES.find((x) => x.f === el.dataset.f);
       toast(`${UI('lock')} ${f.name}: ${S.restaurantLv(G()) < f.lv ? `opens at restaurant level ${f.lv}` : 'coming in a later update'}`);
@@ -824,7 +930,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, shop, standInAd, eventsCard, eventNote, live, openRoom, closeRoom, renderRoom,
+    toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, shop, standInAd, eventsCard, eventNote, mini, miniDone, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${UI('quest')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${IT({ cook: 'pan', waiter: 'tray', courier: 'helmet' }[s.role] || 'register')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },

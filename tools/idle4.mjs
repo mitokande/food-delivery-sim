@@ -43,6 +43,20 @@ const buy = (a, room, id) => ev(`game.act('${a}', '${room}', ${id ? `'${id}'` : 
 const cash = (n) => ev(`game.G.cash = ${n}`);
 // the card when a renovation is done: wait for it (→ its text), then a tap closes it
 const upCard = async () => { if (!(await until('!!document.querySelector(".modal.upcard.in")', 6000))) return ''; await wait(800); return ev('document.querySelector(".modal.upcard").innerText'); };
+// the mini game on screen, played through its peek() by `move` (what peek() shows, the stage's box → a point to tap or
+// null) until the card with its stars is up: → the taps made (-1: no card); `name`: a screenshot after a few taps
+const playMini = async (move, name) => {
+  const box = await ev('(() => { const r = document.querySelector(".mstage").getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()');
+  for (let t0 = Date.now(), n = 0, shown = !name; Date.now() - t0 < 45000;) {
+    const s = await ev('({ res: !!document.querySelector(".modal.mres.in"), peek: game.ui.playing?.peek?.() ?? null })');
+    if (s.res) return n;
+    const at = s.peek && move(s.peek, box);
+    if (at) { await page.touchscreen.tap(at[0], at[1]); n++; }
+    if (!shown && n >= 3) { shown = true; await wait(150); await page.screenshot({ path: `${OUT}/idle4-${name}.png` }); console.log('shot', name); }
+    await wait(25);
+  }
+  return -1;
+};
 const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
 await boot('idle4.html?fresh&speed=4&adms=400');
@@ -66,7 +80,7 @@ await shot('1b-rita');
 for (let i = 0; i < 8 && await ev('!!document.querySelector(".modal.talkm")'); i++) { await ev('document.querySelector(".modal.talkm").click()'); await wait(450); }
 check(await ev('!document.querySelector(".modal.talkm") && !game.paused && game.G.seen["g:hello"]'), 'taps take her through her lines and away');
 check(await until('!!document.querySelector(".pointer") && document.querySelector(".pointer").dataset.sel === ".quest"', 2000), 'an arrow points at the quest bar');
-await ev('game.ui.skipGuide()'); // (the rest of her lines would only be in the way)
+await ev('game.ui.skipGuide(); game.ui.guideOff = true'); // (the rest of her lines would only be in the way; nor the inspector's offer, till its turn)
 check(await ev('+document.querySelector(".famev").textContent.replace(/,/g, "") === game.S.fame(game.G) && game.S.fame(game.G) > 0'), 'the top bar shows the fame');
 
 // the building: labels on every room, the ruins, the hint
@@ -264,9 +278,25 @@ check(card4.includes('Restaurant Lv 2!') && ['Terrace', 'Courier Bay', 'Events']
 await shot('6b-office2');
 await closeCard();
 
-// events: Victor's truck (the banner, the camera to it, paying to move it on), a critic
+// events: Victor's truck (the banner; its mini game: flyers handed out in the street, the people won over count as
+// served; then the camera to it, paying to move it on), a critic (his plate cooked by hand; the review's card)
 await ev('(() => { const g = game.G; if (g.rooms.office.lv < 2) g.rooms.office.lv = 2; g.event = null; g.cash = Math.max(g.cash, 1e6); game.S.startEvent(g, "threat"); })()'); await wait(800);
 check(await ev('!document.querySelector(".evbar").hidden && document.querySelector(".evbar").classList.contains("threat") && !document.querySelector(".slot.events").classList.contains("locked")'), 'Victor\'s truck: the banner, the events button open');
+check(await ev('game.S.miniOf(game.G) === "threat" && document.querySelector(".evbar").classList.contains("play") && /flyers/i.test(document.querySelector(".evbar small").textContent)'), 'the banner offers its mini game: flyers');
+await page.click('.evbar');
+check(await until('!!document.querySelector(".modal.minim.k-threat .mstage .flyers")', 8000) && await ev('game.paused && document.querySelector(".mstage .msurf").naturalWidth > 0'), 'a tap on the banner: the street, the restaurant waits');
+{
+  // (a flyer to everyone walking by; and one, by mistake, to one of Victor's crew)
+  let crew = 0;
+  const taps = await playMini((list) => { const w = list.find((q) => q.at > 0.22 && q.at < 0.8 && (!q.crew || !crew)); if (w && w.crew) crew++; return w && [w.x, w.y]; }, '8a-flyers');
+  await wait(900);
+  const fl = await ev('(() => { const e = game.G.event, S = game.S; return { mini: e?.mini, won: e?.won, need: e?.need, tier: S.miniTier("threat", e?.mini ?? 0), cut: S.MINI.threat.cut, stars: document.querySelectorAll(".modal.mres .mstars .on").length, text: document.querySelector(".modal.mres").innerText, can: S.miniOf(game.G), paused: game.paused }; })()');
+  check(taps > 8 && fl.mini >= 0.65 && fl.tier >= 2 && fl.stars === fl.tier && /took a flyer/.test(fl.text) && (!crew || /wasted/.test(fl.text)), `${taps} taps: ${fl.text.match(/\d+\/\d+/)?.[0]} took a flyer${crew ? ', one wasted on his crew' : ''}: ${fl.tier} stars`);
+  check(fl.won === Math.ceil(fl.need * fl.cut[fl.tier]) && fl.won > 0 && !fl.can && fl.paused, `they count as served: +${fl.won} of the ${fl.need}; once a truck`);
+  await shot('8a2-flyers-stars');
+  await page.click('.modal.mres [data-x="close"]'); await wait(500);
+  check(await ev(`!game.paused && !document.querySelector(".evbar").classList.contains("play") && +document.querySelector(".evbar small b").textContent.split("/")[0] >= ${fl.won}`), 'the game goes on; the banner counts them');
+}
 await page.click('.evbar'); await wait(1800);
 check(await ev('game.world.peek().cars[0].on && game.world.peek().cam.z > 22'), 'a tap on the banner: the camera goes to the truck in the street');
 await shot('8-truck');
@@ -275,8 +305,100 @@ check(await ev('!!document.querySelector(".modal.eventscard [data-x=repel]")'), 
 await shot('8b-events');
 await page.click('.modal.eventscard [data-x="repel"]'); await wait(500);
 check(await ev('!game.G.event && game.G.evLog[0].kind === "threat" && game.G.evLog[0].paid > 0'), 'paid: the truck moves on');
-await ev('game.S.startEvent(game.G, "critic")');
-check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'a critic walks in with a tag over his head');
+await ev('game.ui.guideOff = false; game.S.startEvent(game.G, "critic")');
+check(await until('!!document.querySelector(".modal.offer.k-critic.in [data-x=go]")', 5000) && await ev('game.paused && document.querySelector(".modal.offer .rsay img").naturalWidth > 0'), 'a critic: an offer to cook his plate yourself, the restaurant waits');
+await shot('8c-critic');
+await page.click('.modal.offer [data-x="no"]'); await wait(500);
+await ev('game.ui.guideOff = true');
+check(await until('!!document.querySelector("#markers .mk.viptag .vt.critic")', 5000), 'he walks in with a tag over his head');
+check(await ev('game.S.miniOf(game.G) === "critic" && document.querySelector(".evbar").classList.contains("play") && /cook/i.test(document.querySelector(".evbar small").textContent)'), '"Leave it to the kitchen": the banner still offers it');
+// (what the stove is asked to sound like: the names played, and the sizzle's level as the needle runs)
+await ev(`(() => { const a = game.audio, play = a.play, voice = a.voice, log = window.__snd = { play: [], loop: [], live: 0, sets: 0, top: 0, stops: 0 };
+  a.play = (n, o) => { log.play.push(n); return play(n, o); };
+  a.voice = (n, o) => { const v = voice(n, o); log.loop.push(n); if (v) log.live++; return { set(x) { log.sets++; log.top = Math.max(log.top, x?.vol ?? 0); v?.set(x); }, stop(f) { log.stops++; v?.stop(f); } }; }; })()`);
+await page.click('.evbar');
+check(await until('!!document.querySelector(".modal.minim.k-critic .mstage .cook")', 8000) && await ev('game.paused && document.querySelector(".mstage .msurf").naturalWidth > 0'), 'a tap on the banner: the stove, the restaurant waits');
+{
+  // (each thing taken off the heat as the needle comes into the green)
+  const taps = await playMini((k, [L, T, W, H]) => (k.phase === 'cook' && k.p >= k.z - k.hw * 0.5 ? [L + W / 2, T + H * 0.6] : null), '8d-cook');
+  await wait(900);
+  const ck = await ev('(() => { const e = game.G.event, S = game.S; return { mini: e?.mini, tier: S.miniTier("critic", e?.mini ?? 0), stars: document.querySelectorAll(".modal.mres .mstars .on").length, text: document.querySelector(".modal.mres").innerText, can: S.miniOf(game.G), paused: game.paused }; })()');
+  check(taps === 5 && ck.mini >= 0.65 && ck.tier >= 2 && ck.stars === ck.tier && /perfect/.test(ck.text) && !ck.can && ck.paused, `five things off the heat in the green (${ck.text.match(/\d+ perfect · \d+ good/)?.[0]}): ${ck.tier} stars; once a critic`);
+  await shot('8e-cook-stars');
+  const snd = await ev(`(async () => { const l = window.__snd, n = (k) => l.play.filter((x) => x === k).length, m = await (await fetch('assets/audio/manifest.json')).json(), ac = new AudioContext();
+    const len = await Promise.all(['sizzle', 'drop', 'flip', 'take', 'burnt', 'ignite', 'bell'].map(async (f) => (m['cook-' + f] ? (await ac.decodeAudioData(await (await fetch('assets/audio/cook-' + f + '.mp3')).arrayBuffer())).duration : 0)));
+    return { loop: l.loop.join(), live: l.live, sets: l.sets, top: l.top, stops: l.stops, ignite: n('cook-ignite'), drop: n('cook-drop'), flip: n('cook-flip'), take: n('cook-take'), bell: n('cook-bell'), hop: n('hop'), len, ready: game.audio.ready }; })()`);
+  check(snd.ready && snd.loop === 'cook-sizzle' && snd.live === 1 && snd.sets > 50 && snd.top > 0.6 && snd.top <= 1.2 && snd.stops === 1, `the skillet sizzles with the needle (a recorded loop, steered ${snd.sets} times, up to ${snd.top.toFixed(2)}) and goes quiet with the plate`);
+  check(snd.ignite === 1 && snd.drop === 4 && snd.flip === 1 && snd.take === 5 && snd.bell === 1 && snd.hop === 1 && snd.len.every((d) => d > 0.3) && snd.len[0] >= 6, `and around it: the burner, ${snd.drop} things landing, a flip, ${snd.take} off with the spatula, the bell (seven recordings, all decode)`);
+  await page.click('.modal.mres [data-x="close"]'); await wait(400);
+  check(await until('!!document.querySelector(".modal.review.in")', 150000), 'he has eaten: the review gets a card');
+  await wait(900);
+  const rv = await ev('({ log: game.G.evLog[0], on: document.querySelectorAll(".modal.review .mstars.row .on").length, face: document.querySelector(".modal.review .rsay img").naturalWidth > 0, text: document.querySelector(".modal.review").innerText })');
+  check(rv.log.kind === 'critic' && rv.log.mini === ck.tier && rv.on === rv.log.stars && rv.log.stars >= 3 && rv.face && /\$/.test(rv.text), `${rv.log.stars} stars on the review (never under three after a good plate), what it pays`);
+  await shot('8f-review');
+  await page.click('.modal.review [data-x="close"]'); await wait(400);
+}
+// the mini game: the health inspector comes, the offer to scrub the kitchen first; the banner offers it too; rubbing
+// wipes the dirt away (the bar, its stars); the stars' card; the grade's card when he has looked
+await ev('(() => { const g = game.G; g.event = null; g.cust = g.cust.filter((c) => !c.vip); game.S.MINI.inspector.dur = 8; game.ui.guideOff = false; game.S.startEvent(g, "inspector"); })()');
+check(await until('!!document.querySelector(".modal.offer.in [data-x=go]")', 5000) && await ev('game.paused && document.querySelector(".modal.offer .rsay img").naturalWidth > 0'), 'the inspector comes: an offer to scrub the kitchen first, the restaurant waits');
+await shot('9-offer');
+await page.click('.modal.offer [data-x="no"]'); await wait(600);
+check(await ev('!game.paused && game.S.miniOf(game.G) === "inspector" && document.querySelector(".evbar").classList.contains("play") && /scrub/i.test(document.querySelector(".evbar small").textContent)'), '"Let him look": the game goes on, the banner still offers it');
+await ev('game.ui.guideOff = true');
+await page.click('.evbar');
+check(await until('!!document.querySelector(".modal.minim .mstage .msponge")', 8000) && await ev('game.paused'), 'a tap on the banner: the mini game, the restaurant waits');
+await wait(1300);
+{
+  const [L, T, W, H] = await ev('(() => { const r = document.querySelector(".mstage").getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()');
+  // (what's left of the stains, the bar, the stars lit: read while the game is still on screen)
+  const look = () => ev('(() => { const c = document.querySelector(".mstage .mstain"); if (!c) return null; const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i]; return { a, bar: parseFloat(document.querySelector(".mbar u").style.width) || 0, stars: document.querySelectorAll(".mbar i.on").length, won: !!document.querySelector(".mini.won") }; })()');
+  const first = await look(); let last = first;
+  await page.mouse.move(L + W * 0.1, T + H * 0.06); await page.mouse.down();
+  rub: for (let pass = 0, i = 0; pass < 3; pass++) {
+    for (let r = 0; r < 10; r++, i++) {
+      await page.mouse.move(L + W * (i % 2 ? 0.92 : 0.08), T + H * (0.06 + 0.88 * r / 9), { steps: 8 });
+      const now = await look();
+      if (!now) break rub;
+      last = now;
+      if (now.won) break rub;
+      if (pass === 0 && r === 5) await shot('9b-scrub');
+    }
+  }
+  await page.mouse.up();
+  check(first.a > 0 && last.a < first.a * 0.6 && last.bar >= 35 && last.stars >= 1, `rubbing wipes the stains away (${Math.round(100 - 100 * last.a / first.a)}% gone), the bar fills (${last.bar}%), ${last.stars} star${last.stars > 1 ? 's' : ''} lit`);
+}
+check(await until('!!document.querySelector(".modal.mres.in")', 15000), 'time is up: the card with the stars');
+await wait(900);
+const sc = await ev('({ clean: game.G.event?.mini, tier: game.S.miniTier("inspector", game.G.event?.mini ?? 0), stars: document.querySelectorAll(".modal.mres .mstars .on").length, can: game.S.miniOf(game.G), paused: game.paused })');
+check(sc.clean >= 0.35 && sc.tier >= 1 && sc.stars === sc.tier && !sc.can && sc.paused, `the kitchen is ${Math.round(sc.clean * 100)}% clean: ${sc.tier} star${sc.tier > 1 ? 's' : ''}; once an inspection`);
+await shot('9c-stars');
+await page.click('.modal.mres [data-x="close"]'); await wait(400);
+check(await ev('!game.paused'), 'the game goes on: he takes his look');
+check(await until('!!document.querySelector(".modal.grade.in")', 90000), 'he has looked: the grade gets a card');
+await wait(900);
+const gr = await ev('({ log: game.G.evLog[0], src: document.querySelector(".modal.grade .gstamp img").getAttribute("src"), ok: document.querySelector(".modal.grade .gstamp img").naturalWidth > 0, text: document.querySelector(".modal.grade").innerText })');
+check(gr.log.kind === 'inspector' && gr.log.mini === sc.tier && gr.ok && gr.src.endsWith(`/${gr.log.grade.toLowerCase()}.webp`) && (sc.tier < 2 || gr.log.grade !== 'C') && (!gr.log.cash || /\$/.test(gr.text)), `grade ${gr.log.grade} on its badge, what it pays`);
+await shot('9d-grade');
+await page.click('.modal.grade [data-x="close"]'); await wait(400);
+// what a scrub is worth (the same inspection, five ways: left alone, then cleaner and cleaner)
+const five = await ev(`(() => { const S = game.S, run = (clean) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip); S.startEvent(g, 'inspector'); const t = clean == null ? null : S.playMini(g, clean); for (let i = 0; i < 6000 && g.event; i++) S.tick(g, 0.1, 1); return { ...g.evLog[0], t, again: S.playMini(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
+{
+  const [no, t0, t1, t2, t3] = five, gi = (r) => 'ABC'.indexOf(r.grade);
+  check(five.every((r) => r.kind === 'inspector' && gi(r) >= 0 && r.again == null) && no.mini === undefined && t0.t === 0 && t1.t === 1 && t2.t === 2 && t3.t === 3, `the inspection alone: grade ${no.grade}; the tiers 0…3`);
+  check(t0.grade === no.grade && t0.cash === no.cash && t1.grade === no.grade && t1.cash > no.cash, 'too little changes nothing; one star: a tip');
+  check(gi(t2) === Math.min(1, gi(no)) && t2.cash > t1.cash - 0.01 && gi(t3) === Math.max(0, gi(no) - 1) && t3.cash > t2.cash && (gi(no) > 0 || t3.mod.dur > no.mod.dur), `two stars: never a C (${t2.grade}); three: a grade better (${t3.grade})`);
+}
+// what a plate cooked by hand is worth (the same critic, five ways), and what the flyers are
+const crit = await ev(`(() => { const S = game.S, run = (score) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip); S.startEvent(g, 'critic'); const t = score == null ? null : S.playMini(g, score); for (let i = 0; i < 9000 && g.event; i++) S.tick(g, 0.1, 1); return { ...g.evLog[0], t, again: S.playMini(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
+{
+  const [no, t0, t1, t2, t3] = crit;
+  check(crit.every((r) => r.kind === 'critic' && r.stars >= 1 && r.again == null) && no.stars > 1 && no.mini === undefined && t0.t === 0 && t1.t === 1 && t2.t === 2 && t3.t === 3, `the critic alone: ${no.stars} stars; the tiers 0…3`);
+  check(t0.stars === no.stars && t0.cash === no.cash && !t0.up && t1.stars === no.stars && t1.cash > no.cash, 'too little changes nothing; one star: a tip');
+  check(t2.stars === Math.max(3, no.stars) && t2.cash > t1.cash && t3.stars === Math.min(5, no.stars + 1) && t3.cash > t2.cash && t3.up && (no.stars < 5 || t3.mod.dur > no.mod.dur), `two stars: never under three (${t2.stars}); three: a star more (${t3.stars})${no.stars === 5 ? ', a rave' : ''}`);
+}
+const thr = await ev(`(() => { const S = game.S, run = (score) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip); S.startEvent(g, 'threat'); const e = g.event, base = e.base, t = score == null ? null : S.playMini(g, score); return { t, need: e.need, won: e.won, cut: base - e.base, again: S.playMini(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
+check(thr[0].won === undefined && thr[1].won === 0 && thr.slice(1).every((r, i) => r.t === i && r.cut === r.won && r.won === Math.ceil(r.need * [0, 0.1, 0.2, 0.3][i]) && r.again == null), `the flyers: +${thr.slice(2).map((r) => r.won).join(', +')} of the ${thr[0].need} to serve`);
 // the courier bay: repair it, hire a courier; an order from the app is cooked, bagged, ridden out on a motor and paid
 await ev('(() => { const g = game.G; g.event = null; g.evNext = g.t + 9999; g.cash = Math.max(g.cash, 1e7); })()');
 // (the busy restaurant above may have done it already)
