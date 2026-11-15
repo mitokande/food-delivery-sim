@@ -802,9 +802,16 @@ function guestLeft(G, c, stars, ev) {
   const e = G.event;
   if (!e || e.cust !== c.id) return;
   if (e.kind === 'critic') {
+    // (their plate cooked by hand: a perfect one is a star more, a good one is never under three; five stars and a
+    // perfect plate is a rave, half as much again and a longer boost. No plate, no help: they walked out)
+    const tier = e.mini == null ? null : stars > 1 ? miniTier('critic', e.mini) : 0, was = stars;
+    if (tier === 3) stars = Math.min(5, stars + 1); else if (tier === 2) stars = Math.max(3, stars);
+    const rave = tier === 3 && was === 5;
     G.stats.stars = Math.max(G.stats.stars, stars);
     const R = { 5: [1.5, 240, 15], 4: [1.3, 180, 8], 3: [1.1, 120, 0], 2: [1, 0, 0], 1: [0.8, 150, 0] }[stars];
-    endEvent(G, e, { ok: stars >= 3, stars, cash: Math.round(avgBill(G) * R[2]), mod: R[1] ? { k: 'walk', x: R[0], dur: R[1], why: 'review' } : null }, ev);
+    const res = { ok: stars >= 3, stars, cash: Math.round(avgBill(G) * (R[2] * (rave ? 1.5 : 1) + (tier ? MINI.critic.tip[tier] : 0))), mod: R[1] ? { k: 'walk', x: R[0], dur: rave ? 360 : R[1], why: 'review' } : null };
+    if (tier != null) { res.mini = tier; res.up = stars > was || rave; }
+    endEvent(G, e, res, ev);
   } else if (e.kind === 'star') {
     endEvent(G, e, stars > 1 ? { ok: true, stars, mod: { k: 'walk', x: 1.4, dur: 180, why: 'fans' } } : { ok: false, stars, mod: { k: 'walk', x: 0.85, dur: 120, why: 'gossip' } }, ev);
   }
@@ -817,22 +824,41 @@ function inspected(G, c, ev) {
   const seats = 2 * (nTables(G, 'dining') + nTables(G, 'terrace')), dirty = Object.keys(G.dirty).length;
   const score = 0.5 * (o ? a / o : 0) + 0.3 * (1 - Math.min(1, G.ema.food * 1.5)) + 0.2 * (1 - (seats ? dirty / seats : 0));
   // (scrubbed before he looked: spotless is a grade better, clean is never a C; an A that shines pays half as much again)
-  const tier = e.clean == null ? null : scrubTier(e.clean), base = score >= 0.7 ? 0 : score >= 0.45 ? 1 : 2;
+  const tier = e.mini == null ? null : miniTier('inspector', e.mini), base = score >= 0.7 ? 0 : score >= 0.45 ? 1 : 2;
   const gi = tier === 3 ? Math.max(0, base - 1) : tier === 2 ? Math.min(1, base) : base, grade = 'ABC'[gi];
-  const shine = tier === 3 && base === 0, bills = { A: 12, B: 5, C: 0 }[grade] * (shine ? 1.5 : 1) + (tier ? SCRUB.tip[tier] : 0);
+  const shine = tier === 3 && base === 0, bills = { A: 12, B: 5, C: 0 }[grade] * (shine ? 1.5 : 1) + (tier ? MINI.inspector.tip[tier] : 0);
   const res = { ok: grade !== 'C', grade, cash: Math.round(avgBill(G) * bills), mod: grade === 'A' ? { k: 'walk', x: 1.2, dur: shine ? 300 : 180, why: 'grade' } : null };
-  if (tier != null) { res.scrub = tier; res.up = gi < base || shine; }
+  if (tier != null) { res.mini = tier; res.up = gi < base || shine; }
   endEvent(G, e, res, ev);
 }
-// The mini game: the kitchen scrubbed before the inspector looks. `clean` is how much of the dirt went (0..1), and
-// the tiers are its stars: 1 a tip for the effort, 2 never a C, 3 a grade better. Not playing changes nothing.
-export const SCRUB = { dur: 12, tiers: [0.35, 0.65, 0.9], tip: [0, 2, 4, 8] }; // (tip: in bills)
-export const scrubTier = (clean) => SCRUB.tiers.filter((x) => clean >= x).length;
-export const canScrub = (G) => G.event?.kind === 'inspector' && G.event.clean == null && G.cust.some((c) => c.id === G.event.cust);
-export function scrub(G, clean) {
-  if (!canScrub(G)) return null;
-  G.event.clean = Math.max(0, Math.min(1, clean));
-  return scrubTier(G.event.clean);
+// The mini games: one to an event, played once while it's on. What comes back is a score (0..1), and the tiers are
+// its stars; not playing changes nothing.
+// - inspector, "scrub": the kitchen scrubbed before he looks. 1 a tip for the effort, 2 never a C, 3 a grade better.
+// - critic, "cook": their plate cooked by hand before it's served. 1 a tip, 2 never under three stars, 3 a star more.
+// - threat, "flyers": flyers handed out in the street; a share of the customers to serve (`cut`, rounded up) counts
+//   as served.
+export const MINI = {
+  inspector: { game: 'scrub', dur: 12, tiers: [0.35, 0.65, 0.9], tip: [0, 2, 4, 8] }, // (tip: in bills)
+  critic: { game: 'cook', dur: 16, tiers: [0.4, 0.65, 0.85], tip: [0, 2, 4, 8] },
+  threat: { game: 'flyers', dur: 15, tiers: [0.4, 0.65, 0.85], cut: [0, 0.1, 0.2, 0.3] },
+};
+export const miniTier = (kind, score) => MINI[kind].tiers.filter((x) => score >= x).length;
+// the event whose game can be played now (its kind), or null
+export function miniOf(G) {
+  const e = G.event;
+  if (!e || !MINI[e.kind] || e.mini != null) return null;
+  if (e.kind === 'threat') return 'threat';
+  const c = G.cust.find((x) => x.id === e.cust);
+  return c && (e.kind === 'inspector' || c.stars == null) ? e.kind : null; // (the critic: until the plate is on the table)
+}
+// the game was played → its tier (null: the event was over before it was)
+export function playMini(G, score) {
+  const kind = miniOf(G), e = G.event;
+  if (!kind) return null;
+  e.mini = Math.max(0, Math.min(1, score));
+  const tier = miniTier(kind, e.mini);
+  if (kind === 'threat') { e.won = Math.ceil(e.need * MINI.threat.cut[tier]); e.base -= e.won; }
+  return tier;
 }
 // have Victor's truck moved on (it costs) → true
 export function repel(G, ev = []) {

@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma oyunu (§14.11), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1388,7 +1388,8 @@ anahtarını verdi. Dal `idle-minigames`.
   - Temizlik oranı: tabaka %25, lekeler %75 (`FILM_W`). Üstteki çubuk oranı ve üç yıldızın eşiklerini gösterir.
   - Süre 12 saniye. Son 3 saniyede saat kırmızı yanar. %100 olursa oyun erken biter.
   - Fırça ayarları `BRUSH` içinde: yarıçap sahnenin %12'si, bir geçişte tabakadan ve lekeden ne kadar sildiği.
-- **Kurallar (`sim.js` `SCRUB`, `scrub`, `scrubTier`, `canScrub`).** Eşikler %35, %65 ve %90.
+- **Kurallar (`sim.js` `SCRUB`, `scrub`, `scrubTier`, `canScrub`; §14.12'de `MINI.inspector`, `playMini`, `miniTier`,
+  `miniOf` oldu).** Eşikler %35, %65 ve %90.
 
   | Yıldız | Temizlik | Etkisi | Bahşiş |
   |---|---|---|---|
@@ -1416,3 +1417,63 @@ anahtarını verdi. Dal `idle-minigames`.
 - **Test.** Tarayıcı testi 120 kontrol. Yeni kontroller: teklif kartı ve duran restoran; süngerli bant; banttan açılan
   oyun; ovmanın lekeleri silmesi, çubuğu ve yıldızları doldurması; yıldız kartı; not kartı; beş temizlik değeri için
   not, para ve artış kuralları. Otomatik kartlar test boyunca `game.ui.guideOff` ile kapalıdır.
+
+### 14.12 Mini oyunlar 2: tabak pişirme ve el ilanı (15 Kasım 2026)
+
+Kullanıcı ovma oyununu beğendi ve PR'ı birleştirdi: "go on with next games". Bu turda iki olay daha kendi oyununu
+aldı: eleştirmen (zamanlama) ve Victor'un kamyonu (dokunma). Dal `idle-minigames2`.
+
+- **Genelleme (`sim.js`).** Ovma oyununa özel kurallar tek tabloya taşındı.
+  - `MINI`: olay türü → oyun, süre, yıldız eşikleri ve ödül (`tip` ya da `cut`).
+  - `miniOf(G)`: şu an oynanabilen oyunun olay türü ya da `null`. `playMini(G, puan)`: sonucu olaya yazar (`e.mini`),
+    yıldız sayısını döndürür. `miniTier(tür, puan)`: puanın yıldızı.
+  - Her olayda oyun bir kez oynanır. Oynamayan oyuncu için hiçbir şey değişmez.
+  - Arayüzde de tek akış var (`ui.js` `MG` tablosu, `miniOffer`, `mini`, `miniDone`): teklif kartı, oyun penceresi,
+    yıldızlı sonuç kartı. Olay bandı oyun oynanabilirken `play` sınıfını alır ve oyunun simgesini gösterir.
+- **Tabak pişirme (`mini.js` `cookGame`, olay: eleştirmen).** Eleştirmen girince "A food critic!" kartı açılır:
+  "Cook!" ya da "Leave it to the kitchen". Tabak masaya gelene kadar bant ve Events kartı da oyunu açar.
+  - Tavaya sırayla beş şey girer (`COOK`): köfte, köftenin öbür yüzü ("Flip!"), ekmek, pastırma, soğan.
+  - Üstteki ibre çiğden yanığa gider. Dokunuş tavadakini ateşten alır; ibre yeşile ne kadar yakınsa o kadar iyi.
+    Yeşilin sarı ortası "Perfect!" (1 puan), yeşilin kalanı "Good!" (0,7), biraz dışı "A bit raw / A bit dark"
+    (0,35), ötesi ve dokunulmayan "Raw! / Burnt!" (0).
+  - Her adım bir öncekinden hızlıdır ve yeşili daha dardır (2,6 sn ve %20'den 1,7 sn ve %14'e). Yeşilin yeri her
+    adımda değişir. Puan, beş adımın ortalamasıdır.
+  - Tavadaki resim ibreyle birlikte çiğden pişmişe, sonra yanığa döner; buhar ve duman da ibreyi izler.
+- **El ilanı (`mini.js` `flyersGame`, olay: Victor'un kamyonu).** Kamyon yola çıkınca "Victor's truck!" kartı açılır:
+  "Hand them out!" ya da "Just serve fast". Bant oyun oynanana kadar "Tap: hand out flyers!" der; oynandıktan sonra
+  eskisi gibi kamerayı kamyona götürür.
+  - Sokaktan 14 kişi ve Victor'un kırmızılı 5 adamı yürür (dört şerit, yukarıdan aşağı, yaklaştıkça büyür).
+  - Bir kişiye dokunmak ona ilan verir (kalpli balon, zıplama). Kırmızılıya dokunmak ilanı boşa harcar: yarım kişi
+    geri alınır, ekran sarsılır.
+  - Puan: (ilan alan − 0,5 × boşa giden) / 14.
+- **Kurallar.** Eşikler iki oyunda da %40, %65 ve %85.
+
+  | Yıldız | Eleştirmen | Bahşiş | Kamyon |
+  |---|---|---|---|
+  | 0 | yok | yok | yok |
+  | 1 | yok | 2 hesap | hedefin %10'u servis edilmiş sayılır |
+  | 2 | yorum 3 yıldızın altına inmez | 4 hesap | %20 |
+  | 3 | yoruma bir yıldız eklenir | 8 hesap | %30 |
+
+  - Yorum zaten 5 yıldızsa 3 yıldızlı tabak "rave" verir: ödül 1,5 katı, yürüyen müşteri artışı 240 yerine 360 saniye.
+  - Eleştirmen yemeğini alamadan çıkarsa (1 yıldız) tabak sayılmaz.
+  - Kamyonda pay yukarı yuvarlanır (hedef 8 ise 1, 2, 3 kişi). Kazanılanlar `e.won` içinde durur ve banttaki sayaca
+    eklenir.
+  - Eleştirmen yemeğini bitirince, oyun oynandıysa eski bildirim yerine yorum kartı çıkar (`reviewCard`): beş
+    yıldız, eleştirmenin cümlesi, para ve yürüyen müşteri artışı.
+- **Ortak çerçeve.** `setup(stage, dur)` artık süreyi de alır. Oyunlar `won` (üç yıldızla bitince), `done` (daha
+  azıyla bitince) ve `tally()` (sonuç kartındaki kısa özet) de verir. `peek()` testlerin oyunu oynaması içindir.
+- **Görseller.** OpenAI `gpt-image-2.6-flare` ile 7 görsel: ocak, sokak, pişenler sayfası (4 malzeme × çiğ, pişmiş,
+  yanık), mutfak aletleri sayfası, yayalar sayfası (6 kişi, 2 kırmızılı), ilan aletleri sayfası, eleştirmenin yüzü.
+  - `assets/ui4/cook/` (19 dosya), `assets/ui4/flyers/` (15 dosya), `assets/ui4/faces/critic.webp`.
+  - İstemler `tools/genart.mjs` içinde (`cook-*`, `flyers-*`, `face-critic`). Sayfaları
+    `python3 tools/genart-mini.py <ham klasör>` keser; kesim çizgisini resimler arasındaki boşluktan seçer.
+  - Anahtar depoya ve belleğe yazılmadı.
+- **Denemek için.** `idle4.html?mini=cook` ve `?mini=flyers` alıştırma açar (sonuç sayılmaz). `?ev=critic` ve
+  `?ev=threat` olayı hemen başlatır.
+- **Denge.** Bot oynamadığı için bot dengesi değişmedi. Zorluk gerçek parmakla henüz denenmedi. Ayar yerleri:
+  `MINI` (süre, eşikler, bahşiş, pay), `COOK` (adım süresi `t`, yeşilin yarı genişliği `hw`), `DONE` (sarı ortanın
+  payı), `WALK` (şeritler, geçiş süresi, yanlış dokunuşun cezası) ve `flyersGame` içindeki kişi sayıları.
+- **Test.** Tarayıcı testi 135 kontrol. Yeni kontroller: kamyonun bandındaki oyun çağrısı, sokak, yayalara dokunuş
+  (biri bilerek kırmızılıya), sayılan müşteriler; eleştirmenin teklif kartı, ocak, beş şeyin yeşilde alınması, yorum
+  kartı; eleştirmen ve kamyon için beş puan değerinde kurallar. Test oyunları `game.ui.playing.peek()` ile oynar.
