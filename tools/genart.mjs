@@ -4,7 +4,8 @@
 //   OPENAI_API_KEY=… node tools/genart.mjs <outdir> [name …]
 // Writes <outdir>/<name>.png (raw, 1536×1024 or 1024×1024); tools/genart-webp.py makes the small webp copies.
 // Also the art of Ferdi's mini games: the scrub-* names (tools/genart-scrub.py cuts those into assets/ui4/scrub), and
-// the cook-*, flyers-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers and faces/critic.webp).
+// the cook-*, flyers-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers and faces/critic.webp),
+// and the duel-* names of the cook-offs (tools/genart-mini.py too: assets/ui4/duel and the rivals' faces).
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -139,6 +140,40 @@ export const ART = {
     + 'a paper flyer, cream with an orange border, with a picture of a burger and a gold star on it and no writing; a hand holding a fanned stack of the same flyers; '
     + 'a white thought bubble with a burger and a red heart in it; a red angry scribble cloud with a lightning bolt; '
     + `a red and black food truck with a striped awning, seen from a three-quarter view; an orange megaphone. ${SHEET}` },
+  // the cook-offs against Victor's chain (the city map and the duel): the stage they're fought on and the map
+  // (portrait), sheets of the rival cooks' faces, of the skills and of the icons. tools/genart-mini.py cuts them into
+  // assets/ui4/duel and assets/ui4/faces.
+  'duel-arena': { size: '1024x1536', prompt: `${UI4} A cook-off stage built on a town square at dusk, seen from high above at a steep angle (almost top-down), filling the whole picture edge to edge, portrait. `
+    + 'Across the top third: a long kitchen counter in glossy red and black with two steel stoves and red banners behind it (the rival burger chain\'s side). '
+    + 'Across the bottom third: a long kitchen counter in warm orange and cream with two steel stoves and striped orange and cream bunting (the home diner\'s side). '
+    + 'Between them, across the middle: a wooden stage floor with a round spotlight on it, warm string lights along the left and right edges and a few potted plants. '
+    + 'The counters are empty: no cooks. Festive, a little dramatic. No people, no text, no letters, no signs with writing.' },
+  'duel-map': { size: '1024x1536', prompt: `${UI4} A painted game world map of a small seaside city seen from above at an angle, portrait, filling the whole picture edge to edge with no border. `
+    + 'The bottom third is a cosy old town: terracotta roofs, a cobbled square with a fountain, market stalls. '
+    + 'The middle third is a harbour: wooden docks, fishing boats, brick warehouses and blue water along the right side. '
+    + 'The top third is a rich uptown: shiny glass towers, a green park and a big dark red and black skyscraper at the very top. '
+    + 'One wide pale sand-coloured road winds in big gentle S-curves from the bottom edge all the way up to the skyscraper, with clear open space along it. '
+    + 'Miniature, toy-like, soft daylight. No people, no cars, no text, no letters, no labels, no map pins.' },
+  'duel-rivals': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Character portrait sheet for a game: eight head-and-shoulders portraits in a neat grid of 4 columns and 2 rows, `
+    + 'each facing the viewer and turned a little to one side, big expressive animated-film faces, smug and cocky but comic, not scary. '
+    + 'The first six work for a rival burger chain and all wear the same bright red cap, red polo shirt and black apron: '
+    + '1) a tall thin young man with a long chin and a crooked grin; 2) a short round woman with two pigtails blowing a pink bubble of gum; '
+    + '3) a big muscular man with a buzz cut and a square jaw; 4) a freckled teenager with messy ginger hair and headphones round his neck; '
+    + '5) a stern older woman with pointed glasses and a grey hair bun; 6) a man with big black sideburns chewing a toothpick. '
+    + 'The last two are their bosses: 7) a sharp district manager, a woman with a sleek black bob, red lipstick, a red blazer and one raised eyebrow; '
+    + '8) a huge celebrity chef with a tall black chef hat, a black chef jacket with red buttons, a curled red moustache and a gold medal. '
+    + `${SHEET}` },
+  'duel-skills': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI skill icon sheet, twelve icons in a neat grid of 4 columns and 3 rows: `
+    + 'a black frying pan with a tall orange flame bursting out of it; a silver serving tray with a cloche and two small white wings; a red heart with a red rose across it and a sparkle; '
+    + 'a glass jar brimming with gold coins; a golden plate with a towering fancy dessert and two lit sparklers; a golden whistle on a red and white lanyard with sound lines; '
+    + 'a red delivery bag with a yellow lightning bolt on it; a giant salt shaker tipped over pouring out a heap of salt; a dark grey smoke cloud rising from a burnt black pan; '
+    + 'a fat cream envelope stuffed with green banknotes; a blue dizzy swirl with sweat drops and little stars; a golden starburst with a crossed fork and knife on it. '
+    + `${SHEET}` },
+  'duel-icons': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, eight icons in a neat grid of 4 columns and 2 rows: `
+    + 'a golden fork with a glossy red heart on its tip; a yellow lightning bolt with a small white wing; a light blue shield with a white snowflake on it; '
+    + 'an orange admission ticket with a gold star and a crossed spatula and whisk on it and no writing; a round badge, half red and half orange, with a crossed spatula and whisk over it; '
+    + 'a map pin: a tiny red and black burger shop standing on a round red base; a map pin: a tiny orange and cream diner with a striped awning and a little flag standing on a round orange base; '
+    + `a map pin: a tiny dark tower with red banners and a golden crown standing on a round black base. ${SHEET}` },
 };
 
 async function gen(name, outdir) {

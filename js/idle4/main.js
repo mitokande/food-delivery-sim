@@ -9,6 +9,7 @@ import { S as courierSave } from '../state.js'; // (audio.js reads its volumes f
 import { keep, restore } from '../native.js';
 import { buzz } from '../haptics.js';
 import * as S from './sim.js';
+import * as D from './duel.js';
 import * as Q from './quests.js';
 import * as St from './store.js';
 import { createUI } from './ui.js';
@@ -30,7 +31,7 @@ try {
   const raw = q.has('fresh') ? null : localStorage.getItem(S.KEY);
   if (raw) {
     const d = JSON.parse(raw);
-    if (d && d.v === 1) { const f = S.fresh(); G = S.migrate({ ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }); fresh = false; }
+    if (d && d.v === 1) { const f = S.fresh(); G = S.migrate({ ...f, ...d, settings: { ...f.settings, ...d.settings }, stats: { ...f.stats, ...d.stats }, seen: { ...d.seen } }); Q.migrate(G); fresh = false; }
   }
 } catch (e) { console.warn('idle4 save load failed', e); }
 let wiped = false;
@@ -66,7 +67,7 @@ addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); applyV
 // ---------------------------------------------------------------- the game object (what ui.js and world.js call)
 let playing = false;
 const game = {
-  G, S, audio, save, canvas, paused: false,
+  G, S, D, audio, save, canvas, paused: false,
   act(a, room, id) {
     const hadYou = !S.youCook(G) || !S.youServe(G);
     const r = S.act(G, a, room, id);
@@ -107,6 +108,31 @@ const game = {
     const r = S.claimSignin(G, game.today(), times);
     if (r) { audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live(); }
     return r;
+  },
+  // the crew: a manager trained with chef's hats
+  trainCrew(room) {
+    const lv = S.train(G, room);
+    if (!lv) { audio.play('ui-error'); ui.toast('Not enough chef\'s hats', 'bad'); return 0; }
+    audio.play('ui-levelup'); buzz(30); save(); ui.live(); ui.renderRoom();
+    return lv;
+  },
+  // the cook-offs (duel.js): one started (a ticket), what it paid when it's over, a full set of tickets for gems
+  duelStart(id, team, dishes) {
+    const X = D.start(G, id, team, dishes, Date.now(), (Date.now() ^ (G.seq * 7919)) | 0);
+    if (!X) { audio.play('ui-error'); return null; }
+    ui.closeRoom(); save();
+    return X;
+  },
+  duelClaim(X) {
+    const r = D.claim(G, X);
+    if (r?.won) buzz(30);
+    save(); ui.live();
+    return r;
+  },
+  duelRefill() {
+    if (!D.refill(G, Date.now())) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return false; }
+    audio.play('ui-purchase'); buzz(20); save(); ui.live();
+    return true;
   },
   // gems: finish the building work at once; cash for gems; a pack bought in the shop (real money: store.js)
   finishNow() {

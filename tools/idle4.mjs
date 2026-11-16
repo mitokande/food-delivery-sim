@@ -10,6 +10,10 @@
 // Phase 4: the courier bay (repair, a courier, a delivery order cooked, bagged and ridden out on a motor, paid), tables
 // left dirty and cleared, managers (locked before level 3, the card, hiring one, standing in the room, buying things for
 // you, the switch).
+// Phase 8: the city (locked before level 3; the map, its pins, the tickets), a Gristle Burger's panel (who cooks there,
+// who goes with which dishes), a cook-off (the game paused, a skill, the win: stars, cash and chef's hats; a loss: the
+// tips), tickets for gems, a district's head office beaten (a Ferdi's there: every bill pays more), training a manager
+// with hats (the bonus grows), a save from before the new quests keeping its place.
 // Phase 10: gems in the top bar, the shop (packs, prices, cash for gems, free gems for the stand-in ad, ?iap=test
 // purchases, the starter pack once), finishing building work with gems.
 // Phase 6: reviews and the mood (the mailbox's Reviews tab), each day's rewards, the daily gift.
@@ -93,7 +97,7 @@ check(/^0[89]:\d\d$/.test(await ev('document.querySelector(".clk").textContent')
 await page.click('.slot.events'); await wait(300);
 check(await ev('document.querySelector(".slot.events").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Events: opens at restaurant level 2"))'), 'events: locked before restaurant level 2');
 await page.click('.slot.managers'); await wait(300);
-check(await ev('document.querySelector(".slot.managers").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Managers: opens at restaurant level 3"))'), 'managers: locked before restaurant level 3');
+check(await ev('document.querySelector(".slot.managers").classList.contains("locked") && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Crew: opens at restaurant level 3"))'), 'managers: locked before restaurant level 3');
 // you do everything: cook, carry, bring the bill
 check(await until('game.G.staff[0].job && game.G.staff[0].job.kind === "cook"', 60000), 'you cook the first order yourself');
 check(await until('game.G.stats.served > 0', 90000), 'and serve it and bring the bill: the first customer paid');
@@ -170,8 +174,8 @@ const c2 = await ev('game.G.cash');
 await ev('document.querySelector("#markers .mk.tipm").click()'); await wait(300);
 check(await ev('game.G.cash') >= c2 + 7 - 0.01 && await ev('game.G.stats.tips') === 1 && !(await ev('game.G.tips.some((t) => t.id === 99999)')), 'a tap picks it up: +$7');
 // a locked feature
-await page.click('.slot.locked[data-f="map"]'); await wait(300);
-check(await ev('[...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("City map: opens at restaurant level 4"))'), 'a locked feature says when it opens');
+await page.click('.slot.city.locked'); await wait(300);
+check(await ev('[...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("The city: opens at restaurant level 3"))'), 'a locked feature says when it opens');
 check(await ev('document.querySelector(".lvb b").textContent') === '1', 'the top bar shows the restaurant level');
 
 // a station brings a dish; the cashier and a register
@@ -429,6 +433,57 @@ check(await ev('!!document.querySelector("#sheet .mgrrow.on")'), 'the kitchen pa
 await page.click('#sheet [data-act="mgrauto"]'); await wait(300);
 check(await ev('game.G.mgr.kitchen.auto === false'), 'the switch: no more buying');
 await ev('game.ui.closeRoom()');
+// the city: a cook-off against a Gristle Burger, chef's hats, training
+await ev('(() => { const g = game.G; g.hats = 0; g.gems = Math.max(g.gems, 40); g.rooms.office.lv = 3; g.duel = { tix: 5, at: null, won: {}, branches: 0, team: [], dishes: [], auto: false }; g.stats.duels = 0; })()'); await wait(600);
+check(await ev('!document.querySelector(".slot.city").classList.contains("locked") && document.querySelector(".slot.city .lock").hidden && !document.querySelector(".slot.city .badge").hidden'), 'the City button is open, with a badge: tickets to spend');
+await page.click('.slot.city'); await wait(600);
+check(await ev('document.querySelectorAll(".citym .pin").length === 15 && document.querySelectorAll(".citym .pin.now").length === 1 && document.querySelectorAll(".citym .pin.shut").length === 14 && document.querySelectorAll(".citym .pin.boss").length === 3 && document.querySelector(".citym .tix b").textContent === "5/5"'), 'the map: 15 Gristle Burgers (3 head offices), the first one open, 5 tickets');
+await shot('9c-city');
+await page.click('.citym .pin[data-stage="1"]'); await wait(300);
+check(await ev('document.querySelector(".citym .stage").hidden && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Beat Market Street first"))'), 'the second one: beat the first one first');
+await page.click('.citym .pin.now'); await wait(400);
+check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelectorAll(".rv").length === game.D.STAGES[0].cooks.length && p.querySelectorAll(".cchip.on").length === 1 && p.querySelector(".cchip.on").dataset.crew === "kitchen" && p.querySelectorAll(".dchip.on").length >= 1 && p.querySelectorAll(".dchip.on").length <= 3 && !!p.querySelector(".dchip.weak.on") && !p.querySelector(\'[data-x="go"]\').disabled && p.querySelector(".pays").textContent.includes("3"); })()'), 'its panel: who cooks there, the head chef goes, the weak dish is picked, what a win pays');
+await shot('9d-stage');
+await page.click('.citym .cchip.on'); await wait(200);
+check(await ev('document.querySelector(\'.citym [data-x="go"]\').disabled && document.querySelector(\'.citym [data-x="go"]\').textContent === "Pick your team"'), 'nobody picked: no cook-off');
+await page.click('.citym .cchip'); await wait(200);
+const dc0 = await ev('game.G.cash');
+await page.click('.citym [data-x="go"]'); await wait(1600);
+check(await ev('!!document.querySelector(".modal.duelm.in") && game.paused && game.G.duel.tix === 4 && !!game.ui.arena.cur && document.querySelectorAll(".duelm .dc.us").length === 1 && document.querySelectorAll(".duelm .dsk").length === 1'), 'the cook-off: its own window, the game paused, a ticket spent');
+await until('game.ui.arena.cur.D.us.pts > 0 && game.ui.arena.cur.D.them.pts > 0', 15000);
+check(await ev('parseInt(document.querySelector(".duelm .dbar.us b").textContent) > 0 && document.querySelector(".duelm .dbar.us i").style.width !== "0%"'), 'plates go to the jury: the scores climb');
+await ev('game.ui.arena.cur.D.us.cooks[0].charge = 1'); await wait(120);
+check(await ev('document.querySelector(".duelm .dsk").classList.contains("ready")'), 'the head chef\'s skill is ready');
+await page.click('.duelm .dsk'); await wait(250);
+check(await ev('game.ui.arena.cur.D.us.cooks[0].charge < 0.5 && document.querySelector(".duelm .dcall").textContent.includes("Flambé")'), 'a tap: Flambé!');
+await shot('9e-duel');
+await ev('(() => { const c = game.ui.arena.cur; c.D.us.pts = c.D.goal - 0.01; c.D.them.pts = 0; c.skip(); })()');
+check(await until('!!document.querySelector(".modal.dres.won.in")', 6000) && await ev('!document.querySelector(".modal.duelm.in") && !game.paused && game.G.duel.won[0] === 3 && game.G.hats === 3 && game.G.stats.duels === 1') && await ev('game.G.cash') > dc0, 'won with three stars: cash and 3 chef\'s hats, the game goes on');
+await shot('9f-duel-won');
+await page.click('.modal.dres [data-x="next"]'); await wait(500);
+check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelector(".sthead b").textContent === game.D.STAGES[1].name && document.querySelector(\'.citym .pin[data-stage="0"]\').classList.contains("won") && document.querySelectorAll(\'.citym .pin[data-stage="0"] .pst img:not(.off)\').length === 3; })()'), 'next: the second one\'s panel; the first pin is a Ferdi\'s flag with 3 stars');
+// (out of tickets: a full set for gems; then a loss)
+await ev('(() => { const g = game.G; g.duel.tix = 0; g.duel.at = Date.now(); })()'); await wait(1200);
+const dg0 = await ev('game.G.gems');
+check(await ev('document.querySelector(\'.citym [data-x="go"]\').dataset.why === "tix" && /\\d:\\d\\d/.test(document.querySelector(".citym .tix small").textContent)'), 'no tickets: the button offers a set, the bar counts down to the next one');
+await page.click('.citym [data-x="go"]'); await wait(400);
+await page.click('.modal.tixm [data-x="buy"]'); await wait(500);
+check(await ev('game.G.duel.tix === 5') && await ev('game.G.gems') === dg0 - 20, '5 tickets for 20 gems');
+await page.click('.citym [data-x="go"]'); await wait(1500);
+await ev('(() => { const c = game.ui.arena.cur; c.D.them.pts = c.D.goal - 0.01; c.D.us.pts = 0; c.skip(); })()');
+check(await until('!!document.querySelector(".modal.dres.lost.in")', 6000) && await ev('game.G.duel.tix === 4 && game.G.stats.duels === 1 && !game.G.duel.won[1] && document.querySelectorAll(".modal.dres .tipsl li").length === 3'), 'a loss: the ticket is gone, nothing won, three tips');
+await shot('9g-duel-lost');
+await page.click('.modal.dres [data-x="crew"]'); await wait(600);
+check(await ev('!document.querySelector(".modal.citym.in") && !!document.querySelector(".modal.managerscard.in") && document.querySelector(\'[data-act="train"][data-room="kitchen"]\').disabled && document.querySelector(".hbal b").textContent === "3" && !!document.querySelector(".mgrrow.on .cstat .sk")'), 'to the crew card: training costs 4 hats, not yet; each one\'s cook-off numbers and skill');
+await ev('game.G.hats = 4'); await page.click('.modal.managerscard [data-act="mgrauto"][data-room="kitchen"]'); await page.click('.modal.managerscard [data-act="mgrauto"][data-room="kitchen"]'); await wait(300);
+const ct0 = await ev('game.S.cookTime(game.G, "burger")'), ht0 = await ev('game.D.hero(game.G, "kitchen").taste');
+await page.click('.modal.managerscard [data-act="train"][data-room="kitchen"]'); await wait(400);
+check(await ev('game.G.mgr.kitchen.lv === 2 && game.G.hats === 0') && await ev('game.S.cookTime(game.G, "burger")') < ct0 && await ev('game.D.hero(game.G, "kitchen").taste') > ht0 && await ev('document.querySelector(".modal.managerscard .mgrrow.on .mt > small").textContent.includes("15%")'), 'the head chef is level 2: cooks work 15% faster, and she cooks better in the city');
+await shot('9h-crew-trained');
+await page.click('.modal.managerscard [data-x="close"]'); await wait(300);
+// (a district's head office)
+check(await ev('(() => { const g = game.G, D = game.D, p0 = game.S.priceOf(g, "burger", "dining"); g.duel.won = { 0: 3, 1: 1, 2: 1, 3: 1 }; g.duel.tix = 5; const X = game.duelStart(4, ["kitchen"], ["burger"]); if (!X) return "no start"; X.us.pts = X.goal - 0.01; while (!X.over) D.tick(X, 0.1); const r = game.duelClaim(X); return r.won && r.branch?.name === "Old Town" && r.gems === 10 + (r.stars === 3 ? 2 : 0) && g.duel.branches === 1 && Math.abs(game.S.priceOf(g, "burger", "dining") / p0 - 1.08) < 0.02 && game.duelClaim(X) === null; })()') === true, 'Old Town\'s head office beaten: 10 gems, a Ferdi\'s there, every bill 8% up; paid once');
+check(await ev('import("./js/idle4/quests.js").then((Q) => { const a = { quest: { i: 34 } }, b = { quest: { i: 33 } }, c = { quest: { i: 5, v: 2 } }; Q.migrate(a); Q.migrate(b); Q.migrate(c); return a.quest.i === 35 && Q.questAt(35).text === "Have a team of 10" && b.quest.i === 33 && Q.questAt(33).k === "duels" && c.quest.i === 5; })'), 'an older save keeps its place in the longer quest chain');
 // the night
 await ev('(() => { const g = game.G, h = game.S.hourOf(g); g.t += ((23 - h + 24) % 24) / 24 * game.S.DAY.len; })()'); await wait(800);
 check(await ev('game.world.scene.background.getHSL({}).l < 0.25 && document.querySelector(".clk").textContent.startsWith("23")'), 'at 23:00 it is night');

@@ -33,3 +33,9 @@ shares one style and one light.
   what's cooked, a column each, raw / done / burnt: `patty0`…`2`, `bun0`…`2`, `bacon0`…`2`, `onion0`…`2`. One 3×2
   sheet: `spatula`, `bell`, `burger`, `steam`, `smoke`, `flame`. One 4×2 sheet of people: `p1`…`p6` (townspeople),
   `v1`, `v2` (Victor's crew, in red). One 3×2 sheet: `flyer`, `hand`, `love`, `angry`, `truck`, `megaphone`.
+- `duel/*.webp` and the faces `todd`, `pip`, `brick`, `kyle`, `sharp`, `sly`, `dolores`, `baron` (the city and its
+  cook-offs): made on 2026-11-16 the same way, the prompts in `tools/genart.mjs` (the `duel-*` names), cut by
+  `tools/genart-mini.py`. `duel/map` and `duel/arena` are one picture each. One 4×2 sheet of the rivals' faces. One
+  4×3 sheet of skills: `flambe`, `express`, `charm`, `tipjar`, `showstopper`, `peptalk`, `rush`, `salt`, `smoke`,
+  `bribe`, `panic`, `crit`. One 4×2 sheet: `taste`, `pace`, `calm`, `ticket`, `emblem`, `pin-rival`, `pin-ours`,
+  `pin-boss`.

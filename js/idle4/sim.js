@@ -12,7 +12,8 @@
 // truck threatens to park outside, a food critic, a celebrity or the health inspector walks in, a tour van stops.
 // The courier bay takes orders from the delivery app: the cooks bag them, couriers ride them out on their motors.
 // A table someone has left is dirty until a waiter clears it. Managers (from restaurant level 3) look after a room:
-// a bonus, and if you like they buy its things for you.
+// a bonus, and if you like they buy its things for you. They are also the crew that cooks against Victor's chain in
+// the city (duel.js): winning there pays the chef's hats that train them.
 // Everyone who leaves counts toward the restaurant's mood (how many leave happy); some write a review. The mood brings
 // people in or keeps them away. Each calendar day's mood is kept, and the next day you play brings a reward by it; so
 // does just coming back each day (a daily gift). Gems, the premium currency, finish building work at once or buy cash.
@@ -133,20 +134,31 @@ const HIRE = { cooks: 'cook', waiters: 'waiter', registers: 'cashier', couriers:
 export const DELIVERY = { rate: 2, max: 3, patience: 150, ride: 36, fee: 1.5 };
 // clearing a table: s at it (× bus tubs)
 export const CLEAR = 1.2;
-// managers: one for a room, from restaurant level MGR_LV; a bonus (k), and they buy the room's things if you let them
-// (when it costs at most MGR_SPEND of the cash)
+// managers: one for a room, from restaurant level MGR_LV; a bonus (k, at crew level 1: `what` says it with the level's
+// number), and they buy the room's things if you let them (when it costs at most MGR_SPEND of the cash)
 export const MGR_LV = 3, MGR_SPEND = 0.5;
 export const MANAGERS = {
-  entrance: { name: 'Rosa', title: 'Host', char: 'female-c', cost: 3000, k: 1.25, what: 'People wait 25% longer on the benches' },
-  dining: { name: 'Marco', title: 'Head waiter', char: 'male-f', cost: 6000, k: 1.1, what: 'Waiters walk 10% faster' },
-  kitchen: { name: 'Aiko', title: 'Head chef', char: 'female-d', cost: 8000, k: 1.1, what: 'Cooks work 10% faster' },
-  cashier: { name: 'Mr. Patel', title: 'Head cashier', char: 'male-d', cost: 5000, k: 1.2, what: 'Paying is 20% quicker' },
-  terrace: { name: 'Lou', title: 'Terrace host', char: 'female-a', cost: 15000, k: 1.1, what: 'People outside pay 10% more' },
-  staff: { name: 'Greta', title: 'Staff manager', char: 'female-f', cost: 10000, k: 2, what: 'Two more on the team' },
-  bay: { name: 'Dex', title: 'Dispatcher', char: 'male-e', cost: 20000, k: 1.15, what: '15% more delivery orders' },
+  entrance: { name: 'Rosa', title: 'Host', char: 'female-c', cost: 3000, k: 1.25, what: (n) => `People wait ${n}% longer on the benches` },
+  dining: { name: 'Marco', title: 'Head waiter', char: 'male-f', cost: 6000, k: 1.1, what: (n) => `Waiters walk ${n}% faster` },
+  kitchen: { name: 'Aiko', title: 'Head chef', char: 'female-d', cost: 8000, k: 1.1, what: (n) => `Cooks work ${n}% faster` },
+  cashier: { name: 'Mr. Patel', title: 'Head cashier', char: 'male-d', cost: 5000, k: 1.2, what: (n) => `Paying is ${n}% quicker` },
+  terrace: { name: 'Lou', title: 'Terrace host', char: 'female-a', cost: 15000, k: 1.1, what: (n) => `People outside pay ${n}% more` },
+  staff: { name: 'Greta', title: 'Staff manager', char: 'female-f', cost: 10000, k: 2, what: (n) => `${n} more on the team` },
+  bay: { name: 'Dex', title: 'Dispatcher', char: 'male-e', cost: 20000, k: 1.15, what: (n) => `${n}% more delivery orders` },
 };
 export const hasMgr = (G, room) => !!G.mgr?.[room];
-const mgrK = (G, room) => (hasMgr(G, room) ? MANAGERS[room].k : 1);
+// the crew: the managers, trained with chef's hats (won in the cook-offs against Victor's chain: duel.js) up to
+// CREW.max. A level adds `gain` of the bonus they came with (the staff manager: one more on the team), and makes them
+// a better cook in a cook-off. hats[lv]: the hats from lv to lv + 1.
+export const CREW = { max: 5, hats: [0, 4, 10, 22, 45], gain: 0.5 };
+export const crewLv = (G, room) => (hasMgr(G, room) ? G.mgr[room].lv || 1 : 0);
+export const crewK = (room, lv) => (room === 'staff' ? MANAGERS.staff.k + lv - 1 : 1 + (MANAGERS[room].k - 1) * (1 + CREW.gain * (lv - 1)));
+export const mgrWhat = (room, lv = 1) => MANAGERS[room].what(room === 'staff' ? crewK(room, lv) : Math.round((crewK(room, lv) - 1) * 100));
+export const trainCost = (G, room) => (hasMgr(G, room) && crewLv(G, room) < CREW.max ? CREW.hats[crewLv(G, room)] : null);
+const mgrK = (G, room) => (hasMgr(G, room) ? crewK(room, crewLv(G, room)) : 1);
+// branches: a district of the city won from Victor (duel.js) gets a Ferdi's of its own; each adds this to every bill
+export const BRANCH = 0.08;
+export const branchK = (G) => 1 + BRANCH * (G.duel?.branches || 0);
 // tips: the chance a paying customer leaves one by their chair (× uniforms), its share of the bill; at most this many
 // lie about at a time
 export const TIPS = { chance: 0.12, share: 0.4, max: 6 };
@@ -177,6 +189,9 @@ export const CHECKOUT = 4, BILL = 1.4, PICK = 0.3, PLACE = 0.45, PLATE = 0.25, I
 export const QMAX = P.QUEUE.length;
 
 // ---------------------------------------------------------------- the save
+// the cook-offs' part of the save: tickets (and when the next one started to come, ms), the stars of each of Victor's
+// branches beaten, the districts won, the team and the dishes last sent
+const newDuel = () => ({ tix: 5, at: null, won: {}, branches: 0, team: [], dishes: [], auto: false });
 const ITEM_START = (room, id) => ROOMS[room].items[id].start ?? (ROOMS[room].items[id].kind === 'st' && ROOMS[room].items[id].dish === 'burger' ? 1 : 0);
 export function fresh(keep = {}) {
   const rooms = {};
@@ -187,16 +202,17 @@ export function fresh(keep = {}) {
     staff: [], cust: [],
     seats: {}, benches: {}, // seat / bench id → customer id
     tickets: [], pass: [], queue: [], regs: [], stBusy: {},
-    online: [], bags: [], dirty: {}, clearing: {}, mgr: {}, // (delivery orders, bags on the shelf, seats to clear and who's on it, managers: room → { auto })
+    online: [], bags: [], dirty: {}, clearing: {}, mgr: {}, // (delivery orders, bags on the shelf, seats to clear and who's on it, managers: room → { auto, lv })
     acc: { walk: 0.7 },
-    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0, delivered: 0, lostOnline: 0, cleared: 0, gems: 0, gemsSpent: 0 },
+    stats: { served: 0, lost: 0, earned: 0, spent: 0, walkins: 0, tips: 0, tipCash: 0, letters: 0, threats: 0, stars: 0, delivered: 0, lostOnline: 0, cleared: 0, gems: 0, gemsSpent: 0, duels: 0, hats: 0 },
     sold: {},
     tips: [], // { id, seat, amount }
     mail: [], // { id, kind: 'letter' | 'away', key, cash, secs, served, read }
-    quest: { i: 0 }, sent: {}, // (the quest you're on; the letters already sent)
+    quest: { i: 0, v: 2 }, sent: {}, // (the quest you're on, the chain's version: quests.js; the letters already sent)
     rep: { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] }, // (reputation; reviews read up to seq `seen`; today so far; days before)
     daily: { last: null, n: 0 }, // (the daily gift: the day it was last claimed, how many so far)
     gems: GEMS.start, shop: { starter: false, bought: 0 }, ads: { key: null, n: {} }, // (gems; the starter pack, packs bought; ads watched today)
+    hats: 0, duel: newDuel(), // (chef's hats; the cook-offs: duel.js)
     event: null, evNext: null, evLog: [], mods: [], quiet: false, // (the event on now, when the next comes, the last few; boosts and slumps)
     ema: { food: 0, plates: 0, seats: 0, pay: 0, quiet: 0, srv: 0 }, // (srv: customers paid a second)
     settings: { music: 0.5, sfx: 1, quality: 'auto', haptics: true },
@@ -211,6 +227,9 @@ export function migrate(G) {
   G.rep ||= { mood: REP.start, reviews: [], seen: 0, day: { key: null, sum: 0, n: 0 }, hist: [] };
   G.daily ||= { last: null, n: 0 };
   G.gems ??= GEMS.start; G.shop ||= { starter: false, bought: 0 }; G.ads ||= { key: null, n: {} };
+  G.hats ??= 0; G.stats.hats ??= 0; G.stats.duels ??= 0; G.duel ||= newDuel();
+  if (G.jobs) { for (const j of G.jobs) addHats(G, j.hats); delete G.jobs; delete G.stats.jobs; } // (a test build's catering jobs: their hats)
+  for (const room in G.mgr) G.mgr[room].lv ||= 1;
   for (const id of ROOM_IDS) {
     G.rooms[id] ||= { lv: ROOMS[id].start, it: {} };
     for (const k of Object.keys(ROOMS[id].items)) G.rooms[id].it[k] ??= ITEM_START(id, k);
@@ -268,12 +287,12 @@ export const avgBill = (G) => (G.stats.served > 10 ? G.stats.earned / G.stats.se
 export const trainK = (G) => step(G, 'office', 'training');
 export const staffSpeed = (G, s) => SPEED.staff * trainK(G) * step(G, 'staff', 'coffee') * (s.role === 'waiter' || s.role === 'you' ? step(G, 'dining', 'service') * mgrK(G, 'dining') : 1);
 export const staffCount = (G) => G.staff.length - 1; // (not you)
-export const staffCap = (G) => STAFF_BASE + (lvOf(G, 'staff') > 0 ? itemOf(G, 'staff', 'lockers') : 0) + (hasMgr(G, 'staff') ? MANAGERS.staff.k : 0);
+export const staffCap = (G) => STAFF_BASE + (lvOf(G, 'staff') > 0 ? itemOf(G, 'staff', 'lockers') : 0) + (hasMgr(G, 'staff') ? crewK('staff', crewLv(G, 'staff')) : 0);
 export const nCouriers = (G) => (lvOf(G, 'bay') > 0 ? itemOf(G, 'bay', 'couriers') : 0);
 export const onlineRate = (G) => nCouriers(G) * DELIVERY.rate * step(G, 'bay', 'app') * mgrK(G, 'bay') * dayK(G); // a minute
 export const rideTime = (G) => DELIVERY.ride * Math.pow(1 - STEP.motors, itemOf(G, 'bay', 'motors'));
 export const clearTime = (G) => CLEAR * Math.pow(1 - STEP.tubs, itemOf(G, 'dining', 'tubs'));
-export const deliveryPrice = (G, dish) => DISH[dish].price * stPrice(itemOf(G, 'kitchen', `st:${dish}`)) * step(G, 'office', 'ledger') * DELIVERY.fee * step(G, 'bay', 'bags');
+export const deliveryPrice = (G, dish) => DISH[dish].price * stPrice(itemOf(G, 'kitchen', `st:${dish}`)) * step(G, 'office', 'ledger') * branchK(G) * DELIVERY.fee * step(G, 'bay', 'bags');
 export const tipChance = (G) => TIPS.chance * step(G, 'staff', 'uniforms');
 export const cookTime = (G, dish) => stTime(dish, itemOf(G, 'kitchen', `st:${dish}`)) / trainK(G) / mgrK(G, 'kitchen');
 export const checkoutTime = (G) => CHECKOUT * Math.pow(1 - STEP.speed, itemOf(G, 'cashier', 'speed')) / trainK(G) / mgrK(G, 'cashier');
@@ -281,7 +300,7 @@ export const benchPatience = (G) => PATIENCE.bench * step(G, 'entrance', 'decor'
 // what a dish brings at a seat (room: 'dining' | 'terrace'), paid at the table or at the register (the cake display)
 export function priceOf(G, dish, room, atRegister) {
   const L = itemOf(G, 'kitchen', `st:${dish}`);
-  return DISH[dish].price * stPrice(L) * step(G, 'office', 'ledger') * (room === 'terrace' ? step(G, 'terrace', 'parasols') * mgrK(G, 'terrace') : step(G, 'dining', 'comfort'))
+  return DISH[dish].price * stPrice(L) * step(G, 'office', 'ledger') * branchK(G) * (room === 'terrace' ? step(G, 'terrace', 'parasols') * mgrK(G, 'terrace') : step(G, 'dining', 'comfort'))
     * (atRegister ? step(G, 'cashier', 'upsell') : 1);
 }
 
@@ -311,13 +330,16 @@ export function readiness(G, room) {
   return [done, of];
 }
 // fame: one number for how far the restaurant has come (the top bar, and the card when a room goes up): a room's level
-// counts squared, then every thing bought, every dish on the menu, everyone on the team, every manager
-export const FAME = { room: 120, item: 6, dish: 150, staff: 25, mgr: 300 };
+// counts squared, then every thing bought, every dish on the menu, everyone on the team, every manager, every level
+// a manager was trained, every star won in a cook-off, every branch
+export const FAME = { room: 120, item: 6, dish: 150, staff: 25, mgr: 300, crew: 100, star: 40, branch: 1500 };
 export const roomFame = (L) => L * L * FAME.room;
 export function fame(G) {
   let f = 0;
   for (const id of ROOM_IDS) { f += roomFame(lvOf(G, id)); for (const k in G.rooms[id].it) f += G.rooms[id].it[k] * FAME.item; }
-  return Math.round(f + menu(G).length * FAME.dish + staffCount(G) * FAME.staff + Object.keys(G.mgr || {}).length * FAME.mgr);
+  for (const room in G.mgr) f += FAME.mgr + (crewLv(G, room) - 1) * FAME.crew;
+  for (const k in G.duel.won) f += G.duel.won[k] * FAME.star;
+  return Math.round(f + menu(G).length * FAME.dish + staffCount(G) * FAME.staff + G.duel.branches * FAME.branch);
 }
 // can this be bought now, apart from the cash? → null, or 'staff' (a hire, and the team is full: lockers first)
 export const itemBlock = (G, room, id) => (HIRE[id] && staffCount(G) >= staffCap(G) ? 'staff' : null);
@@ -356,7 +378,7 @@ function pay(G, cost) { if (cost == null || G.cash + 1e-9 < cost) return false; 
 export function act(G, a, room, id) {
   if (a === 'mgr') {
     if (!mgrOpen(G, room) || !pay(G, MANAGERS[room].cost)) return false;
-    G.mgr[room] = { auto: true };
+    G.mgr[room] = { auto: true, lv: 1 };
     return { mgr: room };
   }
   if (a === 'auto') { if (!hasMgr(G, room)) return false; G.mgr[room].auto = !G.mgr[room].auto; return { auto: room }; }
@@ -970,7 +992,7 @@ export function openMail(G, id) {
 
 // ---------------------------------------------------------------- gems
 export function addGems(G, n) { if (n > 0) { G.gems += n; G.stats.gems += n; } }
-function spendGems(G, n) { if (!(n > 0) || G.gems < n) return false; G.gems -= n; G.stats.gemsSpent += n; return true; }
+export function spendGems(G, n) { if (!(n > 0) || G.gems < n) return false; G.gems -= n; G.stats.gemsSpent += n; return true; }
 // finishing the building work at once: a gem for every GEMS.build s left → the gems it costs (0: nothing being built)
 export const buildGems = (G) => (G.build ? Math.max(1, Math.ceil((G.build.t0 + G.build.dur - G.t) / GEMS.build)) : 0);
 // (the next tick finishes it, as if the time were up: the usual 'built' then)
@@ -1003,6 +1025,16 @@ export function packBought(G, pack) {
   let cash = 0;
   if (pack.once) { G.shop.starter = true; cash = Math.round(perMin(G) * (pack.cashMin || 0)); G.cash += cash; }
   return { gems: pack.gems, cash };
+}
+
+// ---------------------------------------------------------------- the crew
+export function addHats(G, n) { if (n > 0) { G.hats += n; G.stats.hats += n; } }
+// train a manager a level → the new level, or 0 (not hired, at the top, not enough hats)
+export function train(G, room) {
+  const c = trainCost(G, room);
+  if (c == null || G.hats < c) return 0;
+  G.hats -= c;
+  return ++G.mgr[room].lv;
 }
 
 // ---------------------------------------------------------------- while the game is closed

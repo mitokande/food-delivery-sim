@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), ekip `sim.js` içinde, şehir ve aşçı düelloları `duel.js` (saf kurallar) + `arena.js` (arayüz) (§14.13), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1548,3 +1548,62 @@ aldı: eleştirmen (zamanlama) ve Victor'un kamyonu (dokunma). Dal `idle-minigam
   yedi kaydın çalınması ve çözülmesi). Bu turun öbür yeni kontrolleri: kamyonun bandındaki oyun çağrısı, sokak, yayalara dokunuş
   (biri bilerek kırmızılıya), sayılan müşteriler; eleştirmenin teklif kartı, ocak, beş şeyin yeşilde alınması, yorum
   kartı; eleştirmen ve kamyon için beş puan değerinde kurallar. Test oyunları `game.ui.playing.peek()` ile oynar.
+
+### 14.13 8. faz: ekip, şehir ve aşçı düelloları (16 Kasım 2026)
+
+Müdürler artık bir "ekip": seviye atlarlar ve şehirde Victor'un Gristle Burger şubelerine karşı jüri önünde yemek
+düellosuna (cook-off) çıkarlar. Alt çubuktaki "Managers" düğmesi "Crew" oldu; kilitli duran "City" düğmesi açıldı.
+İlk sürümdeki catering işleri (süre dolunca ödül toplanan işler) döngüye bir şey katmadığı için tamamen kaldırıldı
+(`JOBS`, `JOB`, `sendJob`…, `assets/ui4/jobs/`); o test sürümünden kalan bir kayıttaki işlerin şapkası verilir.
+
+- **Döngü.** Restoranı büyüt → ekip güçlenir → şubeyi yen → aşçı şapkası → ekibi eğit (odasına bonusu da büyür) →
+  sıradaki şube. Bir semtin merkez şubesi (boss) düşünce orada bir Ferdi's açılır: bütün hesaplar kalıcı olarak %8
+  artar (`S.BRANCH`, `branchK`; üç semt = +%24).
+- **Aşçı şapkası** (`G.hats`). Yalnızca düellolardan gelir, yalnızca müdür eğitimine harcanır.
+- **Ekip seviyesi** (`sim.js` `CREW`). Her müdür 1–5 seviye (`G.mgr[oda].lv`). Bir seviye, müdürün odasına verdiği
+  bonusun yarısını ekler (`gain: 0.5`): Aiko %10 → %15 → %20 → %25 → %30. Greta her seviyede ekibe bir kişilik yer
+  daha açar. Eğitim bedeli şapkayla: 4, 10, 22, 45. Seviye şöhrete 100 ekler (`FAME.crew`); yıldız 40, şube 1500.
+- **Kurallar: `js/idle4/duel.js`** (saf; saat dışarıdan `now` ile gelir, rastgelelik `seed` ile).
+  - Restoran 3. seviyede açılır (`DUEL.lv`). 15 şube, 3 semt (Old Town, Harbour, Uptown), her semtin 5. şubesi
+    merkez: Dolores Vane, Chef Baron, Victor Gristle. Şubeler sırayla açılır (`STAGES`, `stageOpen`).
+  - Oyuncu en çok 3 müdür ve menüsünden en çok 3 yemek seçer. Her müdürün lezzeti (tabak puanı), hızı (tabaklar
+    arası saniye), sakinliği ve bir yeteneği var (`HEROES`). Lezzet ve sakinlik ekip seviyesiyle (+%22/seviye) ve
+    müdürün odasının seviyesiyle (+%8/seviye) büyür; yemeğin puanı istasyon seviyesiyle (+%4/seviye) büyür. Yani
+    restorana yapılan her yatırım düelloya da yansır.
+  - Her şubenin zayıf olduğu bir yemek var: o yemek ×2 sayar (`DUEL.weak`). Menüde yoksa panel bunu söyler.
+  - Düello bir yarış: hedef puana (`goal` = rakibin gücü × 55 sn) ilk ulaşan kazanır; 90 saniye dolarsa önde olan.
+    Karşı tarafın tabağı aşçının sakinliğini düşürür; sakinlik bitince aşçı 6 sn paniğe girer, %60 sakinlikle döner.
+  - Yetenekler dolunca düğmeye basılır (Auto açıksa kendiliğinden): Flambé (3 tabak birden), Express service (ekip
+    5 sn iki kat hızlı), Charm the jury (jüri rakibi 4 sn görmez), Tip jar (4 tabak +%75), Showstopper (×3 tabak,
+    rakipleri sarsar), Pep talk (herkes sakinleşir, panik biter), Rush order (herkes hemen tabak yollar). Patronların
+    yetenekleri: Salt shaker, Smoke, Envelope.
+  - Yıldız: rakip hedefin yarısına gelmeden biterse 3, %80'ine gelmeden 2, yoksa 1 (`DUEL.stars`).
+  - Ödül (`pays`): ilk galibiyette şubenin şapkası (3 … 25) ve nakdi (gelir dakikası olarak), patronlarda 10 / 20 / 40
+    elmas; ilk 3 yıldızda +2 elmas. Tekrar oynanınca şapkanın %40'ı, nakdin %50'si. Düello nakdi `stats.earned`'e
+    yazılmaz.
+  - Bilet: 5 bilet, biri 20 dakikada dolar (gerçek saat, `sync`/`nextTix`); 20 elmasa tam set (`refill`). Kaybedilen
+    ve bırakılan (`forfeit`) düello da bilet yer.
+- **Arayüz: `js/idle4/arena.js`** (`ui.js` kendi yardımcılarıyla kurar: `arena({...})`).
+  - Şehir kartı: boyalı harita, 15 iğne (kazanılan: Ferdi's bayrağı ve yıldızları; sıradaki zıplar; merkezler
+    taçlı), üstte bilet (geri sayımıyla), şapka ve açılan şube sayısı.
+  - Şube paneli: kimler pişiriyor, zayıf yemek, takım ve yemek seçimi, yetenek listesi, güç ölçer (bizim güç /
+    onların gücü), ödüller, "Cook-off!" düğmesi (bilet yoksa elmasla bilet önerir).
+  - Düello penceresi (oyun arkada duraklar): iki tezgâh, jüriye uçan tabaklar, iki skor çubuğu, süre, yetenek
+    düğmeleri (dolum halkası), Auto. X ile çıkmak kaybetmek demek.
+  - Sonuç kartı: yıldızlar ve ödüller, semt düşünce şube müjdesi; kayıpta üç ipucu (zayıf yemeği getir / ekle,
+    ekibi eğit, istasyonları yükselt, odaları yenile) ve ekip kartına kısayol.
+  - Ekip kartı tek sayfa: her müdürün düello sayıları ve yeteneği de yazıyor.
+- **Görevler.** Zincire dört görev eklendi (`quests.js`): bir düello kazan, bir eğitim, Old Town'da şube aç,
+  6 eğitim. Eski kayıtlar yerini korur (`Q.migrate`, `G.quest.v = 2`).
+- **Rehber.** İlk müdür işe alınınca Rita şehri anlatır (`city` adımı, City düğmesini gösterir).
+- **Görseller.** Hepsi GPT Image 2.6 ile, `tools/genart.mjs` (`duel-*` adları), `tools/genart-mini.py` keser:
+  `assets/ui4/duel/` (harita, arena, 10 yetenek + panik + kritik ikonu, lezzet/hız/sakinlik/bilet/amblem, üç iğne)
+  ve sekiz rakip yüzü (`assets/ui4/faces/`).
+- **Denge.** `node tools/idle4duel.mjs` simülasyonuyla ayarlandı (yedi ilerleme durumu × 15 şube, 40ar düello): 1 müdürle ilk 2 şube, 2 müdürle Old
+  Town'ın çoğu, 3 müdür 2. seviyeyle Harbour'ın ortası, 5 müdür 3–4. seviyeyle Uptown'ın başı, 7 müdür 4. seviyeyle
+  hepsi. Denk bir düello 20–55 sn sürer. Gerçek oyuncuyla denenmedi. Ayar yerleri: `DUEL`, `HEROES`, `SKILLS`,
+  `STAGES` (`k`: şubenin gücü, `hats`, `pay`).
+- **Test.** Tarayıcı testi 168 kontrol. Bu fazın kontrolleri: kilitli/açık City düğmesi, harita ve iğneler, kilitli
+  şube, şube paneli, takımsız başlamama, düello penceresi (duraklama, bilet, skor), yetenek, 3 yıldızlı galibiyet
+  ve ödülü, sıradaki şube, biletsizlik ve elmasla bilet, kayıp ve ipuçları, ekip kartı ve eğitim, merkez şube ve
+  %8 hesap artışı, eski kaydın görev zincirindeki yeri.
