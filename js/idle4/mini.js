@@ -9,9 +9,9 @@
 // What a result is worth is sim.js's business (MINI); the window round the frame, and the cards with the result, are
 // ui.js's. The art is in assets/ui4/scrub, cook and flyers.
 
-const IMG = (n) => `assets/ui4/${n}.webp`;
-const load = (src) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
-const rnd = (a, b) => a + Math.random() * (b - a);
+export const IMG = (n) => `assets/ui4/${n}.webp`;
+export const load = (src) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+export const rnd = (a, b) => a + Math.random() * (b - a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The frame. Builds itself in `host` and plays `game` for `dur` seconds. `done` resolves with the score (0..1) when

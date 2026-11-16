@@ -11,6 +11,7 @@ import { app } from '../native.js';
 import * as St from './store.js';
 import { buzz } from '../haptics.js';
 import * as Mini from './mini.js';
+import * as Fix from './fix.js';
 import * as D from './duel.js';
 import { arena } from './arena.js';
 
@@ -84,6 +85,7 @@ const BUILT_TEXT = {
 const BLOCK_TEXT = {
   office: (G) => `Upgrade Ferdi's Office to Lv ${S.officeLv(G) + 1} first`,
   build: () => 'Another room is being worked on',
+  fix: () => 'Clear it out by hand first',
   gate: (G, room) => `Needs restaurant level ${S.ROOMS[room].gate}`,
   max: () => 'As good as it gets (for now)',
   soon: (G, room) => `Coming in a later update (${S.ROOMS[room].soon})`,
@@ -199,8 +201,16 @@ export function createUI(game) {
     let html = '';
     if (R.soon) html = `<div class="note">${BLOCK_TEXT.soon(g, room)}. ${room === 'bay' ? 'Couriers will ride from here.' : 'More staff will fit in with lockers and a break room.'}</div>`;
     else if (lv === 0) {
-      const cost = S.upCost(g, room);
-      html = `<div class="repair"><p>${R.blurb}</p>
+      const cost = S.upCost(g, room), f = FX[room], fixed = g.rooms[room].fix;
+      // (a ruin is cleared out by hand first, in a mini game: fix.js; then the builders are paid to come)
+      if (block === 'fix') html = `<div class="repair"><p>${R.blurb}</p>
+        <div class="fixstep"><span class="fsi">${UI(f.icon)}</span><span class="fst"><b>${f.title}</b><small>${f.lead}</small></span></div>
+        <div class="mtiers">${[1, 2, 3].map((i) => `<span>${STARS(i)}<small>+${M(S.fixCash(room, i))}</small></span>`).join('')}</div>
+        <button class="btn gold big" data-act="fix" data-room="${room}">${UI(f.icon)} ${f.go}<small>Free</small></button>
+        ${S.canSkipFix(g, room) ? `<button class="btn ghost" data-act="fixskip" data-room="${room}">Leave it to the crew</button>` : ''}
+        <small class="hint">Then the builders come: Repair · ${M(cost)}</small></div>`;
+      else html = `<div class="repair"><p>${R.blurb}</p>
+        ${fixed != null ? `<div class="fixed">${UI(f.icon)}<b>${f.done}</b>${fixed ? STARS(fixed) : ''}</div>` : ''}
         ${b ? `<div class="prog"><span class="pbar"><u data-live="build"></u></span><small data-live="eta"></small></div>${hurryRow(g)}`
           : block ? `<button class="btn big" disabled>${BLOCK_TEXT[block](g, room)}</button>`
           : `<button class="btn gold big" data-act="up" data-room="${room}" data-cost="${cost}">Repair · ${M(cost)}<small>${secs(S.upTime(g, room))}</small></button>`}</div>`;
@@ -429,9 +439,9 @@ export function createUI(game) {
     sfx('ui-open', { vol: 0.5 });
   }
   // the game in its window: → { score (0..1), tally (the result in a few words) }, or null if it was left before it began
-  function mini(kind) {
-    const d = MG[kind], cfg = S.MINI[kind], g = d.make({ sfx, buzz, loop: sfxLoop, warm: sfxWarm });
-    const m = modal(`<h2>${UI(d.icon)} ${d.play}</h2><div class="mhost"></div>`, { cls: `minim k-${kind}`, pause: true });
+  const mini = (kind) => { const d = MG[kind]; return playIn(d.make({ sfx, buzz, loop: sfxLoop, warm: sfxWarm }), d.icon, d.play, `k-${kind}`, S.MINI[kind]); };
+  function playIn(g, icon, title, cls, cfg) {
+    const m = modal(`<h2>${UI(icon)} ${title}</h2><div class="mhost"></div>`, { cls: `minim ${cls}`, pause: true });
     const frame = Mini.play($('.mhost', m.card), g, { dur: cfg.dur, tiers: cfg.tiers, sfx, buzz });
     const x = document.createElement('button'); x.className = 'xr'; x.type = 'button'; x.setAttribute('aria-label', 'Stop'); x.innerHTML = X;
     x.addEventListener('click', () => { frame.leave(); sfx('ui-back', { vol: 0.4 }); }); m.card.append(x);
@@ -491,6 +501,38 @@ export function createUI(game) {
     if (d === 'quiet') return ['entrance', 'Empty tables: a better sign brings people in'];
     return null;
   }
+  // ---------- the repairs by hand ----------
+  // A room in ruins is cleared out in a mini game (S.FIX, fix.js) before the builders are paid: its step in the room's
+  // panel (renderRoom), the game in the same window as the others, and the card of what was found in the mess.
+  const FX = {
+    entrance: { icon: 'fix/crowbar', title: 'Boarded up!', lead: 'Somebody nailed the door shut. Pull the boards off it yourself.', go: 'Pull the boards', play: 'Pull the boards!', done: 'Boards pulled off' },
+    cashier: { icon: 'fix/toolbox', title: 'No power!', lead: 'The fuse box is a tangle. Put every wire back where it belongs.', go: 'Fix the wiring', play: 'Fix the wiring!', done: 'Wiring fixed' },
+    office: { icon: 'fix/roller', title: 'Peeling walls!', lead: 'Uncle Ferdi never painted this wall. Roll a fresh coat over it.', go: 'Paint the wall', play: 'Paint the wall!', done: 'Wall painted' },
+    staff: { icon: 'fix/wrench', title: 'Leaky pipes!', lead: 'The old pipes leak at every joint. Shut the leaks as they spring.', go: 'Stop the leaks', play: 'Stop the leaks!', done: 'Leaks stopped' },
+    terrace: { icon: 'fix/glove', title: 'Overgrown!', lead: 'Weeds and rubbish all over the paving. Pull them out.', go: 'Clear the weeds', play: 'Clear the weeds!', done: 'Weeds cleared' },
+    bay: { icon: 'fix/bolt', title: 'Loose door!', lead: 'The garage door hangs by its bolts. Tighten them up.', go: 'Tighten the bolts', play: 'Tighten the bolts!', done: 'Bolts tightened' },
+  };
+  const FIX_TIERS = [['Not quite…', 'It has to be cleared before the builders can start.'], ['That will do', 'Cleared out.'], ['Good work!', 'Cleared out, and quickly.'], ['Perfect!', 'Not a thing left to do.']];
+  const fixPlay = (room) => { const d = FX[room], cfg = S.FIX[room]; return playIn(Fix.GAMES[cfg.game]({ sfx, buzz }), d.icon, d.play, `k-fix k-${cfg.game}`, cfg); };
+  // what came of it: res = S.fixRoom's { tier, cash, done } (`practice`: nothing was at stake)
+  function fixDone(room, res, tally, practice) {
+    const d = FX[room], R = S.ROOMS[room], [title, what] = FIX_TIERS[res.tier], g = G();
+    const m = modal(`<h2>${UI(d.icon)} ${title}</h2>
+      ${STARS(res.tier)}
+      <p class="mpct">${tally}</p>
+      ${res.cash ? `<div class="gwin"><span>${UI('fix/tin')}<b>+${M(res.cash)}</b></span></div>` : ''}
+      <p class="small">${practice ? 'Just practice: nothing to repair here.' : res.done ? `${what} ${res.cash ? 'Look what was lying in the mess! ' : ''}Now the builders can repair the ${R.name}.` : `${what} Have another go!`}</p>
+      <button class="btn big gold" data-x="${practice ? 'close' : res.done ? 'room' : 'again'}">${practice ? 'Done' : res.done ? 'To the builders' : 'Try again'}</button>
+      ${!practice && !res.done && S.canSkipFix(g, room) ? '<button class="btn ghost" data-x="skip">Leave it to the crew</button>' : ''}`, { cls: 'mres fixres', pause: true });
+    m.card.addEventListener('click', (ev) => {
+      const x = ev.target.closest('[data-x]')?.dataset.x; if (!x) return;
+      m.close();
+      if (x === 'again') game.fix(room); else if (x === 'skip') game.fixSkip(room); else if (x === 'room') game.openRoom(room);
+    });
+    [1, 2, 3].forEach((i) => { if (i <= res.tier) setTimeout(() => sfx('qte-good', { vol: 0.5 }), 250 * i); });
+    if (res.cash) setTimeout(() => sfx('ui-coins', { vol: 0.5 }), 900);
+    if (!res.tier) sfx('order-late', { vol: 0.4 });
+  }
   // what stands between you and the quest → [room, text] or null
   function questHelp(g, q) {
     const room = q.room;
@@ -498,6 +540,7 @@ export function createUI(game) {
       if (S.building(g, r)) return [r, 'Being worked on'];
       if (g.build) return [g.build.room, 'Another room is being worked on'];
       const b = S.upBlock(g, r);
+      if (b === 'fix') return [r, 'Ready to clear out by hand'];
       if (b === 'gate') return ['office', `Needs restaurant level ${S.ROOMS[r].gate}: upgrade Ferdi's Office`];
       if (b === 'office') return ['office', `Upgrade Ferdi's Office to Lv ${S.officeLv(g) + 1} first`];
       if (b === 'items') { const [a, o] = S.readiness(g, r); return [r, `Max out everything in the ${S.ROOMS[r].name} first (${a}/${o})`]; }
@@ -679,7 +722,7 @@ export function createUI(game) {
       'Oh! You must be the new owner. I\'m Rita. I waited tables here for thirty years, for your uncle.',
       'Ferdi cooked every burger himself, the stubborn old goat. You can\'t do it all alone. Hire a cook first: the bar at the bottom always says what\'s next.'] },
     { key: 'cook', when: (g) => S.nCooks(g) > 0, point: '.quest', lines: ['A cook in the kitchen, lovely. Now somebody has to carry the plates: hire a waiter in the Dining Hall.'] },
-    { key: 'free', when: (g) => !S.youCook(g) && !S.youServe(g), lines: ['Look at that, the place runs without you! Now fix up the rooms in ruins, one by one. Tap one to see what it costs.'] },
+    { key: 'free', when: (g) => !S.youCook(g) && !S.youServe(g), lines: ['Look at that, the place runs without you! Now fix up the rooms in ruins, one by one. Tap one: you clear it out yourself first, then the builders come.'] },
     { key: 'build', when: (g) => !!g.build, point: '#markers .mk.bmk', lines: ['The builders are in! Tap the timer over the room to lend them a hand. It goes faster.'] },
     { key: 'built', when: (g) => !g.build && S.ROOM_IDS.some((r) => S.lvOf(g, r) > S.ROOMS[r].start), lines: [
       'Every room has things to buy. Fill them all up, and the room can be renovated to the next level.',
@@ -948,6 +991,8 @@ export function createUI(game) {
     else if (a === 'mgr' || a === 'mgrauto') game.act(a === 'mgr' ? 'mgr' : 'auto', el.dataset.room);
     else if (a === 'evfocus') { if (S.miniOf(G())) game.mini(); else if (!game.world?.focusEvent()) eventsCard(); }
     else if (a === 'settings') settings();
+    else if (a === 'fix') game.fix(el.dataset.room);
+    else if (a === 'fixskip') game.fixSkip(el.dataset.room);
     else if (a === 'item' || a === 'up') {
       if (game.act(a, el.dataset.room, el.dataset.id)) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
     }
@@ -955,7 +1000,7 @@ export function createUI(game) {
 
   Object.defineProperty(api, 'room', { get: () => room }); // (the open room, or null)
   Object.assign(api, {
-    city: (at) => Arena.city(at), arena: Arena, toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, shop, standInAd, eventsCard, eventNote, mini, miniDone, live, openRoom, closeRoom, renderRoom,
+    city: (at) => Arena.city(at), arena: Arena, toast, modal, story, built, upgraded, away, mailbox, letter, daysCard, signin, shop, standInAd, eventsCard, eventNote, mini, miniDone, fixPlay, fixDone, live, openRoom, closeRoom, renderRoom,
     claimed(q) { toast(`${UI('quest')} Quest done: +${M(q.cash)}`, 'good'); questEl.classList.remove('pop'); void questEl.offsetWidth; questEl.classList.add('pop'); },
     hired(s) { toast(`${IT({ cook: 'pan', waiter: 'tray', courier: 'helmet' }[s.role] || 'register')} ${s.name} joins as a ${s.role}!`, 'good'); },
     managerJoined(room) { const m = S.MANAGERS[room]; toast(`${MGR_IC(room)} ${m.name} joins as ${m.title.toLowerCase()} of the ${S.ROOMS[room].name}!`, 'good'); },

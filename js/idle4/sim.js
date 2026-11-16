@@ -344,13 +344,15 @@ export function fame(G) {
 // can this be bought now, apart from the cash? → null, or 'staff' (a hire, and the team is full: lockers first)
 export const itemBlock = (G, room, id) => (HIRE[id] && staffCount(G) >= staffCap(G) ? 'staff' : null);
 // can the room go up a level now? → null, or why not: 'max' | 'soon' | 'build' (a renovation is going on somewhere) |
-// 'office' (the office has to go up first) | 'gate' (a repair waiting for the office) | 'items' (not everything at its cap)
+// 'office' (the office has to go up first) | 'gate' (a repair waiting for the office) | 'fix' (a room in ruins to clear
+// out by hand first) | 'items' (not everything at its cap)
 export function upBlock(G, room) {
   const R = ROOMS[room], L = lvOf(G, room);
   if (R.soon) return 'soon';
   if (L >= MAXLV || !R.up[L] || !R.up[L][0]) return 'max';
-  if (G.build) return 'build';
   if (L === 0 && officeLv(G) < R.gate) return 'gate';
+  if (needsFix(G, room)) return 'fix';
+  if (G.build) return 'build';
   if (room !== 'office' && L >= 1 && L + 1 > officeLv(G) + 1) return 'office';
   if (L >= 1) { const [d, o] = readiness(G, room); if (d < o) return 'items'; }
   return null;
@@ -890,6 +892,44 @@ export function playMini(G, score) {
   const tier = miniTier(kind, e.mini);
   if (kind === 'threat') { e.won = Math.ceil(e.need * MINI.threat.cut[tier]); e.base -= e.won; }
   return tier;
+}
+
+// ---------------------------------------------------------------- the repairs by hand
+// A room in ruins is cleared out by hand before the builders are paid to come: a mini game to each (FIX), played once.
+// Its stars are cash found in the mess: a share of what the repair costs (`back`, at least `least`). Under a star it's
+// played again; after FIX_SKIP tries the crew can be left to it (no cash). Rooms repaired already never ask.
+// - entrance, "planks": the nails pulled out of the boards over the door,
+// - cashier, "wires": each wire plugged in where its colour is,
+// - office, "paint": the wall painted over with the roller,
+// - staff room, "leaks": the leaks in the pipes shut as they spring,
+// - terrace, "weeds": weeds and rubbish pulled off the paving,
+// - courier bay, "bolts": the bolts of the garage door turned tight.
+export const FIX = {
+  entrance: { game: 'planks', dur: 12, tiers: [0.4, 0.8, 1] },
+  cashier: { game: 'wires', dur: 16, tiers: [0.34, 0.67, 1] },
+  office: { game: 'paint', dur: 12, tiers: [0.45, 0.75, 0.97] },
+  staff: { game: 'leaks', dur: 16, tiers: [0.4, 0.65, 0.9] },
+  terrace: { game: 'weeds', dur: 13, tiers: [0.4, 0.7, 1] },
+  bay: { game: 'bolts', dur: 15, tiers: [0.4, 0.7, 1] },
+};
+export const FIX_CASH = { back: [0, 0.08, 0.15, 0.25], least: [0, 5, 10, 15] };
+export const FIX_SKIP = 2;
+export const fixTier = (room, score) => FIX[room].tiers.filter((x) => score >= x).length;
+// the cash a room's stars are worth
+export const fixCash = (room, tier) => Math.round(Math.max(FIX_CASH.least[tier], ROOMS[room].up[0][0] * FIX_CASH.back[tier]));
+// is the room still to be cleared out by hand?
+export const needsFix = (G, room) => !!FIX[room] && lvOf(G, room) === 0 && G.rooms[room].fix == null;
+// can it be now? (not before the office lets the room be repaired)
+export const canFix = (G, room) => needsFix(G, room) && !ROOMS[room].soon && officeLv(G) >= ROOMS[room].gate;
+export const canSkipFix = (G, room) => canFix(G, room) && (G.rooms[room].tries || 0) >= FIX_SKIP;
+// the game was played (score 0..1; null: left to the crew) → { tier, cash, done } or null
+export function fixRoom(G, room, score) {
+  if (!canFix(G, room) || (score == null && !canSkipFix(G, room))) return null;
+  const r = G.rooms[room], tier = score == null ? 0 : fixTier(room, score);
+  if (score != null && !tier) { r.tries = (r.tries || 0) + 1; return { tier, cash: 0, done: false }; }
+  const cash = fixCash(room, tier);
+  r.fix = tier; delete r.tries; G.cash += cash; G.stats.fixes = (G.stats.fixes || 0) + 1;
+  return { tier, cash, done: true };
 }
 // have Victor's truck moved on (it costs) → true
 export function repel(G, ev = []) {

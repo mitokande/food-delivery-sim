@@ -899,3 +899,78 @@
 .modal.dres .btn + .btn { width: 100%; min-height: 40px; margin-top: 8px; }
 .tipsl { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; text-align: left; }
 .tipsl li { display: flex; align-items: center; gap: 6px; padding: 5px 9px 5px 4px; border-radius: 11px; background: #fff; box-shadow: var(--row); font-size: 12.5px; font-weight: 700; line-height: 1.2; color: var(--navy-ink); } .tipsl .u4 { flex: none; width: 24px; height: 24px; }
+
+/* the repairs by hand (js/idle4/fix.js): a layer over the picture each is played on; sizes are of the stage's width */
+.fix { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.fix > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fix img { display: block; -webkit-user-drag: none; }
+.fix.zap::after, .fix.oops::after { content: ''; position: absolute; inset: 0; z-index: 300; background: rgba(255,240,150,.7); animation: fflash .35s ease-out both; }
+.fix.oops::after { background: rgba(90,170,255,.5); }
+@keyframes fflash { to { opacity: 0; } }
+.fpuff { position: absolute; z-index: 200; transform: translate(-50%, -50%); animation: fpuff .5s ease-out both; }
+.fpuff.spin { animation-name: fspark; }
+@keyframes fpuff { from { transform: translate(-50%, -50%) scale(.4); } to { transform: translate(-50%, -62%) scale(1.25); opacity: 0; } }
+@keyframes fspark { from { transform: translate(-50%, -50%) scale(.3); } to { transform: translate(-50%, -50%) scale(1.3) rotate(90deg); opacity: 0; } }
+/* (the tool that strikes where you tapped: the crowbar's hook, the wrench's jaw on the point) */
+.ftool { position: absolute; z-index: 150; width: 30%; margin: -20% 0 0 -1%; opacity: 0; transform-origin: 4% 77%; filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); }
+.leaks .ftool { margin: -5% 0 0 -24%; transform-origin: 80% 18%; }
+.ftool.go { animation: ftool .32s ease-out; }
+@keyframes ftool { 0% { opacity: 1; transform: rotate(18deg); } 60% { opacity: 1; transform: rotate(-22deg); } 100% { opacity: 0; transform: rotate(-22deg); } }
+/* the boards */
+.fp { position: absolute; transform: translate(-50%, -50%) rotate(var(--r)); filter: drop-shadow(0 5px 3px rgba(0,0,0,.45)); transition: transform .6s cubic-bezier(.5,0,.9,.6), opacity .2s .4s; }
+.fp > img:first-child { width: 100%; }
+.fp.fall { transform: translate(-50%, 900%) rotate(calc(var(--r) + var(--d) * 50deg)); opacity: 0; }
+.fn { position: absolute; top: 50%; width: 8.5%; transform: translate(-50%, -50%); filter: saturate(.15) brightness(1.3) drop-shadow(0 2px 1px rgba(0,0,0,.5)); transition: transform .15s, opacity .2s; }
+.fn.rusty { width: 10.5%; filter: drop-shadow(0 2px 1px rgba(0,0,0,.5)); }
+.fn.loose { transform: translate(-50%, -62%) rotate(25deg) scale(1.12); }
+.fn.out { transform: translate(-50%, -260%) scale(1.5); opacity: 0; }
+/* the wires */
+.wires > canvas { z-index: 2; }
+.fk { position: absolute; z-index: 1; width: 17%; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 2px rgba(0,0,0,.45)); transition: transform .12s; }
+.fk.held { transform: translate(-50%, -50%) scale(1.14); }
+.fk.in { filter: drop-shadow(0 0 7px rgba(255,235,120,.95)); }
+.fk.no { animation: fno .35s; }
+@keyframes fno { 25% { transform: translate(-62%, -50%); } 50% { transform: translate(-40%, -50%); } 75% { transform: translate(-56%, -50%); } }
+/* the paint */
+.froller { position: absolute; left: 0; top: 0; z-index: 3; width: 34%; margin: -9% 0 0 -9.5%; filter: drop-shadow(0 6px 4px rgba(0,0,0,.35)); will-change: transform; }
+.froller.idle { animation: frollidle 1s ease-in-out infinite; }
+@keyframes frollidle { 50% { margin-top: calc(-9% - 10px); } }
+/* the leaks */
+.fl { position: absolute; width: 36%; transform: translate(-100%, -50%) rotate(calc(var(--r) - 180deg)); transform-origin: 100% 50%; }
+.fl img { width: 100%; transform: scale(calc(.55 + var(--f, 0) * .6)); transform-origin: 100% 50%; animation: fspray .14s linear infinite alternate; }
+@keyframes fspray { to { opacity: .8; } }
+.fl.shut { width: 22%; transform: translate(-50%, -50%); animation: fshut .9s both; }
+.fl.shut img { transform: none; animation: none; filter: drop-shadow(0 4px 2px rgba(0,0,0,.4)); }
+@keyframes fshut { 0% { transform: translate(-50%, -50%) scale(1.6); } 20%, 75% { transform: translate(-50%, -50%); opacity: 1; } 100% { transform: translate(-50%, -50%); opacity: 0; } }
+.fwater { position: absolute; left: 0; right: 0; bottom: 0; height: 0; z-index: 100; background: linear-gradient(180deg, rgba(120,195,255,.6), rgba(40,110,220,.7)); border-top: 4px solid rgba(255,255,255,.7); transition: height .4s; }
+/* the weeds */
+.fw2 { position: absolute; width: 24%; transform: translate(calc(-50% + var(--x, 0px)), calc(-85% + var(--y, 0px))); filter: drop-shadow(0 4px 2px rgba(0,0,0,.35)); transition: transform .15s; }
+.fw2.junk { width: 21%; }
+.fw2.held { transition: none; filter: brightness(1.12) drop-shadow(0 8px 4px rgba(0,0,0,.35)); }
+.fw2.out { transform: translate(calc(-50% + var(--x)), calc(-85% + var(--y))) rotate(40deg); opacity: 0; transition: transform .35s ease-in, opacity .35s ease-in; }
+.fglove { position: absolute; left: 0; top: 0; z-index: 250; width: 20%; margin: -24% 0 0 -8%; opacity: 0; transition: opacity .15s; filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); will-change: transform; }
+.fglove.on { opacity: 1; }
+/* the bolts */
+.fb { position: absolute; width: 23%; aspect-ratio: 1; transform: translate(-50%, -50%); transition: transform .12s; }
+.fb img { position: relative; width: 100%; height: 100%; transform: rotate(var(--a, 0rad)) scale(calc(1.16 - var(--p, 0) * .16)); filter: drop-shadow(0 5px 3px rgba(0,0,0,.5)); }
+.fring { position: absolute; inset: -16%; border-radius: 50%; background: conic-gradient(#8be06f calc(var(--p, 0) * 360deg), rgba(15,25,45,.5) 0); -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 82%); mask: radial-gradient(closest-side, transparent 80%, #000 82%); }
+.fb.now { transform: translate(-50%, -50%) scale(1.08); }
+.fb.done .fring { background: #ffd24a; filter: drop-shadow(0 0 6px rgba(255,220,90,.9)); }
+.fwrench { position: absolute; left: 0; top: 0; z-index: 5; width: 42%; margin: -8% 0 0 -33%; transform-origin: 79% 19%; opacity: 0; transition: opacity .12s; filter: drop-shadow(0 6px 4px rgba(0,0,0,.45)); }
+.fwrench.on { opacity: 1; }
+/* its step in a ruin's panel, the label over the ruin, the card after */
+.fixstep { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; padding: 8px 12px 8px 8px; border-radius: 14px; background: #fff; box-shadow: var(--row); text-align: left; }
+.fixstep .fsi { flex: none; width: 58px; height: 58px; } .fixstep .fsi .u4 { display: block; width: 100%; height: 100%; object-fit: contain; }
+.fixstep .fst b { display: block; font: var(--dw) 18px/1.1 var(--display); color: var(--navy-ink); }
+.fixstep .fst small { display: block; margin-top: 2px; font-size: 13px; font-weight: 600; color: #4d6290; }
+.repair .mtiers { margin: 8px 0 10px; }
+.repair .btn .u4 { width: 34px; height: 34px; margin: -8px 2px -8px -4px; vertical-align: middle; object-fit: contain; }
+.repair .btn.ghost { width: 100%; min-height: 40px; margin-top: 8px; }
+.repair .hint { margin: 8px 0 0; }
+.fixed { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 0 10px; padding: 5px 10px; border-radius: 12px; background: linear-gradient(180deg, #eaffdc, #cdf2b4); box-shadow: inset 0 0 0 2px #7cc85a; font: var(--dw) 14px/1 var(--display); color: #2a6a14; }
+.fixed > .u4 { width: 30px; height: 30px; object-fit: contain; }
+.fixed .mstars { gap: 0; } .fixed .mstars span, .fixed .mstars span:nth-child(2) { width: 20px; height: 20px; margin: 0; animation: none; }
+.rl .rfix.byhand img { width: 22px; height: 22px; margin: -5px 0 -5px -4px; object-fit: contain; }
+.modal.fixres .gwin { margin: 6px 0; } .modal.fixres .gwin .u4 { object-fit: contain; }
+.modal.fixres .btn + .btn { margin-top: 8px; width: 100%; min-height: 40px; }
+.modal.minim h2 .u4, .modal.mres h2 .u4 { object-fit: contain; }
