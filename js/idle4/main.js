@@ -9,6 +9,7 @@ import { S as courierSave } from '../state.js'; // (audio.js reads its volumes f
 import { keep, restore } from '../native.js';
 import { buzz } from '../haptics.js';
 import * as S from './sim.js';
+import * as D from './duel.js';
 import * as Q from './quests.js';
 import * as St from './store.js';
 import { createUI } from './ui.js';
@@ -66,7 +67,7 @@ addEventListener('pointerdown', () => { if (!audio.ready) { audio.init(); applyV
 // ---------------------------------------------------------------- the game object (what ui.js and world.js call)
 let playing = false;
 const game = {
-  G, S, audio, save, canvas, paused: false,
+  G, S, D, audio, save, canvas, paused: false,
   act(a, room, id) {
     const hadYou = !S.youCook(G) || !S.youServe(G);
     const r = S.act(G, a, room, id);
@@ -108,30 +109,30 @@ const game = {
     if (r) { audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live(); }
     return r;
   },
-  // the crew: a manager trained with chef's hats; a catering job sent out, brought back at once for gems, collected
+  // the crew: a manager trained with chef's hats
   trainCrew(room) {
     const lv = S.train(G, room);
     if (!lv) { audio.play('ui-error'); ui.toast('Not enough chef\'s hats', 'bad'); return 0; }
     audio.play('ui-levelup'); buzz(30); save(); ui.live(); ui.renderRoom();
     return lv;
   },
-  sendJob(kind, crew) {
-    const j = S.sendJob(G, kind, crew, Date.now());
-    if (!j) { audio.play('ui-error'); return null; }
-    audio.play('ui-purchase', { vol: 0.7 }); setTimeout(() => audio.play('hop', { vol: 0.4 }), 150); buzz(20); save(); ui.live();
-    return j;
+  // the cook-offs (duel.js): one started (a ticket), what it paid when it's over, a full set of tickets for gems
+  duelStart(id, team, dishes) {
+    const X = D.start(G, id, team, dishes, Date.now(), (Date.now() ^ (G.seq * 7919)) | 0);
+    if (!X) { audio.play('ui-error'); return null; }
+    ui.closeRoom(); save();
+    return X;
   },
-  rushJob(id) {
-    const c = S.rushJob(G, id, Date.now());
-    if (!c) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return 0; }
+  duelClaim(X) {
+    const r = D.claim(G, X);
+    if (r?.won) buzz(30);
+    save(); ui.live();
+    return r;
+  },
+  duelRefill() {
+    if (!D.refill(G, Date.now())) { audio.play('ui-error'); ui.toast('Not enough gems', 'bad'); return false; }
     audio.play('ui-purchase'); buzz(20); save(); ui.live();
-    return c;
-  },
-  collectJob(id) {
-    const j = S.collectJob(G, id, Date.now());
-    if (!j) return null;
-    audio.play('ui-coins'); setTimeout(() => audio.play('ui-levelup', { vol: 0.6 }), 150); buzz(25); save(); ui.live();
-    return j;
+    return true;
   },
   // gems: finish the building work at once; cash for gems; a pack bought in the shop (real money: store.js)
   finishNow() {

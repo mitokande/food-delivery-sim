@@ -6,10 +6,10 @@ import * as S from './sim.js';
 // k: what is counted. 'item' (room, id: how many / its level), 'lv' (a room's level), 'served' (customers, all
 // together), 'tips' (picked up), 'letters' (read), 'staff' (the team), 'menu' (dishes on it), 'threats' (Victor's
 // truck driven off by serving fast enough), 'stars' (the best review), 'delivered' (deliveries), 'managers' (hired),
-// 'mood' (the share of guests leaving happy, %), 'jobs' (catering jobs collected), 'trained' (levels the crew was
+// 'mood' (the share of guests leaving happy, %), 'duels' (cook-offs won), 'branches' (districts won), 'trained' (levels the crew was
 // trained).
-// room: where the bar takes you ('mail': the mailbox, 'events': the events card, 'managers': the crew card, 'jobs':
-// its catering tab).
+// room: where the bar takes you ('mail': the mailbox, 'events': the events card, 'managers': the crew card, 'city':
+// the city map).
 // cash: the reward (gems: some quests give gems too).
 const Q = (k, n, cash, room, text, o = {}) => ({ k, n, cash, room, text, ...o });
 const st = (dish, cash, text) => Q('item', 1, cash, 'kitchen', text, { id: `st:${dish}` });
@@ -47,7 +47,7 @@ export const CHAIN = [
   Q('lv', 3, 5000, 'office', 'Upgrade Ferdi\'s Office to Lv 3', { gems: 25 }),
   Q('stars', 4, 5000, 'events', 'Get a 4-star review from a critic'),
   Q('managers', 1, 4000, 'managers', 'Hire a manager', { gems: 15 }),
-  Q('jobs', 1, 3000, 'jobs', 'Send your crew on a catering job', { gems: 5 }),
+  Q('duels', 1, 3000, 'city', 'Win a cook-off in the City', { gems: 5 }),
   Q('delivered', 50, 5000, 'bay', 'Make 50 deliveries'),
   Q('staff', 10, 5000, 'staff', 'Have a team of 10'),
   Q('trained', 1, 5000, 'managers', 'Train a manager with chef\'s hats'),
@@ -55,7 +55,7 @@ export const CHAIN = [
   Q('tips', 50, 6000, 'dining', 'Pick up 50 tips'),
   Q('lv', 4, 12000, 'kitchen', 'Renovate the Kitchen to Lv 4'),
   Q('managers', 4, 15000, 'managers', 'Have 4 managers'),
-  Q('jobs', 10, 12000, 'jobs', 'Finish 10 catering jobs', { gems: 10 }),
+  Q('branches', 1, 12000, 'city', 'Open a Ferdi\'s in Old Town', { gems: 10 }),
   Q('mood', 85, 12000, 'mail', 'Make 85% of the guests happy', { gems: 20 }),
   st('fish', 15000, 'Build a fryer'),
   Q('lv', 4, 25000, 'office', 'Upgrade Ferdi\'s Office to Lv 4', { gems: 40 }),
@@ -72,7 +72,7 @@ function tail(j) {
   const n = 4000 + j * 1500;
   return Q('served', n, Math.round(100000 * Math.pow(1.15, j) / 1000) * 1000, 'dining', `Serve ${n.toLocaleString('en-US')} customers`, { gems: 5 });
 }
-// the chain grew (version 2: the four crew and catering quests): a save from before keeps its place. ADDED: where
+// the chain grew (version 2: the four crew and cook-off quests): a save from before keeps its place. ADDED: where
 // they went in, counted in the old chain; a quest put in right where you are comes next.
 const VERSION = 2, ADDED = [33, 35, 39, 43];
 export function migrate(G) {
@@ -97,7 +97,8 @@ export function progress(G, q = current(G)) {
     case 'stars': have = G.stats.stars; break;
     case 'delivered': have = G.stats.delivered; break;
     case 'managers': have = Object.keys(G.mgr).length; break;
-    case 'jobs': have = G.stats.jobs; break;
+    case 'duels': have = G.stats.duels; break;
+    case 'branches': have = G.duel.branches; break;
     case 'trained': have = Object.keys(G.mgr).reduce((n, room) => n + S.crewLv(G, room) - 1, 0); break;
     case 'mood': have = Math.round(G.rep.mood * 100); break;
     default: break;
