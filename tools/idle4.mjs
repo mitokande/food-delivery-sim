@@ -43,7 +43,8 @@ const ev = (js) => page.evaluate(js);
 const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) process.exitCode = 1; };
 const boot = async (url) => { await page.goto(`${base}/${url}`, { waitUntil: 'networkidle0', timeout: 180000 }); await page.waitForFunction('window.ready', { timeout: 90000, polling: 200 }); };
 const until = (js, ms = 30000) => page.waitForFunction(js, { timeout: ms, polling: 100 }).then(() => true, () => false);
-const buy = (a, room, id) => ev(`game.act('${a}', '${room}', ${id ? `'${id}'` : 'undefined'})`).then((r) => !!r);
+// (a repair: the ruin counts as cleared out by hand already, with nothing found in it; that step has its own checks)
+const buy = (a, room, id) => ev(`(() => { const r = game.G.rooms['${room}']; if (${a === 'up'} && game.S.needsFix(game.G, '${room}')) r.fix = 0; return game.act('${a}', '${room}', ${id ? `'${id}'` : 'undefined'}); })()`).then((r) => !!r);
 const cash = (n) => ev(`game.G.cash = ${n}`);
 // the card when a renovation is done: wait for it (→ its text), then a tap closes it
 const upCard = async () => { if (!(await until('!!document.querySelector(".modal.upcard.in")', 6000))) return ''; await wait(800); return ev('document.querySelector(".modal.upcard").innerText'); };
@@ -61,6 +62,26 @@ const playMini = async (move, name) => {
   }
   return -1;
 };
+// a repair game with no room at stake (game.fix(room, true)), played by `move` (what peek() shows, the stage's box:
+// it makes its own touches) until its card is up: → the stars on the card (-1: no card)
+const playFix = async (room, move, name) => {
+  ev(`game.fix('${room}', true)`);
+  if (!(await until('!!document.querySelector(".mstage .fix") && document.querySelector(".mcount").hidden', 15000))) return -1;
+  const box = await ev('(() => { const r = document.querySelector(".mstage").getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()');
+  for (let t0 = Date.now(), n = 0; Date.now() - t0 < 40000; n++) {
+    const s = await ev('({ res: !!document.querySelector(".modal.mres.in"), on: !!document.querySelector(".modal.minim.in"), peek: game.ui.playing?.peek?.() ?? null })');
+    if (s.res) break;
+    if (s.on && !(await ev('!!document.querySelector(".mini.won") || !document.querySelector(".mcount").hidden'))) await move(s.peek, box, n);
+    if (n === 2) { await page.screenshot({ path: `${OUT}/idle4-${name}.png` }); console.log('shot', name); }
+    await wait(30);
+  }
+  if (!(await until('!!document.querySelector(".modal.mres.in")', 3000))) return -1;
+  await wait(900);
+  const stars = await ev('document.querySelectorAll(".modal.mres .mstars span.on").length');
+  await ev('document.querySelector(".modal.mres [data-x=close]").click()'); await wait(450);
+  return stars;
+};
+const drag = async (pts) => { await page.touchscreen.touchStart(pts[0][0], pts[0][1]); for (const [x, y] of pts.slice(1)) { await page.touchscreen.touchMove(x, y); } await page.touchscreen.touchEnd(); };
 const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
 await boot('idle4.html?fresh&speed=4&adms=400');
@@ -125,6 +146,36 @@ await cash(50); check(await buy('item', 'dining', 'waiters'), 'hiring a waiter')
 check(await until('game.G.staff[0].at === "host"', 30000), 'nobody needs you on the floor: you wait at the door (the office is in ruins)');
 
 // repairs: the entrance (a builder, a timer), benches; the office (you sit down in it, the restaurant level)
+// first a ruin is cleared out by hand (fix.js): the entrance's boards, from its panel
+await cash(100);
+check(!(await ev('!!game.S.act(game.G, "up", "entrance")')) && await ev('game.S.upBlock(game.G, "entrance") === "fix" && !game.G.build'), 'a ruin can\'t be repaired before it is cleared out by hand');
+check(await until('[...document.querySelectorAll("#markers .rfix.byhand")].length >= 3 && !!document.querySelector("#markers .rfix.locked")', 3000), 'the ruins say "Fix it up!" (not the ones the office gates)');
+await ev('game.openRoom("entrance")'); await wait(600);
+check(await ev('!!document.querySelector("#sheet [data-act=fix]") && !document.querySelector("#sheet [data-act=up]") && document.querySelectorAll("#sheet .mtiers > span").length === 3 && !document.querySelector("#sheet [data-act=fixskip]")'), 'its panel: the game first, what the stars find, no repair button yet');
+check(await ev('document.querySelector("#sheet .mtiers").textContent.replace(/\\s/g, "") === "+$5+$10+$15"'), 'the entrance: $5, $10, $15 in the mess');
+await shot('4a-fix-panel');
+await page.click('#sheet [data-act="fix"]');
+check(await until('document.querySelectorAll(".mstage .fp").length === 5 && document.querySelectorAll(".mstage .fn").length === 10 && document.querySelector(".mstage .msurf").naturalWidth > 0', 10000) && await ev('game.paused'), 'the boards over the door: five, two nails each, the game paused');
+const pulls = await playMini((list) => list[0] && [list[0].x, list[0].y], '4b-planks');
+check(pulls >= 10 && pulls <= 20, `every nail pulled, the rusty ones twice (${pulls} taps)`);
+check(await ev('game.G.rooms.entrance.fix === 3 && Math.abs(game.G.cash - 115) < 0.01 && game.G.stats.fixes === 1 && /\\+\\$15/.test(document.querySelector(".modal.fixres").textContent)'), 'three stars: $15 found in the mess');
+await shot('4c-fix-done');
+await page.click('.modal.fixres [data-x="room"]'); await wait(700);
+check(await ev('game.ui.room === "entrance" && !!document.querySelector("#sheet [data-act=up]") && !!document.querySelector("#sheet .fixed") && !document.querySelector("#sheet [data-act=fix]")'), 'back in its panel: cleared, now the builders (Repair)');
+check(await ev('game.S.fixRoom(game.G, "entrance", 1) === null'), 'once only');
+await shot('4d-fix-repair');
+await page.click('#sheet [data-act="close"]'); await wait(400);
+// (the rules: too little is a try again, two of those and the crew can do it; the gate; what the stars are worth)
+check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); const a = S.fixRoom(g, 'cashier', 0.1), skip0 = S.canSkipFix(g, 'cashier'), b = S.fixRoom(g, 'cashier', 0.2), skip1 = S.canSkipFix(g, 'cashier'), c0 = g.cash, c = S.fixRoom(g, 'cashier', null);
+  return !a.done && !skip0 && !b.done && skip1 && c.done && c.cash === 0 && g.cash === c0 && g.rooms.cashier.fix === 0 && S.upBlock(g, 'cashier') !== 'fix'; })()`), 'under one star: try again; after two tries the crew can do it (for nothing)');
+check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); return !S.canFix(g, 'terrace') && S.fixRoom(g, 'terrace', 1) === null && S.upBlock(g, 'terrace') === 'gate' && !S.needsFix(g, 'kitchen') && [1, 2, 3].map((t) => S.fixCash('bay', t)).join() === '200,375,625' && S.fixTier('office', 0.96) === 2 && S.fixTier('office', 0.97) === 3; })()`), 'not before the office lets the room be repaired; the stars pay a share of the repair');
+// the other five, for a try
+check(await playFix('cashier', async (list) => { const w = list?.[0]; if (w) await drag([[w.from.x, w.from.y], [(w.from.x + w.to.x) / 2, w.to.y - 20], [w.to.x, w.to.y]]); }, '4e-wires') === 3, 'the wires: each dragged to its colour, three stars');
+check(await playFix('office', async (_, [L, T, W, H], n) => { const y = T + H * (0.04 + (n % 14) * 0.072); await drag([[L + W * 0.1, y], [L + W * 0.35, y], [L + W * 0.65, y], [L + W * 0.9, y], [L + W * 0.5, y + 6], [L + W * 0.1, y + 6]]); }, '4f-paint') >= 2, 'the paint: the wall rolled over');
+check(await playFix('staff', async (list) => { if (list?.[0]) await page.touchscreen.tap(list[0].x, list[0].y); }, '4g-leaks') === 3, 'the leaks: every one shut in time, three stars');
+check(await playFix('terrace', async (list) => { const w = list?.[0]; if (w) await drag([[w.x, w.y], [w.x + 30, w.y - 30], [w.x + 70, w.y - 70], [w.x + 90, w.y - 90]]); }, '4h-weeds') === 3, 'the weeds: all swiped away, three stars');
+check(await playFix('bay', async (list) => { const b = list?.[0]; if (b) await drag([...Array(14)].map((_, i) => [b.x + Math.cos(i) * b.r, b.y + Math.sin(i) * b.r])); }, '4i-bolts') === 3, 'the bolts: turned tight, three stars');
+check(await ev('game.G.stats.fixes === 1 && game.G.rooms.cashier.fix == null && !game.paused'), 'a try changes nothing');
 await cash(100);
 check(await buy('up', 'entrance'), 'repairing the entrance');
 check(await until('game.G.build?.room === "entrance" && !!document.querySelector("#markers .rl.busy")', 3000), 'the label shows the work going on');
@@ -241,6 +292,13 @@ await ev('game.openRoom("kitchen")'); await wait(500);
 check(await ev('!!document.querySelector("#sheet .buy.teamfull")'), 'the kitchen panel says the team is full');
 await page.click('#sheet .buy.teamfull'); await wait(500);
 check(await ev('game.ui.room') === 'staff', 'which leads to the staff room');
+// (cleared out by hand first: the leaks, for the room this time)
+await page.click('#sheet [data-act="fix"]');
+await until('!!document.querySelector(".mstage .fix.leaks")', 15000);
+const cf = await ev('game.G.cash');
+await playMini((list) => list[0] && [list[0].x, list[0].y]);
+check(await ev('game.G.rooms.staff.fix === 3 && Math.abs(game.G.cash - ' + (cf + 75) + ') < 0.01'), 'the staff room\'s leaks shut: three stars, $75 in the mess');
+await page.click('.modal.fixres [data-x="room"]'); await wait(700);
 await page.click('#sheet [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "staff") === 1', 60000), 'the staff room is repaired');
 check(await buy('item', 'staff', 'lockers') && await ev('game.S.staffCap(game.G)') === 6, 'a locker: room for 6');

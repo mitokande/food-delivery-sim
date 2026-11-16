@@ -5,7 +5,8 @@
 // Writes <outdir>/<name>.png (raw, 1536×1024 or 1024×1024); tools/genart-webp.py makes the small webp copies.
 // Also the art of Ferdi's mini games: the scrub-* names (tools/genart-scrub.py cuts those into assets/ui4/scrub), and
 // the cook-*, flyers-* and face-critic names (tools/genart-mini.py: assets/ui4/cook, flyers and faces/critic.webp),
-// and the duel-* names of the cook-offs (tools/genart-mini.py too: assets/ui4/duel and the rivals' faces).
+// and the duel-* names of the cook-offs (tools/genart-mini.py too: assets/ui4/duel and the rivals' faces),
+// and the fix-* names of the repairs by hand (tools/genart-mini.py: assets/ui4/fix).
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -174,6 +175,49 @@ export const ART = {
     + 'an orange admission ticket with a gold star and a crossed spatula and whisk on it and no writing; a round badge, half red and half orange, with a crossed spatula and whisk over it; '
     + 'a map pin: a tiny red and black burger shop standing on a round red base; a map pin: a tiny orange and cream diner with a striped awning and a little flag standing on a round orange base; '
     + `a map pin: a tiny dark tower with red banners and a golden crown standing on a round black base. ${SHEET}` },
+  // the repairs by hand (a mini game per room in ruins, before its repair is paid for): what each is played on
+  // (portrait) and sheets of the things in them. tools/genart-mini.py cuts them into assets/ui4/fix.
+  'fix-door': { size: '1024x1536', prompt: `${UI4} The front of an old closed-down corner diner seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'In the middle a big dusty double wooden door painted faded red with two glass panes covered from inside with yellowed newspaper, a brass handle, a worn stone step under it. '
+    + 'Old red-brown brick wall around it, the torn edge of a faded red and cream striped awning along the top, a dead plant in a pot at the bottom left. '
+    + 'The door is not boarded up: no planks, no boards, no nails. Dusty, abandoned but charming. No people, no text, no letters, no signs with writing.' },
+  'fix-box': { size: '1024x1536', prompt: `${UI4} The inside of a big old open electrical fuse box seen flat, front on, filling the whole picture edge to edge, portrait. `
+    + 'A dark grey-green painted steel back plate with a few scratches, rivets along the edges and a brass screw in each corner; the rim of the box around it in worn cream enamel. '
+    + 'The large middle of the plate is completely empty: no wires, no cables, no switches, no fuses, no sockets. A little dust and one small cobweb in a corner. '
+    + 'No people, no hands, no text, no letters, no numbers, no warning signs.' },
+  'fix-wall-old': { size: '1024x1536', prompt: `${UI4} The wall of an abandoned small office seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Old cracked plaster in a dirty faded beige: long cracks, patches where the plaster has fallen off and the bricks show, brown water stains running down, peeling strips of old paint, '
+    + 'a pale rectangle where a picture used to hang, a dark wooden skirting board along the very bottom with scuffed floorboards under it. '
+    + 'No furniture, no window, no door, no people, no text, no letters.' },
+  'fix-wall-new': { size: '1024x1536', from: 'fix-wall-old', prompt: 'The same wall, same framing, after it was repaired and painted: smooth flawless plaster freshly painted '
+    + 'a warm sage green, still a little glossy and wet, no cracks, no stains, no holes, no bricks showing, no pale rectangle; the skirting board freshly painted glossy cream, '
+    + 'the floorboards sanded and varnished. Same stylized painted game art look. No furniture, no people, no text, no letters.' },
+  'fix-pipes': { size: '1024x1536', prompt: `${UI4} A wall of pale blue-grey square tiles in a staff washroom seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'On it a simple network of fat exposed copper water pipes: a few long horizontal and vertical runs joined by seven big chunky brass joints '
+    + '(elbows, T-pieces and one red-wheeled valve), the joints spread out well apart over the whole wall, none close to an edge. '
+    + 'Everything dry: no water, no drips, no puddles. A little old but not dirty. No people, no hands, no sink, no text, no letters.' },
+  'fix-terrace': { size: '1024x1536', prompt: `${UI4} The floor of an old neglected restaurant terrace: big irregular weathered sandstone paving slabs with wide gaps and cracks between them filled with dark earth, `
+    + 'a few slabs chipped, a little dry moss in the joints. Seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge with no border, portrait. '
+    + 'Nothing on it: no plants, no weeds, no leaves, no furniture, no objects, no people, no text, no letters.' },
+  'fix-garage': { size: '1024x1536', prompt: `${UI4} A close view of an old garage roller door seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Horizontal corrugated steel slats painted faded teal with scratches and a few rust spots; over the middle of it a big thick plain steel mounting plate, '
+    + 'a tall rounded rectangle in brushed dark steel taking up about two thirds of the picture, perfectly smooth and empty: no bolts, no screws, no rivets, no holes, no handle on it. '
+    + 'No people, no hands, no text, no letters, no numbers, no stickers.' },
+  'fix-planks': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: four old weathered wooden boards seen flat from the front, lying horizontally one under the other in four separate rows, `
+    + 'each a long thick plank almost as wide as the picture: one pale grey wood with a knot, one warm brown with a split end, one reddish with flaking white paint, one dark with a chipped corner. '
+    + 'Rough sawn ends, wood grain, no nails in them. Transparent background, no ground shadows, no text. Each one separate with generous empty space between the rows so that none touch.' },
+  'fix-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, twelve icons in a neat grid of 4 columns and 3 rows: `
+    + 'the round flat head of a big rusty iron nail seen from straight in front; a red steel crowbar; a paint roller with a wooden handle, its roll covered in wet sage green paint; '
+    + 'a chunky steel adjustable wrench with a red handle; a jet of blue water spraying out in a fan with white foam and droplets; a grey steel pipe repair clamp with two bolts and a strip of black rubber; '
+    + 'a brown leather gardening glove, open hand; a soft beige puff of dust cloud; a big steel hexagonal bolt head on a round washer seen from straight above; '
+    + `a red metal toolbox with a hammer and a wrench sticking out of it; a claw hammer with a wooden handle; a small crumpled heap of green banknotes and gold coins in a dusty open tin box. ${SHEET}` },
+  'fix-weeds': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: eight things seen from above at a slight angle, in a neat grid of 4 columns and 2 rows: `
+    + 'a dandelion with jagged leaves and two yellow flowers; a spiky green thistle with a purple flower; a thick tuft of wild grass; a clump of clover with small white flowers; '
+    + 'a sprawling leafy weed with a dandelion seed head; a dented empty tin can without a label; a broken terracotta flower pot with spilled earth; a burst of dark earth clods and small stones flying apart. '
+    + `Each weed complete with a little earth at its root. ${SHEET}` },
+  'fix-knobs': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: six identical round electrical terminal knobs seen from straight in front, in a neat grid of 3 columns and 2 rows, `
+    + 'each a glossy coloured dome in a chunky brass ring with a small dark hole in the middle, the same shape and size, only the colour differs: '
+    + `red, yellow, blue, green, purple, orange. ${SHEET}` },
 };
 
 async function gen(name, outdir) {

@@ -710,13 +710,13 @@ export async function createWorld(game, markerEl) {
       const block = S.upBlock(g, room);
       const reno = up && !ruin && !block && S.upCost(g, room) <= g.cash; // (the renovation itself is within reach)
       const cnt = count(g, room);
-      const key = [lv, ruin, soon, !!b, up, reno, block, ruin ? S.upCost(g, room) : 0, cnt].join('|');
+      const key = [lv, ruin, soon, !!b, up, reno, block, ruin ? S.upCost(g, room) : 0, cnt].join('|'); // (block 'fix': a ruin to clear out by hand first)
       if (m.key !== key) {
         m.key = key;
         const name = `<span class="rname">${R.name}</span>`;
         if (soon) m.el.innerHTML = `<span class="rl soon">${name}<small>Coming soon</small></span>`;
         else if (b) m.el.innerHTML = `<span class="rl busy"><span class="rbadge prog"><i class="ring"></i><b>${b.to}</b></span>${name}</span>`;
-        else if (ruin) m.el.innerHTML = `<span class="rl ruin">${name}<span class="rfix ${block === 'gate' ? 'locked' : up ? 'can' : ''}">${block === 'gate' ? `Restaurant Lv ${R.gate}` : `Repair ${S.money(S.upCost(g, room))}`}</span></span>`;
+        else if (ruin) m.el.innerHTML = `<span class="rl ruin">${name}<span class="rfix ${block === 'gate' ? 'locked' : block === 'fix' ? 'can byhand' : up ? 'can' : ''}">${block === 'gate' ? `Restaurant Lv ${R.gate}` : block === 'fix' ? '<img src="assets/ui4/fix/hammer.webp" alt="" draggable="false">Fix it up!' : `Repair ${S.money(S.upCost(g, room))}`}</span></span>`;
         else m.el.innerHTML = `<span class="rl"><span class="rbadge"><b>${lv}</b></span>${name}${cnt ? `<small class="cnt">${cnt}</small>` : ''}${reno ? `<i class="lvup">${UP}<b>Lv ${lv + 1}</b></i>` : up ? UP.replace('u4', 'u4 upa') : ''}</span>`;
       }
       if (b) m.el.style.setProperty('--p', Math.min(1, (g.t - b.t0) / Math.max(0.01, b.dur)).toFixed(3));

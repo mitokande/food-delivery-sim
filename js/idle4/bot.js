@@ -8,6 +8,7 @@ import * as S from './sim.js';
 import * as Q from './quests.js';
 
 export const TIP_EVERY = 30;
+const FIX_SCORE = 0.8;
 
 const afford = (G) => S.prices(G).filter((p) => p.cost <= G.cash);
 const cheapest = (list) => list.sort((a, b) => a.cost - b.cost)[0] || null;
@@ -49,6 +50,7 @@ export function play(name, minutes) {
     for (let q; (q = Q.claim(G));) quests.push({ t: G.t, text: q.text, cash: q.cash });
     for (const m of G.mail.filter((x) => !x.read)) S.openMail(G, m.id);
     if (G.t - tipT >= TIP_EVERY) { tipT = G.t; for (const tp of [...G.tips]) S.collectTip(G, tp.id); }
+    for (const r of S.ROOM_IDS) if (S.canFix(G, r)) S.fixRoom(G, r, FIX_SCORE); // (the repairs by hand: a fair player's two stars)
     for (let i = 0; i < 6; i++) {
       const p = BUY[PLAYERS[name]](G); if (!p) break;
       const key = label(G, p);

@@ -463,7 +463,7 @@ Araç GLB kuralı: metre, +Y yukarı, ön +Z, orijin yerde iki teker arası; `se
 | `idle2.html` · `js/idle2/` + `css/idle2.css` | Hot Chain, yeni idle oyunun 1. aşaması (§12): `sim.js` saf kurallar (bölüm, zincir, sıcaklık, kuryeler; dünya şehirden türetilir), `main.js` açılış + harita + kurye rotaları, `ui.js` arayüz |
 | `idle3.html` · `js/idle3/` + `css/idle3.css` | Idle Restaurant Manager, idle restoran yöneticisi (§13): `sim.js` saf kurallar (masalar, fişler, aşçılar ve getirdikleri yemekler, aşamalar, kuryeler, şöhret), `inside.js` restoranın içi (ana görünüm: oda, istasyonlar, masalar, simülasyondan yürüyen insanlar), `main.js` açılış + iki görünüm + aşamaya göre yeniden kurulan bina + kurye rotaları, `ui.js` arayüz ve hikâye kartları |
 | `idle3-lab.html` · `js/idle3/lab.js` + `lab-worker.js` + `bot.js` + `labbar.js` · `css/idle3-lab.css` | Denge laboratuvarı ve deneme oyunu (§13, yalnızca web): `lab.js` sayı alanları + sonuçlar, `lab-worker.js` bot oyuncuyu Web Worker'da oynatır, `bot.js` bot oyuncular (`tools/idle3sim.mjs` ile ortak), `labbar.js` `idle3.html?lab` içindeki LAB çubuğu. Mağaza uygulamalarına girmez (`mobile/scripts/build-web.mjs` `NOT`) |
-| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), ekip `sim.js` içinde, şehir ve aşçı düelloları `duel.js` (saf kurallar) + `arena.js` (arayüz) (§14.13), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
+| `idle4.html` · `js/idle4/` + `css/idle4.css` | Ferdi's, Idle Restaurant Manager'ın yeniden yapımı (§14): `plan.js` kat planı (odalar, kapılar, noktalar, rotalar; saf), `sim.js` saf kurallar (odalar, eşyalar, renovasyon, müşteri ve personel işleri), `bot.js` bot oyuncular (`tools/idle4sim.mjs`), `quests.js` görev zinciri (saf), elle tamir mini oyunları `fix.js` (§14.14), ekip `sim.js` içinde, şehir ve aşçı düelloları `duel.js` (saf kurallar) + `arena.js` (arayüz) (§14.13), `world.js` (kuryeler için `js/ride/vehicle.js` `makeBike`) izometrik bina (odalar seviyeye göre, harabeler, karakterler, oda etiketleri, bahşişler, posta kutusu, kamera), `ui.js` üst çubuk + yan düğmeler + görev şeridi + oda paneli + posta kutusu + kartlar, `mini.js` mini oyunların ortak çerçevesi + mutfak ovma, tabak pişirme ve el ilanı oyunları (§14.11, §14.12), `main.js` açılış + kayıt + döngü. Mağaza uygulamalarına henüz girmez (`NOT`) |
 | `assets/story/` | Idle Restaurant Manager'ın hikâye ve aşama görselleri, COOK ikonu (OpenAI `gpt-image-2.6-flare`, `tools/genart.mjs`), yemek ikonları `dish-*`, motor ikonları `veh-*` ve Ferdi Amca portresi `ferdi` (10 Kasım 2026, aynı istemlerle Higgsfield üzerinden GPT Image 2.6): hepsi yapay zekâ ile üretildi; webp kopyaları ve ikon sayfalarının kesimi `tools/genart-webp.py` |
 | `js/audio.js` | WebAudio: manifest'ten sesler, yoksa sentez; hızla perdesi değişen motor sesi; arka planda uyutulur, dönüşte (iOS'ta ilk dokunuşta) uyanır; iOS'ta sessiz düğmesine rağmen çalar (`audioSession` 'playback', iOS 16 ve öncesinde sessiz döngü `<audio>`) |
 | `js/analytics.js` | anonim oyuncu kimliği (cihaz başına), oturum (sayfa açılışı ya da 30 dk+ arka plandan dönüş), olay kuyruğu, FPS örnekleri, hata yakalama; `track(ad, veri)` |
@@ -1607,3 +1607,41 @@ düellosuna (cook-off) çıkarlar. Alt çubuktaki "Managers" düğmesi "Crew" ol
   şube, şube paneli, takımsız başlamama, düello penceresi (duraklama, bilet, skor), yetenek, 3 yıldızlı galibiyet
   ve ödülü, sıradaki şube, biletsizlik ve elmasla bilet, kayıp ve ipuçları, ekip kartı ve eğitim, merkez şube ve
   %8 hesap artışı, eski kaydın görev zincirindeki yeri.
+
+### 14.14 Elle tamir mini oyunları (16 Kasım 2026)
+
+Oyunun başında mini oyunları tanıtmak için: harabe bir oda artık önce **elle temizlenir** (bir mini oyun), ustalar
+(parayla "Repair") ondan sonra gelir. Yemek salonu ve mutfak baştan çalıştığı için altı harabe odanın birer oyunu var.
+
+| Oda | Oyun (`S.FIX[oda].game`) | Nasıl oynanır | Süre |
+|---|---|---|---|
+| Entrance | `planks` | Kapıya çakılmış 5 tahta, ikişer çivi; çiviye dokun (paslı olan iki dokunuş), çivisi kalmayan tahta düşer | 12 sn |
+| Cashier | `wires` | Soldaki 6 kabloyu sağdaki aynı renkli düğmeye sürükle; yanlış düğme: kıvılcım ve kısa bekleme | 16 sn |
+| Ferdi's Office | `paint` | Eski duvarın üstünden ruloyla geç (alttaki yeni duvar açılır); %97 = tamamı | 12 sn |
+| Staff Room | `leaks` | Borularda sırayla 14 sızıntı çıkar (gittikçe hızlı); süresi dolmadan dokunup kelepçele, kaçan su odayı doldurur | 16 sn |
+| Terrace | `weeds` | 10 ot ve çöpü parmakla tutup herhangi bir yöne çekerek sök | 13 sn |
+| Courier Bay | `bolts` | 4 cıvatanın etrafında parmağı saat yönünde çevir (cırcır: ters yön saymaz), 1,25–1,75 tur | 15 sn |
+
+- **Kurallar** (`sim.js`: `FIX`, `FIX_CASH`, `FIX_SKIP`, `needsFix`, `canFix`, `canSkipFix`, `fixTier`, `fixCash`,
+  `fixRoom`). `upBlock` harabe için yeni bir engel döndürür: `'fix'` (ofis kapısı `'gate'`ten sonra, `'build'`den
+  önce: başka oda yapılırken ya da para yokken de oynanır, ama ofisin açmadığı oda oynanmaz). Oda başına bir kez
+  (`G.rooms[oda].fix` = alınan yıldız), bedava.
+- **Ödül.** Yıldızlar "pisliğin içinden çıkan" nakit verir: tamir ücretinin %8 / %15 / %25'i, en az $5 / $10 / $15
+  (Entrance $5–15, Bay $200–625). Bu para `stats.earned`'e yazılmaz (ortalama hesabı bozulmasın), `stats.fixes` sayar.
+- **Başaramazsan.** Bir yıldızın altı: "Try again" (`rooms[oda].tries` artar). İki başarısız denemeden sonra
+  "Leave it to the crew" çıkar: oda ödülsüz temizlenmiş sayılır (`fixRoom(G, oda, null)`). Kimse takılıp kalmaz.
+- **Arayüz.** Harabenin etiketi "Fix it up!" (çekiçli, yeşil); panelinde önce oyunun kartı (başlık, yıldız başına
+  nakit, "… · Free" düğmesi, altında "Then the builders come: Repair · $X"), oyundan sonra yeşil "… ✓ ★★★" satırı ve
+  eski Repair düğmesi. Sonuç kartı (`fixDone`): yıldızlar, bulunan para (kasa kutusu), "To the builders" odanın
+  paneline döner. Rita'nın "free" repliği ve görev çubuğunun ipucu ("Ready to clear out by hand") güncellendi.
+- **Kod.** Oyunlar `js/idle4/fix.js` (`GAMES`), mini oyun çerçevesinde (`mini.js` `play`) oynanır; `ui.js` `FX`
+  (metinler), `fixPlay`, `fixDone`, pencere artık ortak `playIn`; `main.js` `game.fix(oda, deneme)`, `game.fixSkip`.
+  Deneme: `idle4.html?mini=planks|wires|paint|leaks|weeds|bolts` (hiçbir şey değişmez).
+- **Görseller.** `assets/ui4/fix/` (GPT Image 2.6, `tools/genart.mjs` `fix-*`, kesim `tools/genart-mini.py`; kesici
+  artık ham klasörde olmayan sayfaları atlar): 7 arka plan, 4 tahta, 12 alet, 8 ot/çöp, 6 düğme.
+- **Eski kayıtlar.** Hâlâ harabe olan odalar oyunu ister; tamir edilmiş odalar etkilenmez. Botlar (`bot.js`) oyunu
+  iki yıldızla oynanmış sayar.
+- **Test.** `tools/idle4.mjs`: girişin oyunu panelden gerçekten oynanır (çiviler, 3 yıldız, $15, panel Repair'e
+  döner), kurallar (tekrar dene, ekibe bırak, ofis kapısı, ödül tablosu), diğer beş oyun deneme modunda dokunuş /
+  sürükleme ile oynanır, personel odası oyunu gerçek ödülle. Diğer tamir adımları `buy('up')` içinde odayı ödülsüz
+  temizlenmiş sayar.

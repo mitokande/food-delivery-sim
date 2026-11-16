@@ -39,3 +39,9 @@ shares one style and one light.
   4×3 sheet of skills: `flambe`, `express`, `charm`, `tipjar`, `showstopper`, `peptalk`, `rush`, `salt`, `smoke`,
   `bribe`, `panic`, `crit`. One 4×2 sheet: `taste`, `pace`, `calm`, `ticket`, `emblem`, `pin-rival`, `pin-ours`,
   `pin-boss`.
+- `fix/*.webp` (the repair mini games): made on 2026-11-16 the same way, the prompts in `tools/genart.mjs` (the
+  `fix-*` names), cut by `tools/genart-mini.py`. Seven pictures (the backgrounds): `door`, `box`, `wall-old`,
+  `wall-new` (an edit of `wall-old`), `pipes`, `terrace`, `garage`. One sheet of four boards: `plank1`…`plank4`. One
+  4×3 sheet: `nail`, `crowbar`, `roller`, `wrench`, `spray`, `clamp`, `glove`, `dust`, `bolt`, `toolbox`, `hammer`,
+  `tin`. One 4×2 sheet: `w1`…`w5` (weeds), `can`, `pot`, `dirt`. One 3×2 sheet of knobs: `red`, `yellow`, `blue`,
+  `green`, `purple`, `orange`.

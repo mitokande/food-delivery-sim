@@ -1,6 +1,6 @@
-# Cuts the art of Ferdi's cook and flyers mini games and of the cook-offs (tools/genart.mjs, the cook-*, flyers-*,
-# duel-* and face-critic names)
-# into assets/ui4/cook, flyers, duel and faces: the sheets by their grid (cut in the empty gaps between the pictures),
+# Cuts the art of Ferdi's cook and flyers mini games, of the cook-offs and of the repairs by hand (tools/genart.mjs,
+# the cook-*, flyers-*, duel-*, fix-* and face-critic names)
+# into assets/ui4/cook, flyers, duel, fix and faces: the sheets by their grid (cut in the empty gaps between the pictures),
 # each cell trimmed to what is painted in it; the backgrounds scaled down; the faces cut square (from the top).
 #   python3 tools/genart-mini.py <rawdir> [outdir=assets/ui4]
 import os, sys
@@ -17,7 +17,9 @@ def cuts(a, n, across):
         while j < size and not full[j]: j += 1
         gaps.append((i + j) / 2); i = j
     return [0] + [round(min(gaps, key=lambda g: abs(g - size * k / n))) for k in range(1, n)] + [size]
+have = lambda n: os.path.exists(f'{raw}/{n}.png') or print('no', n, '(skipped)') # (only the pictures that are in <rawdir>)
 def cells(name, cols, rows, names, size, sub=None, face=False):
+    if not have(name): return
     im = Image.open(f'{raw}/{name}.png').convert('RGBA'); a = im.getchannel('A')
     d = f'{out}/{sub or name.split("-")[0]}'; os.makedirs(d, exist_ok=True)
     xs, ys = cuts(a, cols, True), cuts(a, rows, False); print(name, 'cut at', xs, ys)
@@ -38,8 +40,16 @@ cells('flyers-tools', 3, 2, ['flyer', 'hand', 'love', 'angry', 'truck', 'megapho
 cells('duel-rivals', 4, 2, ['todd', 'pip', 'brick', 'kyle', 'sharp', 'sly', 'dolores', 'baron'], 256, sub='faces', face=True)
 cells('duel-skills', 4, 3, ['flambe', 'express', 'charm', 'tipjar', 'showstopper', 'peptalk', 'rush', 'salt', 'smoke', 'bribe', 'panic', 'crit'], 192)
 cells('duel-icons', 4, 2, ['taste', 'pace', 'calm', 'ticket', 'emblem', 'pin-rival', 'pin-ours', 'pin-boss'], 192)
-for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map')]:
+cells('fix-planks', 1, 4, ['plank1', 'plank2', 'plank3', 'plank4'], 640)
+cells('fix-tools', 4, 3, ['nail', 'crowbar', 'roller', 'wrench', 'spray', 'clamp', 'glove', 'dust', 'bolt', 'toolbox', 'hammer', 'tin'], 192)
+cells('fix-weeds', 4, 2, ['w1', 'w2', 'w3', 'w4', 'w5', 'can', 'pot', 'dirt'], 256)
+cells('fix-knobs', 3, 2, ['red', 'yellow', 'blue', 'green', 'purple', 'orange'], 160)
+for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map'), ('fix-door', 'fix/door'), ('fix-box', 'fix/box'),
+             ('fix-wall-old', 'fix/wall-old'), ('fix-wall-new', 'fix/wall-new'), ('fix-pipes', 'fix/pipes'), ('fix-terrace', 'fix/terrace'), ('fix-garage', 'fix/garage')]:
+    if not have(n): continue
+    os.makedirs(os.path.dirname(f'{out}/{f}'), exist_ok=True)
     Image.open(f'{raw}/{n}.png').convert('RGB').resize((720, 1080), Image.LANCZOS).save(f'{out}/{f}.webp', quality=80, method=6)
+if not have('face-critic'): sys.exit()
 face = Image.open(f'{raw}/face-critic.png').convert('RGBA').crop((290, 0, 930, 640))
 face.paste((0, 0, 0, 0), (0, 420, 40, 640)) # (the tips of the fingers round his fork)
 face.resize((256, 256), Image.LANCZOS).save(f'{out}/faces/critic.webp', quality=88, method=6)
