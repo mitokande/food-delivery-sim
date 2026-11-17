@@ -317,6 +317,7 @@ check(await ev('game.G.rep.reviews.length > 0 && game.G.rep.mood > 0 && game.G.r
 await ev('game.ui.mailbox()'); await wait(500);
 await page.click('.modal.mailbox [data-tab="reviews"]'); await wait(400);
 check(await ev('document.querySelectorAll(".modal.mailbox .rv").length') === Math.min(30, await ev('game.G.rep.reviews.length')) && /^\d+%$/.test(await ev('document.querySelector(".mtrack b").textContent')), 'the mailbox\'s Reviews tab: the mood bar, what people wrote');
+check(await ev('(() => { const p = document.querySelector(".modal.mailbox .mpane").getBoundingClientRect(); return [...document.querySelectorAll(".modal.mailbox .rv")].every((e) => { const r = e.getBoundingClientRect(); return r.width > p.width * 0.9 && r.height < 90; }); })()'), 'each review a row across the pane (no other card\'s look on it)');
 check(await ev('game.G.rep.seen > 0 && game.G.rep.reviews.filter((r) => r.id <= game.G.rep.seen).length > 0'), 'and they count as read');
 await shot('6c-reviews');
 await page.click('.modal.mailbox [data-x="days"]'); await wait(600);
@@ -500,7 +501,7 @@ await shot('9c-city');
 await page.click('.citym .pin[data-stage="1"]'); await wait(300);
 check(await ev('document.querySelector(".citym .stage").hidden && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Beat Market Street first"))'), 'the second one: beat the first one first');
 await page.click('.citym .pin.now'); await wait(400);
-check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelectorAll(".rv").length === game.D.STAGES[0].cooks.length && p.querySelectorAll(".cchip.on").length === 1 && p.querySelector(".cchip.on").dataset.crew === "kitchen" && p.querySelectorAll(".dchip.on").length >= 1 && p.querySelectorAll(".dchip.on").length <= 3 && !!p.querySelector(".dchip.weak.on") && !p.querySelector(\'[data-x="go"]\').disabled && p.querySelector(".pays").textContent.includes("3"); })()'), 'its panel: who cooks there, the head chef goes, the weak dish is picked, what a win pays');
+check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelectorAll(".foe").length === game.D.STAGES[0].cooks.length && p.querySelectorAll(".cchip.on").length === 1 && p.querySelector(".cchip.on").dataset.crew === "kitchen" && p.querySelectorAll(".dchip.on").length >= 1 && p.querySelectorAll(".dchip.on").length <= 3 && !!p.querySelector(".dchip.weak.on") && !p.querySelector(\'[data-x="go"]\').disabled && p.querySelector(".pays").textContent.includes("3"); })()'), 'its panel: who cooks there, the head chef goes, the weak dish is picked, what a win pays');
 await shot('9d-stage');
 await page.click('.citym .cchip.on'); await wait(200);
 check(await ev('document.querySelector(\'.citym [data-x="go"]\').disabled && document.querySelector(\'.citym [data-x="go"]\').textContent === "Pick your team"'), 'nobody picked: no cook-off');
