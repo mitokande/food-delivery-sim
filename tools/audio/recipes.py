@@ -493,3 +493,15 @@ def _cook_ignite(): return seg(fs(262582), 0.62, 2.3)
 
 @rec("cook-bell", "oneshot", [("fs", "221515", "the ring, 0.15-2.8 s")], "kept the ring of a counter bell and its ring-out, long fade-out.", 0.8, fade_out=1200, trim_db=-60)
 def _cook_bell(): return seg(fs(221515), 0.15, 2.8)
+
+# =====================================================================================
+#  REPAIRS  (the repair mini games of Ferdi's: the pressure washer at the front, the coins at the till)
+# =====================================================================================
+@rec("wash-jet", "amb", [("fs", "580534", "steadiest 4 s of 84-106 s")],
+     "picked the steadiest 4 s of a pressure washer spraying, high-passed at 150 Hz, cross-faded a 1 s pre-roll (equal-power) for a seamless loop; mono (the game turns it up while the jet is on).", 0.8,
+     stereo=False, lufs=-20.0, kbps=96)
+def _wash_jet():
+    return amb_loop(hp(seg(fs(580534), 84, 106), 150), 4.0, 1.0, (0, 17), step=0.25)
+
+@rec("coin-drop", "oneshot", [("fs", "368203", "the whole drop, 0.32 s")], "kept a coin dropped on a hard surface with its little bounces, short fade-out.", 0.6, fade_out=80, lufs=-18.0)
+def _coin_drop(): return fs(368203)

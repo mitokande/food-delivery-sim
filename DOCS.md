@@ -1615,8 +1615,8 @@ Oyunun başında mini oyunları tanıtmak için: harabe bir oda artık önce **e
 
 | Oda | Oyun (`S.FIX[oda].game`) | Nasıl oynanır | Süre |
 |---|---|---|---|
-| Entrance | `planks` | Kapıya çakılmış 5 tahta, ikişer çivi; çiviye dokun (paslı olan iki dokunuş), çivisi kalmayan tahta düşer | 12 sn |
-| Cashier | `wires` | Soldaki 6 kabloyu sağdaki aynı renkli düğmeye sürükle; yanlış düğme: kıvılcım ve kısa bekleme | 16 sn |
+| Entrance | `wash` | Tazyikli yıkama (18 Kasım'dan beri, §14.15): kiri jetle sil, inatçı lekeleri ve tabeladaki brandaları jetle sök | saat yok: 30 sn su |
+| Cashier | `coins` | Bozuk para dizme (18 Kasım'dan beri, §14.15): paraları türüne göre tabaklara diz, aynı dört para rulo olup kasaya gider | saat yok: hamle sayısı |
 | Ferdi's Office | `paint` | Eski duvarın üstünden ruloyla geç (alttaki yeni duvar açılır); %97 = tamamı | 12 sn |
 | Staff Room | `leaks` | Borularda sırayla 14 sızıntı çıkar (gittikçe hızlı); süresi dolmadan dokunup kelepçele, kaçan su odayı doldurur | 16 sn |
 | Terrace | `weeds` | 10 ot ve çöpü parmakla tutup herhangi bir yöne çekerek sök | 13 sn |
@@ -1645,3 +1645,40 @@ Oyunun başında mini oyunları tanıtmak için: harabe bir oda artık önce **e
   döner), kurallar (tekrar dene, ekibe bırak, ofis kapısı, ödül tablosu), diğer beş oyun deneme modunda dokunuş /
   sürükleme ile oynanır, personel odası oyunu gerçek ödülle. Diğer tamir adımları `buy('up')` içinde odayı ödülsüz
   temizlenmiş sayar.
+
+### 14.15 Tamir oyunları 2: tazyikli yıkama ve bozuk para dizme (18 Kasım 2026)
+
+Kullanıcı ilk tamir oyunlarını "çiğ" buldu; beyin fırtınasından sonra önce giriş ve kasa için yeniden yapıldı. Eski
+`planks` ve `wires` oyunları, görselleri (`door`, `box`, tahtalar, düğmeler) ve istemleri kaldırıldı.
+
+- **Saatsiz oyun.** `mini.js` `play()` artık `dur: 0` ile de oynar: saat yoktur, oyunu oyun kendisi bitirir; saatin
+  yerinde oyunun kendi göstergesi durur (`meter: { icon, text() }`, azalınca `low()`: kırmızı ve zıplayan kutu).
+- **Giriş: tazyikli yıkama** (`fix.js` `washGame`, `WASH`). Altta temiz cephe (`fix/front`, tabelada FERDI'S), üstte
+  aynı resmin kirli hâli (`fix/front-dirty`, görüntü düzenlemesiyle yapıldı; hizası ölçüldü: 0 piksel kayma). Parmağı
+  basılı tutup sürükle: alttaki sarı tabanca o noktaya döner, jet kiri tek geçişte siler. Üstünde 6 inatçı pislik
+  (8 çeşitten rastgele: iki grafiti, eski afiş, Gristle Burger'in afişi, yosun, örümcek ağı, çamur, is) birkaç geçişte
+  ya da jet üstünde tutulunca gider (%30'u kalınca bir köpükle kopar). Tabelanın üstünde iki branda var: jet ~0,85 sn
+  tutulunca yırtılıp düşer; o zamana kadar jet duvara değil brandaya gelir. Depo 30 sn su (yalnızca jet açıkken akar;
+  test botu 3 yıldızla %40 civarı bırakır). Puan: kirin %55'i + pisliklerin ve brandaların %45'i; yıldızlar
+  0,5 / 0,8 / 1 (üçüncü yıldız: her şey temiz). Su biterse oyun o anki temizlikle biter.
+- **Kasa: bozuk para dizme** (`coinsGame`, `COINS`, `coinPar`). Yeşil keçe üstünde tabaklar, tabaklarda karışık para
+  yığınları (6 çeşit para, her turda rastgele 2–4'ü). Bir yığına dokun: üstteki aynı türden paralar kalkar; başka bir
+  tabağa dokun: boşsa ya da en üstte aynı tür varsa sığdığı kadarı oraya geçer. Aynı türden dört para üst üste gelince
+  rulo olup kasanın çekmecesine uçar, tabak boşalır. Üç tur: 2 tür / 3 tabak, 3 tür / 5 tabak, 4 tür / 6 tabak. Her
+  tur oyunun içinde rastgele dağıtılır ve küçük bir arama (BFS, en zor turda ~1400 durum, birkaç ms) en az hamle
+  sayısını bulur. Takılıp kalınabilecek dağıtımlar atılır, en az hamle de istenen aralıkta (4–5, 7–9, 10–12) olmalıdır.
+  Yıldızlar toplam hamleye göre: en aza +4'e kadar 3, +12'ye kadar 2, fazlası 1 (göstergede `hamle/sınır`).
+- **3D'de oda gözünün önünde temizlenir** (`world.js` `hold`, `clearOut`, `fling`). Elle temizlenmiş harabede tahta,
+  kutu ve moloz yığını kalmaz (yalnızca tozlu zemin ve şerit). Oyun oynanırken ve sonuç kartı açıkken çöpler yerinde
+  durur; "To the builders" deyince kamera odaya gider, çöpler sırayla zıplayıp toz bulutu içinde kaybolur, sonra odanın
+  paneli (Repair) açılır (`game.showCleared`). "Leave it to the crew" de aynısını yapar.
+- **Sesler** (`assets/audio`, CC0, `tools/audio`): `wash-jet` (Freesound #580534 tazyikli yıkama makinesinin en sabit
+  4 sn'si, döngü; jet açıkken açılır), `coin-drop` (Freesound #368203, her para inişinde). Kasa açılışı `ui-purchase`.
+- **Görseller.** `assets/ui4/fix/`: `front`, `front-dirty`, `till`, pislikler `tag1` `tag2` `poster1` `poster2` `moss`
+  `web` `mud` `soot`, `gun` `splash` `drop` `tarp` `foam` `tank`, paralar `c1`…`c6`, `dish`, `roll` (GPT Image 2.6,
+  `tools/genart.mjs` `fix-front`, `fix-front-dirty`, `fix-grime`, `fix-wash`, `fix-till`, `fix-coins`).
+- **Test.** `tools/idle4.mjs`: girişin yıkaması panelden gerçekten oynanır (brandalar, pislikler, satır satır kir;
+  3 yıldız, $15, depoda su kalır), sonuç kartı açıkken çöpler yerinde, "To the builders" sonrası önce temizlenme sonra
+  panel; kasanın paraları deneme modunda en iyi hamlelerle 3 yıldız; çözücünün kendisi (en az hamle, imkânsız dağıtım).
+  Deneme: `idle4.html?mini=wash`, `?mini=coins`.
+

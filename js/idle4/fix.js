@@ -1,7 +1,8 @@
 // Ferdi's (idle4.html): the repairs by hand. A room in ruins is cleared out in a mini game before the builders are paid
 // to come, one game to a room, all played in mini.js's frame:
-// - planks (the entrance): the door is boarded up; a tap pulls a nail, a board with no nails left falls,
-// - wires (the cashier): six wires, each dragged to the knob of its colour on the other side,
+// - wash (the entrance): the front washed with a pressure washer, the grime, the graffiti and the old posters off it
+//   (no clock: a tank of water),
+// - coins (the cashier): the till's spilled coins sorted into stacks of one kind, in as few moves as can be (no clock),
 // - paint (the office): the old wall painted over with the roller,
 // - leaks (the staff room): the pipes spring leaks; a tap shuts one before it floods,
 // - weeds (the terrace): weeds and rubbish pulled off the paving with a swipe,
@@ -29,122 +30,316 @@ function puff(el, name, x, y, w, cls = '') {
   el.append(p); p.addEventListener('animationend', () => p.remove());
 }
 
-// ---------------------------------------------------------------- the boards over the door
-// Five boards nailed across the door, two nails each; a rusty nail takes two taps (the first only works it loose).
-const PLANKS = { at: [[0.54, 0.27, -7], [0.53, 0.38, 5], [0.55, 0.49, -4], [0.53, 0.6, 8], [0.54, 0.71, -5]], w: 0.8, nail: 0.4, rusty: 4, r: 0.13 }; // (x, y of the stage, degrees; a nail's reach, of the width)
+// ---------------------------------------------------------------- the front, washed
+// The front as it was after years of neglect lies over the front as it is (an edit of the same picture, every brick
+// where it was): the jet takes the grime away where it goes, in one pass. On it, the mess that takes longer (a few
+// passes, or the jet held on it): graffiti, posters, moss…, and two old tarps nailed over the sign (the jet tears
+// them off; till then it's washing the tarp, not the wall). The tank runs while the jet does; the game is over when
+// the front is clean or the tank is dry.
+const WASH = {
+  r: 0.085, mark: 0.035, pop: 0.3, full: 0.96, // (the jet's reach, of the stage's width; what a dab takes of a mark; a mark nearly gone comes off; this much of the grime is all of it)
+  tank: 30, low: 0.2, share: 0.55, n: 6, // (seconds of water; the tank is low below this; the grime's share of the score, the mess's the rest; how many bits of mess)
+  tarps: [[0.27, 0.14, -4], [0.74, 0.135, 5]], tarp: [0.52, 0.85], // (x, y of the stage, degrees; a tarp's width of the stage's, the seconds of jet that tear it off)
+  marks: { tag1: [0.15, 0.81, 0.27, -6], tag2: [0.85, 0.81, 0.27, 4], poster1: [0.5, 0.73, 0.19, -5], poster2: [0.84, 0.51, 0.2, 6],
+    moss: [0.27, 0.88, 0.2, 0], web: [0.1, 0.45, 0.2, 0], mud: [0.72, 0.95, 0.24, 10], soot: [0.5, 0.49, 0.24, 0] }, // (x, y, width, degrees)
+  gun: 0.13, // (the gun's width, of the stage's)
+};
 
-export function planksGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, on = false, off = 0;
-  const list = [];
-
-  async function setup(s) {
-    stage = s;
-    ({ el, W, H } = await scene(s, 'door', 'planks', ['fix/plank1', 'fix/plank2', 'fix/plank3', 'fix/plank4', 'fix/nail', 'fix/dust', 'fix/crowbar']));
-    const rusty = new Set(shuffle([...Array(PLANKS.at.length * 2).keys()]).slice(0, PLANKS.rusty)), art = shuffle([1, 2, 3, 4]);
-    PLANKS.at.forEach(([x, y, deg], i) => {
-      const d = div('fp', `<img src="${IMG(`fix/plank${art[i % 4]}`)}" alt="" draggable="false">`), a = (deg + rnd(-2, 2)) * Math.PI / 180;
-      d.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${PLANKS.w * 100}%;--r:${a}rad`;
-      const p = { el: d, x, y, nails: [], gone: false };
-      for (const side of [-1, 1]) {
-        const L = PLANKS.w * PLANKS.nail * side, n = { x: x + Math.cos(a) * L, y: y + Math.sin(a) * L * W / H, hp: rusty.has(i * 2 + (side > 0)) ? 2 : 1, el: img('fix/nail', 'fn') };
-        n.el.style.left = `${50 + PLANKS.nail * 100 * side}%`; if (n.hp > 1) n.el.classList.add('rusty');
-        d.append(n.el); p.nails.push(n);
-      }
-      el.append(d); list.push(p);
-    });
-    el.append(img('fix/crowbar', 'ftool'));
-  }
-  function onDown(e) {
-    if (!on) return;
-    e.preventDefault();
-    const [px, py] = at(stage, e, W, H);
-    let best = null, bd = PLANKS.r * W;
-    for (const p of list) for (const n of p.nails) { const d = Math.hypot(n.x * W - px, n.y * H - py); if (n.hp > 0 && d < bd) { bd = d; best = [p, n]; } }
-    if (!best) return;
-    const [p, n] = best, tool = el.querySelector('.ftool');
-    tool.style.left = `${n.x * 100}%`; tool.style.top = `${n.y * 100}%`; tool.classList.remove('go'); void tool.offsetWidth; tool.classList.add('go');
-    if (--n.hp > 0) { n.el.classList.remove('rusty'); n.el.classList.add('loose'); sfx('ui-tap', { vol: 0.6 }); buzz(8); return; }
-    n.el.classList.add('out'); sfx('event-pop', { vol: 0.5 }); buzz(12);
-    if (p.nails.every((q) => q.hp <= 0)) {
-      p.gone = true; off++; p.el.classList.add('fall'); p.el.style.setProperty('--d', n.x > p.x ? 1 : -1);
-      puff(el, 'fix/dust', p.x, p.y, 0.5); sfx('land', { vol: 0.6 }); buzz(25);
-    }
-  }
-  const h = { pointerdown: onDown };
-  return { hint: 'Tap the nails to pull the boards off the door', go: 'Pull!', won: 'Door\'s open!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; if (stage) listen(stage, false, h); }, tick() {},
-    score: () => off / list.length, over: () => off >= list.length, tally: () => `<b>${off}/${list.length}</b> boards off`,
-    peek: () => list.flatMap((p) => p.nails.filter((n) => n.hp > 0).map((n) => client(stage, n.x, n.y))) };
-}
-
-// ---------------------------------------------------------------- the wires
-// Six wires hang from the knobs on the left; each goes to the knob of its colour on the right (never straight across).
-// Into the wrong one: a spark, and a moment before the next try.
-const WIRES = { cols: ['red', 'yellow', 'blue', 'green', 'purple', 'orange'], ink: { red: '#e8402f', yellow: '#f5c21b', blue: '#2f86e8', green: '#3fbf3a', purple: '#a04be0', orange: '#f58a1f' },
-  x: [0.17, 0.83], y0: 0.13, dy: 0.148, r: 0.12, zap: 0.5 };
-
-export function wiresGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, k, cv, on = false, drag = null, lock = 0, done = 0, t = 0;
-  const left = [], right = [];
+export function washGame({ sfx = () => {}, buzz = () => {}, loop = () => null } = {}) {
+  let stage, el, W, H, k, grime, marks, fx, probe, brush, gun, splash, drop, jet = null;
+  let a0 = 1, clean = 0, water = 1, probeT = 0, dry = 0, lowSaid = false, on = false, down = null, gx = 0, ang = 0;
+  const list = [], tarps = [], drops = [];
 
   async function setup(s) {
     stage = s;
-    ({ el, W, H } = await scene(s, 'box', 'wires', [...WIRES.cols.map((c) => `fix/${c}`), 'scrub/sparkle']));
+    const names = shuffle(Object.keys(WASH.marks)).slice(0, WASH.n);
+    const [dirty, ...ims] = await Promise.all([load(IMG('fix/front-dirty')), ...names.map((n) => load(IMG(`fix/${n}`)))]);
+    ({ el, W, H } = await scene(s, 'front', 'wash', ['fix/gun', 'fix/splash', 'fix/drop', 'fix/tarp', 'fix/foam', 'scrub/sparkle']));
     k = Math.min(2, devicePixelRatio || 1);
-    cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k); el.append(cv);
-    const a = shuffle([...WIRES.cols]);
-    let b; do { b = shuffle([...WIRES.cols]); } while (b.some((c, i) => c === a[i]));
-    [a, b].forEach((cols, side) => cols.forEach((c, i) => {
-      const n = { c, x: WIRES.x[side], y: WIRES.y0 + WIRES.dy * i, in: false, el: img(`fix/${c}`, 'fk') };
-      n.el.style.cssText = `left:${n.x * 100}%;top:${n.y * 100}%`; el.append(n.el); (side ? right : left).push(n);
-    }));
-    draw();
+    const layer = () => { const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); el.append(c); return c; };
+    grime = layer(); marks = layer();
+    let c = grime.getContext('2d'); c.scale(k, k);
+    if (dirty) c.drawImage(dirty, 0, 0, W, H); else { c.fillStyle = 'rgba(90, 76, 58, .8)'; c.fillRect(0, 0, W, H); }
+    c = marks.getContext('2d'); c.scale(k, k);
+    names.forEach((n, i) => {
+      const im = ims[i]; if (!im) return;
+      const [x, y, w, deg] = WASH.marks[n], m = { n, x: x * W, y: y * H, w: w * W, h: w * W * im.height / im.width, rot: (deg + rnd(-4, 4)) * Math.PI / 180, a0: 1, a: 1, gone: false };
+      c.save(); c.translate(m.x, m.y); c.rotate(m.rot); c.drawImage(im, -m.w / 2, -m.h / 2, m.w, m.h); c.restore();
+      list.push(m);
+    });
+    for (const [x, y, deg] of WASH.tarps) {
+      const t = { x, y, hp: WASH.tarp[1], gone: false, el: img('fix/tarp', 'ftarp') };
+      t.el.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${WASH.tarp[0] * 100}%;--r:${deg}deg`; el.append(t.el); tarps.push(t);
+    }
+    fx = layer();
+    splash = img('fix/splash', 'fsplash'); gun = img('fix/gun', 'fgun'); el.append(splash, gun);
+    drop = await load(IMG('fix/drop'));
+    // the jet's dab: a hard middle, soft at the edge
+    brush = document.createElement('canvas'); brush.width = brush.height = 64;
+    const b = brush.getContext('2d'), g = b.createRadialGradient(32, 32, 10, 32, 32, 32);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.6, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    b.fillStyle = g; b.fillRect(0, 0, 64, 64);
+    probe = document.createElement('canvas'); probe.width = 36; probe.height = Math.round(36 * H / W);
+    read(); a0 = a0 || 1; list.forEach((m) => { m.a0 = m.a || 1; }); read();
+    gx = W / 2; aimAt(W / 2, H * 0.62);
   }
-  // a wire from a to b (px), sagging a little: a dark coat, its colour, a highlight
-  function wire(c, x0, y0, x1, y1, ink) {
-    const sag = Math.min(H * 0.1, Math.abs(x1 - x0) * 0.25 + 8), mx = (x0 + x1) / 2;
-    for (const [w, col] of [[11, 'rgba(20,24,34,.85)'], [7, ink], [2, 'rgba(255,255,255,.55)']]) {
-      c.beginPath(); c.moveTo(x0, y0 - (w === 2 ? 2 : 0)); c.bezierCurveTo(mx, y0 + sag, mx, y1 + sag, x1, y1 - (w === 2 ? 2 : 0));
-      c.lineWidth = w * W / 320; c.strokeStyle = col; c.lineCap = 'round'; c.stroke();
+  // what's left: the grime's alpha, each mark's in its own box
+  function read() {
+    const p = probe.getContext('2d', { willReadFrequently: true }), pw = probe.width, ph = probe.height, q = pw / W;
+    p.clearRect(0, 0, pw, ph); p.drawImage(grime, 0, 0, pw, ph);
+    let d = p.getImageData(0, 0, pw, ph).data, a = 0;
+    for (let i = 3; i < d.length; i += 4) a += d[i];
+    if (!on && !clean) a0 = a;
+    clean = clamp((1 - a / a0) / WASH.full);
+    p.clearRect(0, 0, pw, ph); p.drawImage(marks, 0, 0, pw, ph); d = p.getImageData(0, 0, pw, ph).data;
+    for (const m of list) {
+      if (m.gone) continue;
+      const rr = Math.max(m.w, m.h) / 2, X0 = Math.max(0, Math.floor((m.x - rr) * q)), X1 = Math.min(pw, Math.ceil((m.x + rr) * q)), Y0 = Math.max(0, Math.floor((m.y - rr) * q)), Y1 = Math.min(ph, Math.ceil((m.y + rr) * q));
+      let s = 0; for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) s += d[(y * pw + x) * 4 + 3];
+      m.a = s;
+      if (on && s < m.a0 * WASH.pop) off(m);
     }
   }
-  function draw() {
-    const c = cv.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.clearRect(0, 0, W, H);
-    for (const n of left) {
-      const ink = WIRES.ink[n.c], x = n.x * W, y = n.y * H;
-      if (n.in) { const m = right.find((q) => q.c === n.c); wire(c, x, y, m.x * W, m.y * H, ink); }
-      else if (drag?.n === n) wire(c, x, y, drag.x, drag.y, ink);
-      else wire(c, x, y, x + W * 0.1, y + H * 0.035 + Math.sin(t * 3 + n.y * 20) * 2, ink); // (a loose end, swaying)
-    }
+  // a bit of mess nearly washed away comes off at once
+  function off(m) {
+    m.gone = true;
+    const c = marks.getContext('2d'); c.save(); c.globalCompositeOperation = 'destination-out';
+    c.translate(m.x, m.y); c.rotate(m.rot); c.fillRect(-m.w / 2 - 4, -m.h / 2 - 4, m.w + 8, m.h + 8); c.restore();
+    puff(el, 'fix/foam', m.x / W, m.y / H, 0.26); puff(el, 'scrub/sparkle', m.x / W, m.y / H, 0.3, 'spin');
+    sfx('event-pop', { vol: 0.55 }); buzz(18);
   }
-  const near = (list, px, py) => list.map((n) => [n, Math.hypot(n.x * W - px, n.y * H - py)]).filter(([, d]) => d < WIRES.r * W).sort((p, q) => p[1] - q[1])[0]?.[0];
+  const tarpAt = (x, y) => tarps.find((t) => !t.gone && Math.abs(x - t.x * W) < W * WASH.tarp[0] * 0.46 && Math.abs(y - t.y * H) < W * WASH.tarp[0] * 0.3);
+  // the jet from (x0, y0) to (x1, y1) over dt seconds
+  function spray(x0, y0, x1, y1, dt) {
+    const R = W * WASH.r, d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(d / (R * 0.3)));
+    const t = tarpAt(x1, y1);
+    if (t) { hitTarp(t, dt); return; }
+    const g = grime.getContext('2d'), m = marks.getContext('2d');
+    g.save(); g.globalCompositeOperation = 'destination-out';
+    m.save(); m.globalCompositeOperation = 'destination-out'; m.globalAlpha = 1 - (1 - WASH.mark) ** Math.max(1, dt * 60 / n);
+    for (let i = 1; i <= n; i++) {
+      const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+      if (tarpAt(x, y)) continue;
+      g.drawImage(brush, x - R, y - R, R * 2, R * 2); m.drawImage(brush, x - R * 1.3, y - R * 1.3, R * 2.6, R * 2.6);
+    }
+    g.restore(); m.restore();
+  }
+  function hitTarp(t, dt) {
+    t.hp -= dt; t.el.classList.add('hit'); t.hitT = 0.12;
+    if (t.hp > 0) return;
+    t.gone = true; t.el.classList.remove('hit'); t.el.classList.add('off');
+    puff(el, 'fix/splash', t.x, t.y, 0.4); sfx('land', { vol: 0.6 }); buzz(30);
+  }
+  // the gun stands at the bottom and turns to where the jet goes; its nozzle → [x, y]
+  function aimAt(x, y) {
+    const gw = W * WASH.gun, gh = gw * 384 / 126, L = gh * 0.82;
+    gx += (x * 0.55 + W * 0.225 - gx) * 0.35;
+    const by = H + gh * 0.1;
+    ang = Math.max(-0.9, Math.min(0.9, Math.atan2(x - gx, by - y)));
+    gun.style.transform = `translate(${gx - gw / 2}px, ${by - gh * 0.85}px) rotate(${ang}rad)`;
+    return [gx + Math.sin(ang) * L, by - Math.cos(ang) * L];
+  }
   function onDown(e) {
-    if (!on || drag || lock > 0) return;
-    e.preventDefault();
-    const [x, y] = at(stage, e, W, H), n = near(left.filter((q) => !q.in), x, y);
-    if (!n) return;
-    stage.setPointerCapture?.(e.pointerId); drag = { id: e.pointerId, n, x, y }; n.el.classList.add('held'); sfx('ui-tap', { vol: 0.5 });
+    if (!on || down || water <= 0) return;
+    e.preventDefault(); stage.setPointerCapture?.(e.pointerId);
+    const [x, y] = at(stage, e, W, H); down = { id: e.pointerId, x, y, px: x, py: y };
+    el.classList.add('on'); jet?.set({ vol: 0.9 }); buzz(8);
   }
-  function onMove(e) { if (drag && e.pointerId === drag.id) { e.preventDefault(); [drag.x, drag.y] = at(stage, e, W, H); } }
-  function onUp(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    const { n, x, y } = drag, m = near(right.filter((q) => !q.in), x, y);
-    drag = null; n.el.classList.remove('held');
-    if (!m) return;
-    if (m.c === n.c) {
-      n.in = m.in = true; done++; m.el.classList.add('in'); n.el.classList.add('in');
-      puff(el, 'scrub/sparkle', m.x, m.y, 0.3, 'spin'); sfx('pickup-bonus', { vol: 0.5 }); buzz(15);
-    } else {
-      lock = WIRES.zap; el.classList.remove('zap'); void el.offsetWidth; el.classList.add('zap');
-      m.el.classList.remove('no'); void m.el.offsetWidth; m.el.classList.add('no'); sfx('qte-bad', { vol: 0.5 }); buzz(40);
+  function onMove(e) {
+    if (!down || e.pointerId !== down.id) return;
+    e.preventDefault(); [down.x, down.y] = at(stage, e, W, H);
+  }
+  function onUp(e) { if (down && e.pointerId === down.id) { down = null; el.classList.remove('on'); jet?.set({ vol: 0 }); } }
+  const score = () => WASH.share * clean + (1 - WASH.share) * (list.filter((m) => m.gone).length + tarps.filter((t) => t.gone).length) / (list.length + tarps.length);
+  function draw(dt, tip) {
+    const c = fx.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.clearRect(0, 0, W, H);
+    if (down) { // the jet: a white core in a pale blue spray, a little wobble at the end
+      const [tx, ty] = tip, x = down.x + rnd(-1.5, 1.5), y = down.y + rnd(-1.5, 1.5), mx = (tx + x) / 2, my = (ty + y) / 2 + Math.abs(x - tx) * 0.08;
+      for (const [w, col] of [[11, 'rgba(160, 215, 255, .4)'], [6, 'rgba(225, 245, 255, .85)'], [2.5, '#fff']]) {
+        c.beginPath(); c.moveTo(tx, ty); c.quadraticCurveTo(mx, my, x, y); c.lineWidth = w * W / 360; c.strokeStyle = col; c.lineCap = 'round'; c.stroke();
+      }
+      for (let i = 0; i < 3 && drops.length < 60; i++) drops.push({ x, y, vx: rnd(-170, 170), vy: rnd(-230, -30), r: rnd(3, 6.5) * W / 360, t: 0, life: rnd(0.35, 0.7) });
+      splash.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rnd(-20, 20)}deg) scale(${rnd(0.85, 1.1)})`;
     }
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const d = drops[i]; d.t += dt;
+      if (d.t >= d.life) { drops.splice(i, 1); continue; }
+      d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 900 * dt;
+      c.globalAlpha = 1 - d.t / d.life;
+      if (drop) c.drawImage(drop, d.x - d.r, d.y - d.r * 1.5, d.r * 2, d.r * 3); else { c.fillStyle = '#bfe6ff'; c.beginPath(); c.arc(d.x, d.y, d.r, 0, 7); c.fill(); }
+    }
+    c.globalAlpha = 1;
   }
   const h = { pointerdown: onDown, pointermove: onMove, pointerup: onUp, pointercancel: onUp };
-  return { hint: 'Drag each wire to the knob of its colour', go: 'Wire it!', won: 'Power\'s on!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; drag = null; if (stage) listen(stage, false, h); if (cv) draw(); },
-    tick(dt) { t += dt; lock -= dt; draw(); },
-    score: () => done / left.length, over: () => done >= left.length, tally: () => `<b>${done}/${left.length}</b> wires in`,
-    peek: () => left.filter((n) => !n.in).map((n) => { const m = right.find((q) => q.c === n.c); return { from: client(stage, n.x, n.y), to: client(stage, m.x, m.y), wrong: client(stage, ...((q) => [q.x, q.y])(right.find((q) => q.c !== n.c && !q.in) || m)) }; }) };
+  return { hint: 'Hold and drag to wash · blast the stubborn spots', go: 'Wash!', won: 'Sparkling!', done: 'Out of water!', setup,
+    meter: { icon: 'fix/tank', text: () => `${Math.ceil(water * 100)}%` }, low: () => water < WASH.low,
+    start() { on = true; listen(stage, true, h); jet = loop('wash-jet', { vol: 0 }); },
+    stop() { on = false; down = null; el?.classList.remove('on'); jet?.stop(); jet = null; if (stage) listen(stage, false, h); },
+    tick(dt) {
+      for (const t of tarps) if (t.hitT > 0 && (t.hitT -= dt) <= 0) t.el.classList.remove('hit');
+      const tip = aimAt(down ? down.x : W / 2, down ? down.y : H * 0.62);
+      if (down) {
+        spray(down.px, down.py, down.x, down.y, dt); down.px = down.x; down.py = down.y;
+        water = Math.max(0, water - dt / WASH.tank);
+        if (water < WASH.low && !lowSaid) { lowSaid = true; sfx('countdown-tick', { vol: 0.5 }); }
+        if (water <= 0) { down = null; el.classList.remove('on'); jet?.set({ vol: 0 }); sfx('qte-bad', { vol: 0.4 }); }
+      }
+      if (water <= 0) dry += dt;
+      probeT -= dt; if (probeT <= 0) { probeT = 0.12; const was = clean; read(); if (clean === 1 && was < 1) buzz(20); }
+      draw(dt, tip);
+    },
+    score, over: () => score() >= 0.999 || dry > 0.5, tally: () => `<b>${Math.round(score() * 100)}%</b> clean`,
+    peek: () => ({ tarps: tarps.filter((t) => !t.gone).map((t) => client(stage, t.x, t.y)), marks: list.filter((m) => !m.gone).map((m) => client(stage, m.x / W, m.y / H)),
+      box: stage.getBoundingClientRect().toJSON(), water }) };
+}
+
+// ---------------------------------------------------------------- the coins
+// The old till spilled its coins: they lie in stacks on dishes, every kind mixed up. A tap lifts the top of a stack
+// (the coins of one kind on top of it), a tap on another dish puts them there: on an empty dish or on the same kind,
+// as many as fit. Four alike roll up and go back into the till, and their dish is free again. Three rounds, each
+// bigger than the last; what counts is the moves it took, against the fewest it could have (coinPar).
+const COINS = {
+  cap: 4, kinds: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
+  rounds: [{ kinds: 2, dishes: 3, par: [4, 5] }, { kinds: 3, dishes: 5, par: [7, 9] }, { kinds: 4, dishes: 6, par: [10, 12] }], // (filled dishes hold four each; the rest start empty)
+  spare: [4, 12], cap3: [1, 0.8, 0.55], // (moves over the fewest for three stars, for two; what the score can reach with three, two, one)
+  at: { 3: [[0.2, 0.66], [0.5, 0.66], [0.8, 0.66]], 5: [[0.2, 0.55], [0.5, 0.55], [0.8, 0.55], [0.35, 0.85], [0.65, 0.85]], 6: [[0.2, 0.55], [0.5, 0.55], [0.8, 0.55], [0.2, 0.85], [0.5, 0.85], [0.8, 0.85]] },
+  dish: 0.27, coin: 0.21, step: 0.033, till: [0.5, 0.07], // (widths of the stage's; a coin over the one under it, of the height; the till's drawer)
+};
+// the moves from the dishes `st` (each bottom → top): [from, to, the dishes after]; four alike roll away. (Moving a
+// whole stack of one kind onto an empty dish changes nothing, and isn't one.)
+function coinMoves(st) {
+  const out = [];
+  st.forEach((s, i) => {
+    if (!s.length) return;
+    const top = s[s.length - 1]; let run = 0;
+    while (run < s.length && s[s.length - 1 - run] === top) run++;
+    st.forEach((d, j) => {
+      if (i === j || d.length >= COINS.cap || (d.length ? d[d.length - 1] !== top : run === s.length)) return;
+      const n = Math.min(run, COINS.cap - d.length), nx = st.map((q) => q.slice());
+      nx[j].push(...nx[i].splice(s.length - n, n));
+      if (nx[j].length === COINS.cap && nx[j].every((c) => c === top)) nx[j] = [];
+      out.push([i, j, nx]);
+    });
+  });
+  return out;
+}
+// the fewest moves that clear `st` (null: never), the first move of such a way, and whether any way leads to a dead end
+export function coinPar(st) {
+  const key = (q) => q.map((d) => d.join('.')).sort().join('|');
+  const seen = new Set([key(st)]); let front = [[st, null]], n = 0, stuck = false, first = null;
+  while (front.length) {
+    const next = [];
+    for (const [q, f] of front) {
+      if (q.every((d) => !d.length)) { if (first == null) first = { par: n, next: f }; continue; }
+      const ms = coinMoves(q); if (!ms.length) stuck = true;
+      for (const [i, j, nx] of ms) { const kk = key(nx); if (!seen.has(kk)) { seen.add(kk); next.push([nx, f || [i, j]]); } }
+    }
+    if (first) return { ...first, stuck };
+    front = next; n++;
+  }
+  return { par: null, next: null, stuck: true };
+}
+// a round's dishes: the coins dealt at random, till it takes as many moves as it should and can't get stuck
+function deal(r) {
+  let best = null;
+  for (let t = 0; t < 60; t++) {
+    const bag = shuffle(Array.from({ length: r.kinds * COINS.cap }, (_, i) => Math.floor(i / COINS.cap)));
+    const st = Array.from({ length: r.dishes }, (_, i) => (i < r.kinds ? bag.slice(i * COINS.cap, (i + 1) * COINS.cap) : []));
+    if (st.some((d) => d.length && d.every((c) => c === d[0]))) continue;
+    const p = coinPar(st);
+    if (p.par == null || p.stuck) continue;
+    best = { st, par: p.par };
+    if (p.par >= r.par[0] && p.par <= r.par[1]) break;
+  }
+  return best;
+}
+
+export function coinsGame({ sfx = () => {}, buzz = () => {} } = {}) {
+  let stage, el, W, H, on = false, round = -1, st = [], par = 0, moves = 0, rolled = 0, sel = null, busy = 0, done = false, kinds = [];
+  const total = COINS.rounds.reduce((a, r) => a + r.kinds * COINS.cap, 0), dishes = [], coins = []; // (coins: { el, k, d, i })
+  let rounds = [];
+
+  async function setup(s) {
+    stage = s;
+    ({ el, W, H } = await scene(s, 'till', 'coins', [...COINS.kinds.map((c) => `fix/${c}`), 'fix/dish', 'fix/roll', 'scrub/sparkle']));
+    rounds = COINS.rounds.map(deal); par = rounds.reduce((a, r) => a + r.par, 0);
+    next();
+  }
+  const limit = () => par + COINS.spare[moves <= par + COINS.spare[0] ? 0 : 1];
+  const score = () => (rolled / total) * COINS.cap3[moves <= par + COINS.spare[0] ? 0 : moves <= par + COINS.spare[1] ? 1 : 2];
+  // where a coin sits: on its dish, one coin's step over the one under it
+  const spot = (d, i) => [dishes[d].x, dishes[d].y - 0.012 - i * COINS.step];
+  function put(c, lift = 0) {
+    const [x, y] = spot(c.d, c.i);
+    c.el.style.left = `${x * 100}%`; c.el.style.top = `${(y - lift) * 100}%`; c.el.style.zIndex = String(Math.round(dishes[c.d].y * 100) * 10 + c.i + 1);
+  }
+  // the next round: its dishes pop in, its coins drop onto them
+  function next() {
+    round++; sel = null;
+    for (const d of dishes.splice(0)) d.el.remove();
+    const r = rounds[round]; st = r.st.map((d) => d.slice()); kinds = shuffle([...COINS.kinds]).slice(0, COINS.rounds[round].kinds);
+    COINS.at[st.length].forEach(([x, y], i) => {
+      const d = { x, y, el: img('fix/dish', 'fd') }; d.el.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${COINS.dish * 100}%;animation-delay:${i * 60}ms`;
+      el.append(d.el); dishes.push(d);
+    });
+    st.forEach((s, d) => s.forEach((k, i) => {
+      const c = { el: img(`fix/${kinds[k]}`, 'fc drop'), k, d, i }; c.el.style.width = `${COINS.coin * 100}%`; c.el.style.animationDelay = `${180 + d * 60 + i * 45}ms`;
+      c.el.addEventListener('animationend', () => c.el.classList.remove('drop'), { once: true });
+      put(c); el.append(c.el); coins.push(c);
+    }));
+    if (round) { const b = div('fround', `${round + 1}/${COINS.rounds.length}`); el.append(b); b.addEventListener('animationend', () => b.remove()); }
+    busy = 0.5; sfx('ui-coins', { vol: 0.3 });
+  }
+  const stackOf = (d) => coins.filter((c) => c.d === d).sort((a, b) => a.i - b.i);
+  const runOf = (d) => { const s = stackOf(d), top = s[s.length - 1]; const r = []; for (let i = s.length - 1; i >= 0 && s[i].k === top.k; i--) r.push(s[i]); return r; };
+  function lift(d, up) { if (d == null) return; for (const c of runOf(d)) { c.el.classList.toggle('up', up); put(c, up ? 0.045 : 0); } }
+  function pick(d) { lift(sel, false); sel = d; lift(d, true); sfx('ui-tap', { vol: 0.5 }); buzz(6); }
+  function no(d) { const e = dishes[d].el; e.classList.remove('no'); void e.offsetWidth; e.classList.add('no'); sfx('ui-error', { vol: 0.3 }); buzz(20); }
+  function move(from, to) {
+    const run = runOf(from), dst = stackOf(to), n = Math.min(run.length, COINS.cap - dst.length);
+    lift(from, false);
+    run.slice(0, n).forEach((c, j) => { c.d = to; c.i = dst.length + j; c.el.style.transitionDelay = `${j * 45}ms`; put(c); });
+    st[to].push(...st[from].splice(st[from].length - n, n));
+    moves++; sel = null; busy = 0.18 + n * 0.045;
+    for (let j = 0; j < n; j++) setTimeout(() => sfx('coin-drop', { vol: 0.45 }), 200 + j * 45);
+    const s = st[to];
+    if (s.length === COINS.cap && s.every((k) => k === s[0])) { st[to] = []; busy = 1; setTimeout(() => roll(to), 380); }
+  }
+  // four alike: they roll up, and the roll flies into the till
+  function roll(d) {
+    const four = coins.filter((c) => c.d === d);
+    for (const c of four) { c.el.classList.add('gone'); coins.splice(coins.indexOf(c), 1); setTimeout(() => c.el.remove(), 400); }
+    const r = img('fix/roll', 'froll'), [x, y] = spot(d, 1);
+    r.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${COINS.coin * 100}%`; el.append(r);
+    sfx('pickup-bonus', { vol: 0.5 }); buzz(25); rolled += COINS.cap;
+    setTimeout(() => { r.classList.add('fly'); r.style.left = `${COINS.till[0] * 100}%`; r.style.top = `${COINS.till[1] * 100}%`; }, 260);
+    setTimeout(() => {
+      r.remove(); puff(el, 'scrub/sparkle', COINS.till[0], COINS.till[1] + 0.03, 0.3, 'spin'); sfx('ui-coins', { vol: 0.45 });
+      if (coins.length) { busy = 0; return; }
+      if (round + 1 < COINS.rounds.length) { setTimeout(next, 250); return; }
+      el.classList.add('cha'); sfx('ui-purchase', { vol: 0.7 }); setTimeout(() => { done = true; }, 700);
+    }, 800);
+  }
+  function onDown(e) {
+    if (!on || busy > 0) return;
+    e.preventDefault();
+    const [px, py] = at(stage, e, W, H);
+    const d = dishes.map((q, i) => [i, Math.hypot((q.x * W - px) * 1.3, q.y * H - 0.07 * H - py)]).filter(([, r]) => r < W * 0.19).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (d == null) { lift(sel, false); sel = null; return; }
+    if (sel == null) { if (st[d].length) pick(d); else no(d); return; }
+    if (sel === d) { lift(d, false); sel = null; sfx('ui-tap', { vol: 0.3 }); return; }
+    const top = st[sel][st[sel].length - 1], to = st[d];
+    if (to.length < COINS.cap && (!to.length || to[to.length - 1] === top)) move(sel, d);
+    else if (to.length) pick(d); else no(d);
+  }
+  const h = { pointerdown: onDown };
+  return { hint: 'Tap a stack, then a dish: four alike roll away', go: 'Sort!', won: 'Ka-ching!', setup,
+    meter: { icon: 'fix/c3', text: () => `${moves}/${limit()}` },
+    start() { on = true; listen(stage, true, h); }, stop() { on = false; if (stage) listen(stage, false, h); },
+    tick(dt) { busy -= dt; },
+    score, over: () => done, tally: () => `<b>${moves}</b> moves · the fewest: ${par}`,
+    // (for the tests: the dishes of the best next move, as points on the page)
+    peek: () => { if (busy > 0 || done) return null; const p = coinPar(st); if (!p.next) return null; const pt = (d) => client(stage, dishes[d].x, dishes[d].y - 0.05); return { from: pt(p.next[0]), to: pt(p.next[1]), f: p.next[0], sel }; } };
 }
 
 // ---------------------------------------------------------------- the paint
@@ -387,4 +582,4 @@ export function boltsGame({ sfx = () => {}, buzz = () => {} } = {}) {
     peek: () => list.filter((b) => !b.done).map((b) => ({ ...client(stage, b.x, b.y), r: stage.getBoundingClientRect().width * 0.16, left: b.need - b.a })) };
 }
 
-export const GAMES = { planks: planksGame, wires: wiresGame, paint: paintGame, leaks: leaksGame, weeds: weedsGame, bolts: boltsGame };
+export const GAMES = { wash: washGame, coins: coinsGame, paint: paintGame, leaks: leaksGame, weeds: weedsGame, bolts: boltsGame };

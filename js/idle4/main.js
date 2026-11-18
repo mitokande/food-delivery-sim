@@ -193,9 +193,10 @@ const game = {
   async fix(room, practice = false) {
     if (playing || !S.FIX[room] || (!practice && !S.canFix(G, room))) return;
     playing = true; ui.closeRoom();
+    if (!practice) world.hold(room); // (its junk stays till the camera is back on it: showCleared)
     const r = await ui.fixPlay(room);
     playing = false;
-    if (!r) { if (!practice) game.openRoom(room); return; }
+    if (!r) { world.clearOut(room); if (!practice) game.openRoom(room); return; }
     const res = practice ? { tier: S.fixTier(room, r.score), cash: 0, done: true } : S.fixRoom(G, room, r.score);
     if (!res) return;
     ui.fixDone(room, res, r.tally, practice);
@@ -205,7 +206,13 @@ const game = {
   fixSkip(room) {
     if (!S.fixRoom(G, room, null)) return;
     audio.play('ui-tap', { vol: 0.5 }); ui.toast('The crew cleared it out', 'good');
-    save(); if (ui.room === room) ui.renderRoom(); else game.openRoom(room); ui.live();
+    save(); if (ui.room === room) { world.clearOut(room); ui.renderRoom(); } else game.showCleared(room); ui.live();
+  },
+  // a ruin just cleared out: the camera goes to it, its junk flies off, then its panel opens (the builders' step)
+  showCleared(room) {
+    world.focus(room, innerWidth < innerHeight ? 26 : 22);
+    setTimeout(() => world.clearOut(room), 500);
+    setTimeout(() => { if (ui.room !== room) game.openRoom(room); }, 1800);
   },
   openRoom(room) {
     if (ui.room === room) { ui.closeRoom(); return; }
@@ -286,7 +293,7 @@ window.game = Object.assign(game, { renderer, world, catchUp, speed: (v) => (v =
 window.ready = true;
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }
 else if (gone > 2) catchUp(gone);
-// (for a try: ?mini=scrub, cook or flyers plays that mini game with no event on (planks, wires, paint, leaks, weeds or bolts: a repair game), ?ev=inspector sends the inspector round now)
+// (for a try: ?mini=scrub, cook or flyers plays that mini game with no event on (wash, coins, paint, leaks, weeds or bolts: a repair game), ?ev=inspector sends the inspector round now)
 const idle = (f) => (document.querySelector('#modals').children.length ? setTimeout(() => idle(f), 400) : f());
 const tryMini = Object.keys(S.MINI).find((k) => S.MINI[k].game === q.get('mini'));
 if (tryMini) idle(() => game.mini(tryMini, true));

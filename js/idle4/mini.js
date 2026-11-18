@@ -18,10 +18,13 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // the time is up or the game says it's over, or with null when it's left before it began; leave() ends it now.
 // A game: { hint, go, won, done, setup(stage, dur) (a promise), start(), tick(dt), score(), over(), stop(), tally() }
 // (won: what it says when it's over with every star, done: with fewer; tally: the result in a few words).
+// With no `dur` there is no clock: the game ends itself, and its own meter stands where the clock would
+// (meter: { icon, text() }, low(): it's running out).
 export function play(host, game, { dur, tiers, sfx = () => {}, buzz = () => {} }) {
-  host.innerHTML = `<div class="mini">
+  const timed = dur > 0, meter = game.meter;
+  host.innerHTML = `<div class="mini ${timed ? '' : 'untimed'}">
     <div class="mtop">
-      <span class="mclock"><img src="assets/ui4/stopwatch.webp" alt="" draggable="false"><b></b></span>
+      <span class="mclock"><img src="${timed || !meter ? 'assets/ui4/stopwatch.webp' : IMG(meter.icon)}" alt="" draggable="false"><b></b></span>
       <span class="mbar"><u></u>${tiers.map((t) => `<i style="left:${t * 100}%"><img src="assets/ui4/star.webp" alt="" draggable="false"></i>`).join('')}</span>
     </div>
     <div class="mstage"><b class="mcount" hidden></b></div>
@@ -34,7 +37,7 @@ export function play(host, game, { dur, tiers, sfx = () => {}, buzz = () => {} }
   const say = (t) => { count.hidden = !t; count.textContent = t || ''; if (t) { count.style.animation = 'none'; void count.offsetWidth; count.style.animation = ''; } };
   const show = () => {
     const s = game.score(), n = tiers.filter((t) => s >= t).length;
-    clock.textContent = String(Math.ceil(left)); el.classList.toggle('hurry', left <= 3);
+    clock.textContent = timed ? String(Math.ceil(left)) : meter?.text() ?? ''; el.classList.toggle('hurry', timed ? left <= 3 : !!game.low?.());
     fill.style.width = `${Math.round(s * 100)}%`;
     if (n > lit) { sfx('qte-good', { vol: 0.5 }); buzz(15); }
     lit = n; stars.forEach((x, i) => x.classList.toggle('on', i < n));
@@ -51,12 +54,13 @@ export function play(host, game, { dur, tiers, sfx = () => {}, buzz = () => {} }
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     const was = Math.ceil(left);
-    left = Math.max(0, left - dt); game.tick(dt); show();
-    if (left <= 3 && Math.ceil(left) < was && left > 0) sfx('countdown-tick', { vol: 0.5 });
-    if (game.over()) end('over'); else if (left <= 0) end('time'); else raf = requestAnimationFrame(frame);
+    if (timed) left = Math.max(0, left - dt);
+    game.tick(dt); show();
+    if (timed && left <= 3 && Math.ceil(left) < was && left > 0) sfx('countdown-tick', { vol: 0.5 });
+    if (game.over()) end('over'); else if (timed && left <= 0) end('time'); else raf = requestAnimationFrame(frame);
   }
   (async () => {
-    clock.textContent = String(dur);
+    clock.textContent = timed ? String(dur) : meter?.text() ?? '';
     await game.setup(stage, dur);
     if (state !== 'setup') return;
     state = 'count'; say('Ready?'); await wait(800);

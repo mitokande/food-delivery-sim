@@ -916,21 +916,31 @@
 .leaks .ftool { margin: -5% 0 0 -24%; transform-origin: 80% 18%; }
 .ftool.go { animation: ftool .32s ease-out; }
 @keyframes ftool { 0% { opacity: 1; transform: rotate(18deg); } 60% { opacity: 1; transform: rotate(-22deg); } 100% { opacity: 0; transform: rotate(-22deg); } }
-/* the boards */
-.fp { position: absolute; transform: translate(-50%, -50%) rotate(var(--r)); filter: drop-shadow(0 5px 3px rgba(0,0,0,.45)); transition: transform .6s cubic-bezier(.5,0,.9,.6), opacity .2s .4s; }
-.fp > img:first-child { width: 100%; }
-.fp.fall { transform: translate(-50%, 900%) rotate(calc(var(--r) + var(--d) * 50deg)); opacity: 0; }
-.fn { position: absolute; top: 50%; width: 8.5%; transform: translate(-50%, -50%); filter: saturate(.15) brightness(1.3) drop-shadow(0 2px 1px rgba(0,0,0,.5)); transition: transform .15s, opacity .2s; }
-.fn.rusty { width: 10.5%; filter: drop-shadow(0 2px 1px rgba(0,0,0,.5)); }
-.fn.loose { transform: translate(-50%, -62%) rotate(25deg) scale(1.12); }
-.fn.out { transform: translate(-50%, -260%) scale(1.5); opacity: 0; }
-/* the wires */
-.wires > canvas { z-index: 2; }
-.fk { position: absolute; z-index: 1; width: 17%; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 2px rgba(0,0,0,.45)); transition: transform .12s; }
-.fk.held { transform: translate(-50%, -50%) scale(1.14); }
-.fk.in { filter: drop-shadow(0 0 7px rgba(255,235,120,.95)); }
-.fk.no { animation: fno .35s; }
+/* the front washed: the tarps over the sign, the gun at the bottom, the splash where the jet hits */
+.ftarp { position: absolute; z-index: 1; transform: translate(-50%, -50%) rotate(var(--r)); filter: drop-shadow(0 6px 4px rgba(0,0,0,.4)); transition: transform .9s cubic-bezier(.5,0,.9,.5), opacity .3s .6s; }
+.ftarp.hit { animation: fflap .12s linear infinite alternate; }
+@keyframes fflap { from { transform: translate(-50%, -50%) rotate(var(--r)) skewX(-3deg); } to { transform: translate(-50%, -48%) rotate(calc(var(--r) + 2deg)) skewX(3deg); } }
+.ftarp.off { transform: translate(-50%, 380%) rotate(calc(var(--r) + 35deg)); opacity: 0; }
+.fsplash { position: absolute; left: 0; top: 0; z-index: 3; width: 24%; opacity: 0; transition: opacity .1s; will-change: transform; }
+.wash.on .fsplash { opacity: .95; }
+.fgun { position: absolute; left: 0; top: 0; z-index: 4; width: 13%; transform-origin: 50% 85%; filter: drop-shadow(0 6px 5px rgba(0,0,0,.45)); will-change: transform; }
+/* the coins: dishes on the felt, coins stacked on them, a roll flying into the till */
+.fd { position: absolute; transform: translate(-50%, -50%); filter: drop-shadow(0 5px 3px rgba(0,0,0,.35)); animation: fdin .35s cubic-bezier(.3,1.6,.6,1) both; }
+@keyframes fdin { from { transform: translate(-50%, -50%) scale(0); } }
+.fd.no { animation: fno .35s; }
 @keyframes fno { 25% { transform: translate(-62%, -50%); } 50% { transform: translate(-40%, -50%); } 75% { transform: translate(-56%, -50%); } }
+.fc { position: absolute; transform: translate(-50%, -50%); filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); transition: left .26s ease-out, top .26s cubic-bezier(.3,-.9,.6,1); }
+.fc.up { filter: drop-shadow(0 0 6px rgba(255,236,140,.95)) drop-shadow(0 6px 4px rgba(0,0,0,.3)); }
+.fc.drop { animation: fcdrop .32s cubic-bezier(.5,0,.8,.6) both; }
+@keyframes fcdrop { from { transform: translate(-50%, -400%); opacity: 0; } 30% { opacity: 1; } }
+.fc.gone { transition: transform .3s ease-in, opacity .3s; transform: translate(-50%, -50%) scale(.3); opacity: 0; }
+.froll { position: absolute; z-index: 900; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); animation: fpopin .3s cubic-bezier(.3,1.6,.6,1) both; }
+.froll.fly { animation: none; transition: left .5s cubic-bezier(.5,0,.6,1), top .5s cubic-bezier(.4,-.5,.7,1), transform .5s; transform: translate(-50%, -50%) scale(.55) rotate(-20deg); }
+@keyframes fpopin { from { transform: translate(-50%, -50%) scale(0); } }
+.fround { position: absolute; left: 0; right: 0; top: 30%; z-index: 999; text-align: center; font: var(--dw) 44px/1 var(--display); color: #fff; -webkit-text-stroke: 9px #7a2a08; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(90,20,0,.6); animation: fround 1.1s ease-out both; }
+@keyframes fround { 0% { transform: scale(.4); opacity: 0; } 20% { transform: scale(1.1); opacity: 1; } 30% { transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+.coins.cha::after { content: ''; position: absolute; left: 15%; right: 15%; top: -4%; height: 26%; background: radial-gradient(closest-side, rgba(255,240,170,.95), transparent); animation: fcha .9s ease-out both; }
+@keyframes fcha { from { opacity: 0; transform: scale(.6); } 30% { opacity: 1; } to { opacity: 0; transform: scale(1.4); } }
 /* the paint */
 .froller { position: absolute; left: 0; top: 0; z-index: 3; width: 34%; margin: -9% 0 0 -9.5%; filter: drop-shadow(0 6px 4px rgba(0,0,0,.35)); will-change: transform; }
 .froller.idle { animation: frollidle 1s ease-in-out infinite; }

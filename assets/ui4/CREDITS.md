@@ -40,8 +40,11 @@ shares one style and one light.
   `bribe`, `panic`, `crit`. One 4×2 sheet: `taste`, `pace`, `calm`, `ticket`, `emblem`, `pin-rival`, `pin-ours`,
   `pin-boss`.
 - `fix/*.webp` (the repair mini games): made on 2026-11-16 the same way, the prompts in `tools/genart.mjs` (the
-  `fix-*` names), cut by `tools/genart-mini.py`. Seven pictures (the backgrounds): `door`, `box`, `wall-old`,
-  `wall-new` (an edit of `wall-old`), `pipes`, `terrace`, `garage`. One sheet of four boards: `plank1`…`plank4`. One
-  4×3 sheet: `nail`, `crowbar`, `roller`, `wrench`, `spray`, `clamp`, `glove`, `dust`, `bolt`, `toolbox`, `hammer`,
-  `tin`. One 4×2 sheet: `w1`…`w5` (weeds), `can`, `pot`, `dirt`. One 3×2 sheet of knobs: `red`, `yellow`, `blue`,
-  `green`, `purple`, `orange`.
+  `fix-*` names), cut by `tools/genart-mini.py`. Five pictures (the backgrounds): `wall-old`, `wall-new` (an edit of
+  `wall-old`), `pipes`, `terrace`, `garage`. One 4×3 sheet: `roller`, `wrench`, `spray`, `clamp`, `glove`, `bolt`,
+  `hammer`, `tin` (its other four pictures, for the first entrance and cashier games, are no longer cut). One 4×2
+  sheet: `w1`…`w5` (weeds), `can`, `pot`, `dirt`.
+- `fix/*.webp` of the entrance's and the cashier's second games (the front washed, the coins sorted): made on
+  2026-11-18 the same way. Three pictures: `front`, `front-dirty` (an edit of `front`, so every brick is in the same
+  place) and `till`. One 4×2 sheet of mess: `tag1`, `tag2`, `poster1`, `poster2`, `moss`, `web`, `mud`, `soot`. One
+  3×2 sheet: `gun`, `splash`, `drop`, `tarp`, `foam`, `tank`. One 4×2 sheet: the coins `c1`…`c6`, `dish`, `roll`.
