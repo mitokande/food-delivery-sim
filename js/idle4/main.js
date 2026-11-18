@@ -293,7 +293,7 @@ window.game = Object.assign(game, { renderer, world, catchUp, speed: (v) => (v =
 window.ready = true;
 if (fresh || !G.seen.intro) { save(); if (!q.has('noti')) ui.story(); else G.seen.intro = true; }
 else if (gone > 2) catchUp(gone);
-// (for a try: ?mini=scrub, cook or flyers plays that mini game with no event on (wash, coins, paint, leaks, weeds or bolts: a repair game), ?ev=inspector sends the inspector round now)
+// (for a try: ?mini=scrub, cook or flyers plays that mini game with no event on (wash, coins, photo, pipes, mow or park: a repair game), ?ev=inspector sends the inspector round now)
 const idle = (f) => (document.querySelector('#modals').children.length ? setTimeout(() => idle(f), 400) : f());
 const tryMini = Object.keys(S.MINI).find((k) => S.MINI[k].game === q.get('mini'));
 if (tryMini) idle(() => game.mini(tryMini, true));

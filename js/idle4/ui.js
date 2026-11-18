@@ -507,10 +507,10 @@ export function createUI(game) {
   const FX = {
     entrance: { icon: 'fix/gun', title: 'Filthy front!', lead: 'Years of grime, graffiti and old posters, and tarps over the sign. Wash it all off.', go: 'Wash the front', play: 'Wash the front!', done: 'Front washed' },
     cashier: { icon: 'fix/roll', title: 'Coins everywhere!', lead: 'The old till spilled its coins. Stack them by kind: four alike roll back into the till.', go: 'Sort the coins', play: 'Sort the coins!', done: 'Coins sorted' },
-    office: { icon: 'fix/roller', title: 'Peeling walls!', lead: 'Uncle Ferdi never painted this wall. Roll a fresh coat over it.', go: 'Paint the wall', play: 'Paint the wall!', done: 'Wall painted' },
-    staff: { icon: 'fix/wrench', title: 'Leaky pipes!', lead: 'The old pipes leak at every joint. Shut the leaks as they spring.', go: 'Stop the leaks', play: 'Stop the leaks!', done: 'Leaks stopped' },
-    terrace: { icon: 'fix/glove', title: 'Overgrown!', lead: 'Weeds and rubbish all over the paving. Pull them out.', go: 'Clear the weeds', play: 'Clear the weeds!', done: 'Weeds cleared' },
-    bay: { icon: 'fix/bolt', title: 'Loose door!', lead: 'The garage door hangs by its bolts. Tighten them up.', go: 'Tighten the bolts', play: 'Tighten the bolts!', done: 'Bolts tightened' },
+    office: { icon: 'fix/frame', title: 'A torn photo!', lead: 'Uncle Ferdi\'s photo of the opening day lies torn on his desk. Put it back together in its frame.', go: 'Mend the photo', play: 'Mend the photo!', done: 'Photo mended' },
+    staff: { icon: 'fix/valve', title: 'No water!', lead: 'The pipes are all twisted. Turn them so the water runs from the tap to the basin.', go: 'Fix the pipes', play: 'Fix the pipes!', done: 'Pipes fixed' },
+    terrace: { icon: 'fix/mower', title: 'A jungle!', lead: 'The lawn hasn\'t been cut in years. Mow every patch in one go, round the pots.', go: 'Mow the lawn', play: 'Mow the lawn!', done: 'Lawn mowed' },
+    bay: { icon: 'fix/scooter', title: 'Blocked in!', lead: 'Junk all over the garage. Slide it out of the way and get the scooter out.', go: 'Clear the way', play: 'Clear the way!', done: 'Way cleared' },
   };
   const FIX_TIERS = [['Not quite…', 'It has to be cleared before the builders can start.'], ['That will do', 'Cleared out.'], ['Good work!', 'Nearly spotless.'], ['Perfect!', 'Not a thing left to do.']];
   const fixPlay = (room) => { const d = FX[room], cfg = S.FIX[room]; return playIn(Fix.GAMES[cfg.game]({ sfx, buzz, loop: sfxLoop }), d.icon, d.play, `k-fix k-${cfg.game}`, cfg); };

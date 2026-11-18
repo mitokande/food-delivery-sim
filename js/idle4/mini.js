@@ -60,8 +60,9 @@ export function play(host, game, { dur, tiers, sfx = () => {}, buzz = () => {} }
     if (game.over()) end('over'); else if (timed && left <= 0) end('time'); else raf = requestAnimationFrame(frame);
   }
   (async () => {
-    clock.textContent = timed ? String(dur) : meter?.text() ?? '';
+    clock.textContent = timed ? String(dur) : '';
     await game.setup(stage, dur);
+    if (!timed) clock.textContent = meter?.text() ?? ''; // (a game's own meter: once it's set up)
     if (state !== 'setup') return;
     state = 'count'; say('Ready?'); await wait(800);
     if (state !== 'count') return;

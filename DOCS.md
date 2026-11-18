@@ -1617,10 +1617,10 @@ Oyunun başında mini oyunları tanıtmak için: harabe bir oda artık önce **e
 |---|---|---|---|
 | Entrance | `wash` | Tazyikli yıkama (18 Kasım'dan beri, §14.15): kiri jetle sil, inatçı lekeleri ve tabeladaki brandaları jetle sök | saat yok: 30 sn su |
 | Cashier | `coins` | Bozuk para dizme (18 Kasım'dan beri, §14.15): paraları türüne göre tabaklara diz, aynı dört para rulo olup kasaya gider | saat yok: hamle sayısı |
-| Ferdi's Office | `paint` | Eski duvarın üstünden ruloyla geç (alttaki yeni duvar açılır); %97 = tamamı | 12 sn |
-| Staff Room | `leaks` | Borularda sırayla 14 sızıntı çıkar (gittikçe hızlı); süresi dolmadan dokunup kelepçele, kaçan su odayı doldurur | 16 sn |
-| Terrace | `weeds` | 10 ot ve çöpü parmakla tutup herhangi bir yöne çekerek sök | 13 sn |
-| Courier Bay | `bolts` | 4 cıvatanın etrafında parmağı saat yönünde çevir (cırcır: ters yön saymaz), 1,25–1,75 tur | 15 sn |
+| Ferdi's Office | `photo` | Yırtık fotoğraf (18 Kasım'dan beri, §14.16): Ferdi'nin açılış günü fotoğrafının 12 parçasını çerçevede yerine sürükle | saat yok: hata sayısı |
+| Staff Room | `pipes` | Boru bulmacası (§14.16): karolara dokunup çevir, su musluktan lavaboya aksın; iki tur | saat yok: dokunuş sayısı |
+| Terrace | `mow` | Çim biçme (§14.16): makineyi sürükle, saksıların arasından her kareden bir kez geç | saat yok: geri dönüş sayısı |
+| Courier Bay | `park` | Park bulmacası (§14.16): hurdaları kaydır, motoru garaj kapısından çıkar; iki tur | saat yok: hamle sayısı |
 
 - **Kurallar** (`sim.js`: `FIX`, `FIX_CASH`, `FIX_SKIP`, `needsFix`, `canFix`, `canSkipFix`, `fixTier`, `fixCash`,
   `fixRoom`). `upBlock` harabe için yeni bir engel döndürür: `'fix'` (ofis kapısı `'gate'`ten sonra, `'build'`den
@@ -1681,4 +1681,44 @@ Kullanıcı ilk tamir oyunlarını "çiğ" buldu; beyin fırtınasından sonra �
   3 yıldız, $15, depoda su kalır), sonuç kartı açıkken çöpler yerinde, "To the builders" sonrası önce temizlenme sonra
   panel; kasanın paraları deneme modunda en iyi hamlelerle 3 yıldız; çözücünün kendisi (en az hamle, imkânsız dağıtım).
   Deneme: `idle4.html?mini=wash`, `?mini=coins`.
+
+### 14.16 Tamir oyunları 3: fotoğraf, borular, çim, garaj (18 Kasım 2026)
+
+Kullanıcı yıkama ve bozuk para oyunlarını beğendi (PR #34); kalan dört oda aynı yaklaşımla yeniden yapıldı: bilinen
+bir türün mekaniği, boyalı çizimler, saat yok, en iyi sonuca göre yıldız. Eski `paint`, `leaks`, `weeds`, `bolts`
+oyunları, görselleri ve istemleri kaldırıldı (yalnızca etiketteki çekiç `fix/hammer` ve sonuç kartındaki kasa `fix/tin`
+kaldı). Hepsi `fix.js`'te; yıldız sınırı ortak: en iyiye göre fazlalık `spare[0]` içindeyse 3, `spare[1]` içindeyse 2,
+fazlası 1 yıldız (`tierCap`; puan = ilerleme × 1 / 0,8 / 0,55, kademeler 0,5 / 0,8 / 1).
+
+- **Ofis: yırtık fotoğraf** (`photoGame`, `PHOTO`). Masada (`fix/desk`) boş bir çerçeve (`fix/frame`), altta
+  Ferdi'nin açılış günü fotoğrafının (`fix/photo`, genç ve siyah bıyıklı Ferdi) 3×4 = 12 parçası dağınık ve eğik
+  duruyor. Yırtıklar her oyunda yeniden: hafifçe kaydırılmış bir nokta ızgarası, her kenar iki parçanın paylaştığı
+  tırtıklı bir çizgi; parçalar tuvalde kesilir. Parçayı yerine yakın bırakınca oturur. Çerçevede başka bir yere
+  bırakılırsa hata sayılır ve geri kayar; masada bırakılırsa orada kalır. Hata: 1'e kadar 3, 4'e kadar 2 yıldız.
+- **Personel odası: boru bulmacası** (`pipesGame`, `PIPES`, `pipePath`, `pipeRound`). Fayanslı duvar (`fix/tilewall`)
+  üstünde boru karoları (düz, dirsek, T, artı); solda musluk, ızgaranın altında lavabo. Önce musluktan lavaboya kıvrımlı
+  bir yol çizilir (1. tur 4×5 ızgarada 7–9 kare, 2. tur 5×6'da 11–15), kalan kareler hiçbir yere gitmeyen karolardır;
+  hepsi rastgele çevrilir. Dokunuş karoyu çeyrek tur çevirir; suyun ulaştığı karolar mavi parlar, su lavaboya varınca
+  karolar sırayla akar. En az dokunuş: yoldaki her karonun doğru yöne en kısa dönüşü. Fazla dokunuş: 3'e kadar 3,
+  10'a kadar 2 yıldız.
+- **Teras: çim biçme** (`mowGame`, `MOW`, `mowLevel`). 5×7 karelik çimen (`fix/lawn` biçilmiş, `fix/lawn-wild` onun
+  uzamış hâli, üstte tuvalde). 4–6 engel (saksı, cüce, kuş banyosu, fıskiye, kova, taş) ve alt sıradan bir başlangıç.
+  Önce engeller seçilir, sonra her boş kareden bir kez geçen bir yol aranır (dama tahtası kuralı: iki rengin boş kare
+  sayısı uymuyorsa hiç denenmez; bulunamazsa engelsiz yılan yolu). Makine parmağı kare kare izler, geçtiği yer biçilir.
+  Çıkmaza girince geri sürüklenir ya da biçilmiş bir kareye dokunulur: makine oraya kadar geri gider, çim geri uzar.
+  Geri gidilen kare: 2'ye kadar 3, 8'e kadar 2 yıldız. Motor sesi `engine-moped`'in hızlandırılmışı.
+- **Kurye rampası: park bulmacası** (`parkGame`, `PARK`, `parkPar`, `parkRound`). Garaj zemini (`fix/floor`) üstünde
+  6×6 ızgara; motor (`fix/scooter`) 3. sırada, sağdaki çıkışa (yeşil ok) gitmeli. Hurdalar (araba, kasalar, lastikler: 2
+  kare; minibüs, variller: 3 kare) yalnızca yattıkları yönde kayar. Her tur rastgele dizilir; en az hamle bir arama
+  (BFS) ile bulunur ve aralıkta olmalıdır (1. tur 5 parça, 3–5 hamle; 2. tur 9 parça, 6–10). Motor kapıya varınca korna
+  çalıp çıkar. Fazla hamle: 3'e kadar 3, 10'a kadar 2 yıldız.
+- **Çerçeve** (`mini.js`): saatsiz bir oyunun göstergesi artık oyun kurulduktan sonra okunur (çim oyununun sayacı
+  kurulumdan önce hata veriyordu).
+- **Görseller** (`assets/ui4/fix/`, GPT Image 2.6, `tools/genart.mjs` `fix-desk`, `fix-frame`, `fix-photo`,
+  `fix-tilewall`, `fix-plumb`, `fix-lawn`, `fix-lawn-wild`, `fix-garden`, `fix-floor`, `fix-yard`). Fotoğraf, çerçevenin
+  ölçülen kartonuna göre kırpılır (`tools/genart-mini.py`). Bahçe saksısı `fpot` adını aldı.
+- **Test.** `tools/idle4.mjs`: dördü deneme modunda ipucuyla (`peek`) oynanır ve 3 yıldız alır. Fotoğrafta bir parça
+  bilerek yanlış yere bırakılır, geri kayar ve hata sayılır; çimde başlangıca dokununca makine oraya geri gider.
+  Personel odasının boruları da odanın gerçek tamirinde oynanır (3 yıldız, $75). Deneme:
+  `idle4.html?mini=photo|pipes|mow|park`.
 

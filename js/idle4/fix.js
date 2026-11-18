@@ -3,10 +3,11 @@
 // - wash (the entrance): the front washed with a pressure washer, the grime, the graffiti and the old posters off it
 //   (no clock: a tank of water),
 // - coins (the cashier): the till's spilled coins sorted into stacks of one kind, in as few moves as can be (no clock),
-// - paint (the office): the old wall painted over with the roller,
-// - leaks (the staff room): the pipes spring leaks; a tap shuts one before it floods,
-// - weeds (the terrace): weeds and rubbish pulled off the paving with a swipe,
-// - bolts (the courier bay): the bolts of the garage door turned tight, a finger going round them.
+// - photo (the office): Uncle Ferdi's torn photo of the opening day put back together in its frame,
+// - pipes (the staff room): the pipe tiles turned till the water runs from the tap to the basin,
+// - mow (the terrace): the lawn mowed in one go, every patch once, round the pots,
+// - park (the courier bay): the junk slid out of the way to get the scooter out of the garage.
+// None has a clock: they count the water, the moves or the mistakes it took.
 // What a result is worth is sim.js's business (FIX); the window and the cards are ui.js's. The art is in assets/ui4/fix.
 import { IMG, load, rnd } from './mini.js';
 
@@ -342,244 +343,485 @@ export function coinsGame({ sfx = () => {}, buzz = () => {} } = {}) {
     peek: () => { if (busy > 0 || done) return null; const p = coinPar(st); if (!p.next) return null; const pt = (d) => client(stage, dishes[d].x, dishes[d].y - 0.05); return { from: pt(p.next[0]), to: pt(p.next[1]), f: p.next[0], sel }; } };
 }
 
-// ---------------------------------------------------------------- the paint
-// The wall as it will be lies under the wall as it is; the roller takes the old one away where it goes. How much of
-// it is left is read from a small copy every now and then.
-const PAINT = { r: 0.17, a: 0.92, full: 0.97, ink: ['#8fae7c', '#a4c08f', '#7d9c6c'] }; // (the roller's half width, of the stage's; a pass; this much painted is all of it)
+// (the puzzles with no clock count what they took against the fewest it could have taken: `spare` over it for three
+// stars, for two; `cap` what the score can reach with three, two, one)
+const tierCap = (over, spare) => (over <= spare[0] ? 1 : over <= spare[1] ? 0.8 : 0.55);
 
-export function paintGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, k, old, fx, brush, probe, roller, a0 = 1, cover = 0, probeT = 0, rustleT = 0, on = false, down = null;
-  const drops = [];
+// ---------------------------------------------------------------- the photo
+// Uncle Ferdi's photo of the opening day lies torn on his desk. Each piece is dragged into the frame where it belongs:
+// near enough to its place it snaps in; dropped on another place in the frame it's a mistake and slides back. On the
+// desk it stays where it was put. The tears are a grid of points shaken a little, each edge a jagged line the two
+// pieces either side of it share.
+const PHOTO = {
+  cols: 3, rows: 4, frame: [0.5, 0.315, 0.6], mat: [0.1562, 0.1484, 0.8457, 0.8516], // (the frame: middle x, y and width, of the stage's; its mat, of the frame: tools/genart-mini.py measures it)
+  snap: 0.5, desk: [0.12, 0.7, 0.88, 0.93], spare: [1, 4], // (a piece snaps in within this much of a cell; where the pieces lie, their middles; mistakes for three stars, for two)
+};
+
+export function photoGame({ sfx = () => {}, buzz = () => {} } = {}) {
+  let stage, el, W, H, k, pic, on = false, drag = null, placed = 0, wrong = 0, done = false, z = 10;
+  const list = [];
+  let mx, my, mw, mh, cw, ch; // (the mat on the stage, px; a cell)
 
   async function setup(s) {
     stage = s;
-    const im = await load(IMG('fix/wall-old'));
-    ({ el, W, H } = await scene(s, 'wall-new', 'paint', ['fix/roller']));
+    ({ el, W, H } = await scene(s, 'desk', 'photo', ['fix/frame', 'scrub/sparkle']));
+    pic = await load(IMG('fix/photo'));
     k = Math.min(2, devicePixelRatio || 1);
-    const layer = () => { const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); el.append(c); return c; };
-    old = layer(); fx = layer();
-    const c = old.getContext('2d'); c.scale(k, k);
-    if (im) { const q = Math.max(W / im.width, H / im.height); c.drawImage(im, (W - im.width * q) / 2, (H - im.height * q) / 2, im.width * q, im.height * q); } else { c.fillStyle = '#cdbb98'; c.fillRect(0, 0, W, H); }
-    // the roller's mark: wide and flat, soft at the ends
-    brush = document.createElement('canvas'); brush.width = 96; brush.height = 48;
-    const b = brush.getContext('2d'), g = b.createLinearGradient(0, 0, 0, 48);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.25, 'rgba(0,0,0,1)'); g.addColorStop(0.75, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    b.fillStyle = g; b.beginPath(); b.roundRect(2, 0, 92, 48, 10); b.fill();
-    probe = document.createElement('canvas'); probe.width = 32; probe.height = 48;
-    read(); a0 = a0 || 1;
-    roller = img('fix/roller', 'froller idle'); roller.style.transform = `translate(${W / 2}px, ${H * 0.75}px)`; el.append(roller);
+    const [fx, fy, fw] = PHOTO.frame, fh = fw * W * 1.5 / H; // (the frame is 2:3)
+    const frame = img('fix/frame', 'fframe'); frame.style.cssText = `left:${fx * 100}%;top:${fy * 100}%;width:${fw * 100}%`; el.append(frame);
+    mx = (fx - fw / 2 + fw * PHOTO.mat[0]) * W; mw = fw * (PHOTO.mat[2] - PHOTO.mat[0]) * W;
+    my = (fy - fh / 2 + fh * PHOTO.mat[1]) * H; mh = fh * (PHOTO.mat[3] - PHOTO.mat[1]) * H;
+    cw = mw / PHOTO.cols; ch = mh / PHOTO.rows;
+    // the tears: the points (the mat's edges stay straight), then each edge's jagged line
+    const C = PHOTO.cols, R = PHOTO.rows, pt = [];
+    for (let j = 0; j <= R; j++) for (let i = 0; i <= C; i++) pt.push([i * cw + (i > 0 && i < C ? rnd(-0.12, 0.12) * cw : 0), j * ch + (j > 0 && j < R ? rnd(-0.12, 0.12) * ch : 0)]);
+    const P = (i, j) => pt[j * (C + 1) + i], edges = new Map();
+    const edge = (a, b, inner) => { // (a → b, jagged when it's a tear)
+      const key = `${a}|${b}`, back = `${b}|${a}`;
+      if (edges.has(back)) return edges.get(back).slice().reverse();
+      const [x0, y0] = a, [x1, y1] = b, n = inner ? 7 : 1, len = Math.hypot(x1 - x0, y1 - y0), nx = -(y1 - y0) / len, ny = (x1 - x0) / len, line = [a];
+      for (let q = 1; q < n; q++) { const t = q / n, d = rnd(-0.05, 0.05) * Math.min(cw, ch); line.push([x0 + (x1 - x0) * t + nx * d, y0 + (y1 - y0) * t + ny * d]); }
+      line.push(b); edges.set(key, line); return line;
+    };
+    for (let j = 0; j < R; j++) for (let i = 0; i < C; i++) {
+      const poly = [...edge(P(i, j), P(i + 1, j), j > 0), ...edge(P(i + 1, j), P(i + 1, j + 1), i < C - 1).slice(1), ...edge(P(i + 1, j + 1), P(i, j + 1), j < R - 1).slice(1), ...edge(P(i, j + 1), P(i, j), i > 0).slice(1, -1)];
+      const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), bx = Math.min(...xs) - 3, by = Math.min(...ys) - 3, bw = Math.max(...xs) + 3 - bx, bh = Math.max(...ys) + 3 - by;
+      const cv = document.createElement('canvas'); cv.className = 'fpc'; cv.width = Math.ceil(bw * k); cv.height = Math.ceil(bh * k);
+      cv.style.width = `${bw}px`; cv.style.height = `${bh}px`;
+      const c = cv.getContext('2d'); c.scale(k, k); c.translate(-bx, -by);
+      c.beginPath(); poly.forEach(([x, y], q) => (q ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath();
+      c.save(); c.clip(); if (pic) c.drawImage(pic, 0, 0, mw, mh); else { c.fillStyle = '#c9a77a'; c.fill(); } c.restore();
+      c.lineWidth = 1.6; c.strokeStyle = 'rgba(255, 248, 230, .9)'; c.stroke();
+      const p = { cv, bw, bh, hx: mx + bx + bw / 2, hy: my + by + bh / 2, x: 0, y: 0, rot: 0, in: false }; // (h: its middle, in its place)
+      el.append(cv); list.push(p);
+    }
+    // scattered over the desk, turned this way and that
+    const spots = shuffle(list.map((_, q) => q));
+    list.forEach((p, q) => {
+      const col = spots[q] % 4, row = Math.floor(spots[q] / 4), [x0, y0, x1, y1] = PHOTO.desk;
+      p.x = (x0 + (x1 - x0) * (col + 0.5 + rnd(-0.25, 0.25)) / 4) * W; p.y = (y0 + (y1 - y0) * (row + rnd(-0.2, 0.2)) / 2) * H; p.rot = rnd(-28, 28);
+      p.rest = [p.x, p.y, p.rot]; put(p);
+    });
   }
-  function read() {
-    const p = probe.getContext('2d', { willReadFrequently: true }); p.clearRect(0, 0, 32, 48); p.drawImage(old, 0, 0, 32, 48);
-    const d = p.getImageData(0, 0, 32, 48).data; let a = 0;
-    for (let i = 3; i < d.length; i += 4) a += d[i];
-    if (!on && !cover) a0 = a;
-    cover = clamp(1 - a / a0); if (cover >= PAINT.full) cover = 1;
+  function put(p, anim = false) {
+    p.cv.classList.toggle('go', anim);
+    p.cv.style.transform = `translate(${p.x - p.bw / 2}px, ${p.y - p.bh / 2}px) rotate(${p.rot}deg)`;
   }
-  function roll(x0, y0, x1, y1) {
-    const R = W * PAINT.r, d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(d / (R * 0.3))), c = old.getContext('2d');
-    c.save(); c.globalCompositeOperation = 'destination-out'; c.globalAlpha = PAINT.a;
-    for (let i = 1; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n; c.drawImage(brush, x - R, y - R * 0.5, R * 2, R); }
+  const hit = (x, y) => list.filter((p) => !p.in).sort((a, b) => +b.cv.style.zIndex - +a.cv.style.zIndex).find((p) => {
+    const a = -p.rot * Math.PI / 180, dx = x - p.x, dy = y - p.y, ux = dx * Math.cos(a) - dy * Math.sin(a), uy = dx * Math.sin(a) + dy * Math.cos(a);
+    return Math.abs(ux) < p.bw / 2 && Math.abs(uy) < p.bh / 2;
+  });
+  function onDown(e) {
+    if (!on || drag || done) return;
+    const [x, y] = at(stage, e, W, H), p = hit(x, y);
+    if (!p) return;
+    e.preventDefault(); stage.setPointerCapture?.(e.pointerId);
+    drag = { id: e.pointerId, p, dx: p.x - x, dy: p.y - y };
+    p.cv.style.zIndex = String(++z); p.cv.classList.add('held'); p.rot = 0; put(p, true);
+    sfx('bag-rustle', { vol: 0.25 }); buzz(6);
+  }
+  function onMove(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    e.preventDefault();
+    const [x, y] = at(stage, e, W, H), p = drag.p; p.x = x + drag.dx; p.y = y + drag.dy; put(p);
+  }
+  function onUp(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { p } = drag; drag = null; p.cv.classList.remove('held');
+    if (Math.hypot(p.x - p.hx, p.y - p.hy) < PHOTO.snap * Math.min(cw, ch)) { // in its place
+      p.in = true; p.x = p.hx; p.y = p.hy; p.cv.style.zIndex = '1'; p.cv.classList.add('in'); put(p, true); placed++;
+      puff(el, 'scrub/sparkle', p.hx / W, p.hy / H, 0.22, 'spin'); sfx('pickup-bonus', { vol: 0.45 }); buzz(15);
+      if (placed === list.length) { el.classList.add('whole'); sfx('ui-levelup', { vol: 0.4 }); setTimeout(() => { done = true; }, 900); }
+    } else if (p.x > mx && p.x < mx + mw && p.y > my && p.y < my + mh) { // in the frame, but not its place
+      wrong++; [p.x, p.y, p.rot] = p.rest; put(p, true);
+      p.cv.classList.remove('no'); void p.cv.offsetWidth; p.cv.classList.add('no'); sfx('qte-bad', { vol: 0.4 }); buzz(30);
+    } else { // somewhere on the desk: it stays there
+      p.x = Math.max(p.bw / 3, Math.min(W - p.bw / 3, p.x)); p.y = Math.max(H * 0.5, Math.min(H - p.bh / 3, p.y)); p.rot = rnd(-8, 8); p.rest = [p.x, p.y, p.rot]; put(p, true);
+      sfx('ui-tap', { vol: 0.3 });
+    }
+  }
+  const score = () => (placed / list.length) * tierCap(wrong, PHOTO.spare);
+  const h = { pointerdown: onDown, pointermove: onMove, pointerup: onUp, pointercancel: onUp };
+  return { hint: 'Drag each piece into the frame where it belongs', go: 'Mend it!', won: 'Like new!', setup,
+    meter: { icon: 'fix/frame', text: () => `${placed}/${list.length}` },
+    start() { on = true; listen(stage, true, h); }, stop() { on = false; drag = null; if (stage) listen(stage, false, h); }, tick() {},
+    score, over: () => done, tally: () => `<b>${placed}/${list.length}</b> pieces · ${wrong ? `${wrong} in the wrong place` : 'not one in the wrong place'}`,
+    // (for the tests: a piece still out, where it is and where it goes, and the place of another piece)
+    peek: () => { const p = list.find((q) => !q.in); if (!p || drag) return null; const o = list.find((q) => q !== p && !q.in) || p; return { from: client(stage, p.x / W, p.y / H), to: client(stage, p.hx / W, p.hy / H), wrong: client(stage, o.hx / W, o.hy / H) }; } };
+}
+
+// ---------------------------------------------------------------- the pipes
+// The staff room's pipes are all twisted. A tap turns a tile a quarter round; when the pipes run from the tap on the
+// left to the basin under the grid, the water flows. The way the water should go is laid first (a winding path); the
+// other tiles are pieces that go nowhere. Two rounds, the second bigger.
+const PIPES = {
+  rounds: [{ cols: 4, rows: 5, len: [7, 9] }, { cols: 5, rows: 6, len: [11, 15] }], spare: [3, 10],
+  box: [0.16, 0.04, 0.82, 0.7], // (the grid's box: left, top, width, height of the stage's; its cells are square)
+  kinds: { straight: 10, elbow: 12, tee: 14, cross: 15 }, decoy: [['straight', 0.35], ['elbow', 0.4], ['tee', 0.2], ['cross', 0.05]], // (openings: N 1, E 2, S 4, W 8, as drawn)
+};
+const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // (N E S W: the opening 1 << d)
+const turn = (m, r) => { for (let i = 0; i < ((r % 4) + 4) % 4; i++) m = ((m << 1) | (m >> 3)) & 15; return m; };
+// a winding way from the left of (0, r0) to the bottom of (c1, rows - 1), `len` cells long
+function pipePath(C, R, [lo, hi]) {
+  for (let t = 0; t < 400; t++) {
+    const r0 = Math.floor(Math.random() * R), c1 = Math.floor(Math.random() * C), path = [[0, r0]], seen = new Set([`0,${r0}`]);
+    let budget = 3000;
+    const go = () => {
+      const [x, y] = path[path.length - 1];
+      if (x === c1 && y === R - 1) return path.length >= lo;
+      if (path.length >= hi || --budget < 0) return false;
+      for (const [dx, dy] of shuffle([...DIRS])) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= C || ny >= R || seen.has(`${nx},${ny}`)) continue;
+        seen.add(`${nx},${ny}`); path.push([nx, ny]);
+        if (go()) return true;
+        path.pop(); seen.delete(`${nx},${ny}`);
+      }
+      return false;
+    };
+    if (go()) return path;
+  }
+  return null;
+}
+function pipeRound({ cols: C, rows: R, len }) {
+  const path = pipePath(C, R, len), cells = [];
+  const dirTo = (a, b) => DIRS.findIndex(([dx, dy]) => a[0] + dx === b[0] && a[1] + dy === b[1]);
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+    const i = path.findIndex(([px, py]) => px === x && py === y);
+    if (i < 0) { // a piece that goes nowhere
+      let r = Math.random(), kind = 'straight'; for (const [kk, w] of PIPES.decoy) { if (r < w) { kind = kk; break; } r -= w; }
+      cells.push({ x, y, kind, rot: Math.floor(Math.random() * 4), need: 0 });
+      continue;
+    }
+    const a = i ? dirTo(path[i], path[i - 1]) : 3, b = i < path.length - 1 ? dirTo(path[i], path[i + 1]) : 2, need = (1 << a) | (1 << b);
+    const kind = (a + 2) % 4 === b ? 'straight' : 'elbow', good = [0, 1, 2, 3].filter((r) => turn(PIPES.kinds[kind], r) === need);
+    let rot; do { rot = Math.floor(Math.random() * 4); } while (good.includes(rot) && Math.random() < 0.85);
+    cells.push({ x, y, kind, rot, need, good });
+  }
+  const par = cells.reduce((s, c) => s + (c.need ? Math.min(...c.good.map((g) => (g - c.rot + 4) % 4)) : 0), 0);
+  return { C, R, cells, path, par, r0: path[0][1], c1: path[path.length - 1][0] };
+}
+
+export function pipesGame({ sfx = () => {}, buzz = () => {} } = {}) {
+  let stage, el, W, H, on = false, round = -1, rounds = [], cur, cell, gx, gy, taps = 0, fixed = 0, busy = 0, done = false, valve, sink;
+  const par = () => rounds.reduce((s, r) => s + r.par, 0);
+  const total = () => rounds.reduce((s, r) => s + r.path.length, 0);
+
+  async function setup(s) {
+    stage = s;
+    ({ el, W, H } = await scene(s, 'tilewall', 'pipes', ['fix/p-straight', 'fix/p-elbow', 'fix/p-tee', 'fix/p-cross', 'fix/valve', 'fix/sink', 'fix/splash']));
+    rounds = PIPES.rounds.map(pipeRound);
+    valve = img('fix/valve', 'fvalve'); sink = img('fix/sink', 'fsink'); el.append(valve, sink);
+    next();
+  }
+  function next() {
+    round++; cur = rounds[round];
+    for (const c of el.querySelectorAll('.ft')) c.remove();
+    const [bx, by, bw, bh] = PIPES.box;
+    cell = Math.min(bw * W / cur.C, bh * H / cur.R); gx = bx * W + (bw * W - cell * cur.C) / 2; gy = by * H;
+    cur.cells.forEach((c, i) => {
+      c.el = div('ft', `<img src="${IMG(`fix/p-${c.kind}`)}" alt="" draggable="false">`); c.turns = c.rot;
+      c.el.style.cssText = `left:${gx + c.x * cell}px;top:${gy + c.y * cell}px;width:${cell}px;height:${cell}px;animation-delay:${i * 18}ms`;
+      c.el.firstChild.style.transform = `rotate(${c.rot * 90}deg)`; el.append(c.el);
+    });
+    valve.style.cssText = `left:${gx - cell * 0.8}px;top:${gy + (cur.r0 + 0.5) * cell}px;width:${cell * 0.85}px`;
+    sink.style.cssText = `left:${gx + (cur.c1 + 0.5) * cell}px;top:${gy + cur.R * cell + cell * 0.02}px;width:${cell * 1.35}px`;
+    sink.classList.remove('full');
+    if (round) { const b = div('fround', `${round + 1}/${rounds.length}`); el.append(b); b.addEventListener('animationend', () => b.remove()); }
+    flow(); busy = 0.4;
+  }
+  const at2 = (x, y) => cur.cells[y * cur.C + x];
+  // where the water gets from the tap: the cells it reaches, in order (and whether it gets to the basin)
+  function flow() {
+    const first = at2(0, cur.r0), seen = new Set(), order = [];
+    if (turn(PIPES.kinds[first.kind], first.rot) & 8) { seen.add(first); order.push(first); }
+    for (let q = 0; q < order.length; q++) {
+      const c = order[q], m = turn(PIPES.kinds[c.kind], c.rot);
+      DIRS.forEach(([dx, dy], d) => {
+        if (!(m & (1 << d))) return;
+        const n = at2(c.x + dx, c.y + dy);
+        if (!n || n.x !== c.x + dx || c.x + dx < 0 || c.x + dx >= cur.C || seen.has(n)) return;
+        if (turn(PIPES.kinds[n.kind], n.rot) & (1 << ((d + 2) % 4))) { seen.add(n); order.push(n); }
+      });
+    }
+    for (const c of cur.cells) c.el.classList.toggle('wet', seen.has(c));
+    const end = at2(cur.c1, cur.R - 1);
+    return { order, out: seen.has(end) && !!(turn(PIPES.kinds[end.kind], end.rot) & 4) };
+  }
+  function onDown(e) {
+    if (!on || busy > 0 || done) return;
+    e.preventDefault();
+    const [x, y] = at(stage, e, W, H), cx = Math.floor((x - gx) / cell), cy = Math.floor((y - gy) / cell);
+    if (cx < 0 || cy < 0 || cx >= cur.C || cy >= cur.R) return;
+    const c = at2(cx, cy); c.rot = (c.rot + 1) % 4; c.turns++; taps++;
+    c.el.firstChild.style.transform = `rotate(${c.turns * 90}deg)`; sfx('ui-tap', { vol: 0.45 }); buzz(6);
+    const f = flow();
+    if (!f.out) return;
+    // the water runs: tile after tile, into the basin
+    busy = 9; fixed += cur.path.length;
+    f.order.forEach((c2, q) => setTimeout(() => { c2.el.classList.add('flow'); if (q % 3 === 0) sfx('splash', { vol: 0.18 }); }, 200 + q * 70));
+    setTimeout(() => {
+      sink.classList.add('full'); puff(el, 'fix/splash', (gx + (cur.c1 + 0.5) * cell) / W, (gy + cur.R * cell + cell * 0.3) / H, 0.3);
+      sfx('pickup-bonus', { vol: 0.5 }); buzz(25);
+      setTimeout(() => { if (round + 1 < rounds.length) { next(); } else done = true; }, 900);
+    }, 300 + f.order.length * 70);
+  }
+  const score = () => (fixed / total()) * tierCap(taps - par(), PIPES.spare);
+  const h = { pointerdown: onDown };
+  return { hint: 'Tap a pipe to turn it: get the water to the basin', go: 'Turn!', won: 'Water\'s on!', setup,
+    meter: { icon: 'fix/valve', text: () => `${taps}/${par() + PIPES.spare[taps - par() <= PIPES.spare[0] ? 0 : 1]}` },
+    start() { on = true; listen(stage, true, h); }, stop() { on = false; if (stage) listen(stage, false, h); },
+    tick(dt) { busy -= dt; }, score, over: () => done, tally: () => `<b>${taps}</b> turns · the fewest: ${par()}`,
+    // (for the tests: a tile on the way the water should go that isn't turned right yet)
+    peek: () => { if (busy > 0 || done) return null; const c = cur.cells.find((q) => q.need && !q.good.includes(q.rot)); return c ? client(stage, (gx + (c.x + 0.5) * cell) / W, (gy + (c.y + 0.5) * cell) / H) : null; } };
+}
+
+// ---------------------------------------------------------------- the lawn
+// The terrace's lawn is a jungle. The mower goes from patch to patch after the finger, and every patch must be
+// mowed once, in one go, round the pots and the gnome: a patch it has been over can't be crossed again, so a dead end
+// means backing up (dragging back over the way it came, or a tap on a patch it mowed: it backs up to there). The
+// pots stand where a way through every other patch was found first.
+const MOW = { cols: 5, rows: 7, things: [4, 6], spare: [2, 8], art: ['fpot', 'gnome', 'birdbath', 'sprinkler', 'wcan', 'stone'] };
+// the pots first, then a way through every other patch from a patch of the bottom row (a search that tries the
+// patches with the fewest ways on first). A grid is a chessboard: a way through every patch only exists when the two
+// colours left free are as many (or the start's one more), so other pots aren't even tried. (None found: no pots, and
+// the way snakes up from the corner.)
+function mowLevel(C, R, n) {
+  const N = C * R, nb = (i) => DIRS.map(([dx, dy]) => [i % C + dx, Math.floor(i / C) + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < C && y < R).map(([x, y]) => y * C + x);
+  const colour = (i) => (i % C + Math.floor(i / C)) % 2;
+  for (let t = 0; t < 400; t++) {
+    const start = (R - 1) * C + Math.floor(Math.random() * C), free = new Array(N).fill(true);
+    for (const i of shuffle([...Array(N).keys()].filter((q) => q !== start && !nb(start).includes(q))).slice(0, n)) free[i] = false;
+    const mine = free.filter((f, i) => f && colour(i) === colour(start)).length, other = free.filter((f, i) => f && colour(i) !== colour(start)).length;
+    if (mine !== other && mine !== other + 1) continue;
+    const need = mine + other, seen = new Array(N).fill(false), path = [start]; seen[start] = true;
+    let budget = 4000;
+    const exits = (q) => nb(q).filter((j) => free[j] && !seen[j]).length;
+    const go = (i) => {
+      if (path.length === need) return true;
+      if (--budget < 0) return false;
+      for (const j of shuffle(nb(i).filter((q) => free[q] && !seen[q])).sort((x, y) => exits(x) - exits(y))) { seen[j] = true; path.push(j); if (go(j)) return true; path.pop(); seen[j] = false; }
+      return false;
+    };
+    if (go(start)) return { free, way: path };
+  }
+  const way = []; for (let y = R - 1; y >= 0; y--) for (let x = 0; x < C; x++) way.push(y * C + ((R - 1 - y) % 2 ? C - 1 - x : x));
+  return { free: new Array(N).fill(true), way };
+}
+
+export function mowGame({ sfx = () => {}, buzz = () => {}, loop = () => null } = {}) {
+  let stage, el, W, H, k, wild, wildPic, mower, cell, gy, lvl, on = false, down = null, backs = 0, done = false, engine = null, rev = 0;
+  const path = [], things = [];
+  const C = MOW.cols, R = MOW.rows;
+
+  async function setup(s) {
+    stage = s;
+    ({ el, W, H } = await scene(s, 'lawn', 'mow', ['fix/mower', 'fix/clippings', ...MOW.art.map((a) => `fix/${a}`)]));
+    wildPic = await load(IMG('fix/lawn-wild'));
+    k = Math.min(2, devicePixelRatio || 1); cell = W / C; gy = (H - cell * R) / 2;
+    wild = document.createElement('canvas'); wild.width = Math.round(W * k); wild.height = Math.round(H * k); el.append(wild);
+    const c = wild.getContext('2d'); c.scale(k, k); if (wildPic) c.drawImage(wildPic, 0, 0, W, H); else { c.fillStyle = '#4f8a2a'; c.fillRect(0, 0, W, H); }
+    lvl = mowLevel(C, R, MOW.things[0] + Math.floor(Math.random() * (MOW.things[1] - MOW.things[0] + 1)));
+    const start = lvl.way[0];
+    const art = shuffle([...MOW.art]);
+    lvl.free.forEach((f, i) => { if (f) return; const t = img(`fix/${art[things.length % art.length]}`, 'fthing'); const [x, y] = mid(i); t.style.cssText = `left:${x}px;top:${y}px;width:${cell * 0.86}px;--r:${rnd(-12, 12)}deg`; el.append(t); things.push(t); });
+    mower = img('fix/mower', 'fmower'); mower.style.width = `${cell * 0.62}px`; el.append(mower);
+    path.push(start); mow(start, null); place(0);
+  }
+  const mid = (i) => [(i % C + 0.5) * cell, gy + (Math.floor(i / C) + 0.5) * cell];
+  const cellAt = (x, y) => { const cx = Math.floor(x / cell), cy = Math.floor((y - gy) / cell); return cx >= 0 && cy >= 0 && cx < C && cy < R ? cy * C + cx : -1; };
+  const near = (a, b) => Math.abs(a % C - b % C) + Math.abs(Math.floor(a / C) - Math.floor(b / C)) === 1;
+  // a patch mowed (the long grass over it gone, a strip from the patch it came from), or grown back when backing up
+  function mow(i, from) {
+    const c = wild.getContext('2d'), [x, y] = mid(i);
+    c.save(); c.globalCompositeOperation = 'destination-out'; c.fillRect(x - cell * 0.47, y - cell * 0.47, cell * 0.94, cell * 0.94);
+    if (from != null) { const [fx, fy] = mid(from); c.fillRect(Math.min(x, fx) - cell * 0.47, Math.min(y, fy) - cell * 0.47, Math.abs(x - fx) + cell * 0.94, Math.abs(y - fy) + cell * 0.94); }
     c.restore();
-    for (let i = 0; i < n && drops.length < 50; i++) if (Math.random() < 0.35) drops.push({ x: x1 + rnd(-R, R), y: y1 + rnd(-6, 6), r: rnd(1.5, 4), vx: rnd(-20, 20), vy: rnd(10, 60), t: 0, life: rnd(0.4, 0.8), ink: PAINT.ink[drops.length % 3] });
-    if (d > 3 && rustleT <= 0) { sfx('bag-rustle', { vol: 0.16 }); rustleT = 0.3; }
   }
-  const place = (x, y) => { roller.style.transform = `translate(${x}px, ${y}px)`; };
+  function grow(i) {
+    const c = wild.getContext('2d'), [x, y] = mid(i), a = path[path.length - 1], [ax, ay] = mid(a);
+    c.save(); c.beginPath(); c.rect(x - cell * 0.5, y - cell * 0.5, cell, cell);
+    c.rect(Math.min(x, ax) - cell * 0.47, Math.min(y, ay) - cell * 0.47, Math.abs(x - ax) + cell * 0.94, Math.abs(y - ay) + cell * 0.94); c.clip();
+    if (wildPic) c.drawImage(wildPic, 0, 0, W, H); c.restore();
+    mow(a, null); // (the patch it backed up to stays mowed)
+  }
+  function place(dir) {
+    const [x, y] = mid(path[path.length - 1]);
+    mower.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${dir}deg)`;
+  }
+  const dirOf = (a, b) => { const dx = b % C - a % C, dy = Math.floor(b / C) - Math.floor(a / C); return dx > 0 ? 90 : dx < 0 ? -90 : dy > 0 ? 180 : 0; };
+  function step(i) {
+    const a = path[path.length - 1];
+    path.push(i); mow(i, a); place(dirOf(a, i)); rev = 0.35;
+    puff(el, 'fix/clippings', mid(i)[0] / W, mid(i)[1] / H, 0.24); if (path.length % 2) sfx('bag-rustle', { vol: 0.15 });
+    if (path.length === lvl.way.length) { done = true; sfx('pickup-bonus', { vol: 0.5 }); buzz(30); return; }
+    if (!lvl.free.some((f, q) => f && near(q, i) && !path.includes(q))) { el.classList.remove('stuck'); void el.offsetWidth; el.classList.add('stuck'); sfx('qte-bad', { vol: 0.35 }); buzz(25); }
+  }
+  function back(to) { // (backing up to the patch `to` of the way it came)
+    while (path.length > 1 && path[path.length - 1] !== to) { const i = path.pop(); grow(i); backs++; }
+    place(path.length > 1 ? dirOf(path[path.length - 2], path[path.length - 1]) : 0); sfx('ui-back', { vol: 0.4 }); buzz(10);
+  }
+  function go(i) {
+    if (i < 0 || done) return;
+    const head = path[path.length - 1];
+    if (i === head) return;
+    const j = path.indexOf(i);
+    if (j >= 0) { back(i); return; }
+    if (!lvl.free[i]) return;
+    // (a straight run of fresh patches, as far as the finger went)
+    const hx = head % C, hy = Math.floor(head / C), ix = i % C, iy = Math.floor(i / C);
+    if (hx !== ix && hy !== iy) return;
+    const sx = Math.sign(ix - hx), sy = Math.sign(iy - hy), run = [];
+    for (let x = hx + sx, y = hy + sy; ; x += sx, y += sy) { const q = y * C + x; if (!lvl.free[q] || path.includes(q)) return; run.push(q); if (q === i) break; }
+    for (const q of run) step(q);
+  }
   function onDown(e) {
     if (!on || down) return;
     e.preventDefault(); stage.setPointerCapture?.(e.pointerId);
-    const [x, y] = at(stage, e, W, H); down = { id: e.pointerId, x, y };
-    roller.classList.remove('idle'); roll(x, y, x, y); place(x, y);
+    down = e.pointerId; const [x, y] = at(stage, e, W, H); go(cellAt(x, y));
   }
-  function onMove(e) {
-    if (!down || e.pointerId !== down.id) return;
-    e.preventDefault();
-    for (const p of e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]) { const [x, y] = at(stage, p, W, H); roll(down.x, down.y, x, y); place(x, y); down.x = x; down.y = y; }
-  }
-  function onUp(e) { if (down && e.pointerId === down.id) down = null; }
-  function draw(dt) {
-    const c = fx.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.clearRect(0, 0, W, H);
-    for (let i = drops.length - 1; i >= 0; i--) {
-      const d = drops[i]; d.t += dt;
-      if (d.t >= d.life) { drops.splice(i, 1); continue; }
-      d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 240 * dt;
-      c.globalAlpha = 1 - d.t / d.life; c.fillStyle = d.ink; c.beginPath(); c.arc(d.x, d.y, d.r, 0, 7); c.fill();
-    }
-    c.globalAlpha = 1;
-  }
+  function onMove(e) { if (down === e.pointerId) { e.preventDefault(); const [x, y] = at(stage, e, W, H); go(cellAt(x, y)); } }
+  function onUp(e) { if (down === e.pointerId) down = null; }
+  const score = () => ((path.length) / lvl.way.length) * tierCap(backs, MOW.spare);
   const h = { pointerdown: onDown, pointermove: onMove, pointerup: onUp, pointercancel: onUp };
-  return { hint: 'Roll fresh paint over the old wall with your finger', go: 'Paint!', won: 'Good as new!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; down = null; if (stage) listen(stage, false, h); if (fx) { read(); draw(0.016); } },
-    tick(dt) { rustleT -= dt; probeT -= dt; if (probeT <= 0) { probeT = 0.12; const was = cover; read(); if (cover === 1 && was < 1) buzz(20); } draw(dt); },
-    score: () => cover, over: () => cover >= 1, tally: () => `<b>${Math.round(cover * 100)}%</b> painted` };
+  return { hint: 'Mow every patch once · stuck? drag back', go: 'Mow!', won: 'Neat as a pin!', setup,
+    meter: { icon: 'fix/mower', text: () => (lvl ? `${path.length}/${lvl.way.length}` : '') },
+    start() { on = true; listen(stage, true, h); engine = loop('engine-moped', { vol: 0.08, rate: 1.5 }); },
+    stop() { on = false; down = null; engine?.stop(); engine = null; if (stage) listen(stage, false, h); },
+    tick(dt) { rev = Math.max(0, rev - dt); engine?.set({ vol: rev > 0 ? 0.3 : 0.08, rate: rev > 0 ? 1.75 : 1.5 }); },
+    score, over: () => done, tally: () => `<b>${path.length}/${lvl.way.length}</b> patches · ${backs ? `backed up ${backs}×` : 'never backed up'}`,
+    // (for the tests: the next patch of the way that was found first, while the mower is on it; where it started)
+    peek: () => { const n = path.length; if (!lvl || done || path.some((q, i) => q !== lvl.way[i])) return null; const pt = (i) => client(stage, mid(i)[0] / W, mid(i)[1] / H); return { to: pt(lvl.way[n]), head: pt(path[n - 1]), first: pt(lvl.way[0]), n }; } };
 }
 
-// ---------------------------------------------------------------- the leaks
-// The pipes spring one leak after another, at their joints, faster as it goes. A tap shuts one (a clamp round the
-// pipe); one left too long is water on the floor.
-const LEAKS = { at: [[0.14, 0.13, 50], [0.76, 0.13, 140], [0.77, 0.38, 180], [0.13, 0.48, 320], [0.53, 0.49, 300], [0.13, 0.79, 60], [0.82, 0.77, 120], [0.54, 0.78, 90], [0.45, 0.12, 80]], // (x, y of the stage; the way it sprays, degrees)
-  n: 14, life: [2.4, 1.5], r: 0.14, rise: 0.4 };
-
-export function leaksGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, water, on = false, t = 0, shut = 0, lost = 0;
-  const plan = [], live = [];
-
-  async function setup(s, dur) {
-    stage = s;
-    ({ el, W, H } = await scene(s, 'pipes', 'leaks', ['fix/spray', 'fix/clamp', 'fix/wrench']));
-    water = div('fwater'); el.append(water); el.append(img('fix/wrench', 'ftool'));
-    const span = dur - LEAKS.life[1] - 0.8;
-    for (let j = 0; j < LEAKS.n; j++) { const f = j / (LEAKS.n - 1); plan.push({ t: Math.max(0, f * span + (j ? rnd(-0.2, 0.2) : 0)), life: LEAKS.life[0] + (LEAKS.life[1] - LEAKS.life[0]) * f }); }
-  }
-  function spring(q) {
-    const free = LEAKS.at.map((_, i) => i).filter((i) => !live.some((l) => l.i === i));
-    const i = free[Math.floor(Math.random() * free.length)], [x, y, deg] = LEAKS.at[i];
-    const d = div('fl', `<img src="${IMG('fix/spray')}" alt="" draggable="false">`); d.style.cssText = `left:${x * 100}%;top:${y * 100}%;--r:${deg}deg`;
-    el.append(d); live.push({ i, x, y, t: 0, life: q.life, el: d }); sfx('splash', { vol: 0.25 });
-  }
-  function onDown(e) {
-    if (!on) return;
-    e.preventDefault();
-    const [px, py] = at(stage, e, W, H);
-    const l = live.map((q) => [q, Math.hypot(q.x * W - px, q.y * H - py)]).filter(([, d]) => d < LEAKS.r * W).sort((a, b) => a[1] - b[1])[0]?.[0];
-    if (!l) return;
-    live.splice(live.indexOf(l), 1); shut++;
-    const tool = el.querySelector('.ftool'); tool.style.left = `${l.x * 100}%`; tool.style.top = `${l.y * 100}%`; tool.classList.remove('go'); void tool.offsetWidth; tool.classList.add('go');
-    l.el.innerHTML = `<img src="${IMG('fix/clamp')}" alt="" draggable="false">`; l.el.className = 'fl shut'; l.el.addEventListener('animationend', () => l.el.remove());
-    sfx('qte-good', { vol: 0.4 }); buzz(12);
-  }
-  function tick(dt) {
-    t += dt;
-    while (plan.length && plan[0].t <= t) spring(plan.shift());
-    for (let i = live.length - 1; i >= 0; i--) {
-      const l = live[i]; l.t += dt;
-      l.el.style.setProperty('--f', (l.t / l.life).toFixed(2));
-      if (l.t < l.life) continue;
-      live.splice(i, 1); lost++; l.el.remove(); water.style.height = `${lost / LEAKS.n * LEAKS.rise * 100}%`;
-      el.classList.remove('oops'); void el.offsetWidth; el.classList.add('oops'); sfx('qte-bad', { vol: 0.4 }); buzz(30);
+// ---------------------------------------------------------------- the yard
+// The courier bay is blocked with junk: cars, a van, crates, tyres, drums, each only able to slide the way it lies.
+// The scooter must get out of the open door on the right. A drag slides a thing as far as the finger goes (or till
+// it hits something); the fewest moves are found by a search over where everything can be. Two rounds.
+const PARK = {
+  n: 6, row: 2, rounds: [{ blocks: 5, par: [3, 5] }, { blocks: 9, par: [6, 10] }], spare: [3, 10],
+  box: [0.04, 0.2, 0.84], art: { 2: ['car', 'crates', 'tyres'], 3: ['van', 'drums'] }, // (the grid: left, top, width of the stage's)
+};
+// blocks: [x, y, length, across] (the first is the scooter, across on PARK.row); → the fewest moves to get it to the
+// right edge (null: never) and the first of them [block, to x or y]
+export function parkPar(blocks) {
+  const N = PARK.n, key = (b) => b.map((q) => q[0] * 10 + q[1]).join(',');
+  const grid = (b) => { const g = new Array(N * N).fill(-1); b.forEach(([x, y, l, h], k) => { for (let i = 0; i < l; i++) g[(y + (h ? 0 : i)) * N + x + (h ? i : 0)] = k; }); return g; };
+  const seen = new Set([key(blocks)]); let front = [[blocks, null]], d = 0;
+  while (front.length) {
+    const next = [];
+    for (const [b, f] of front) {
+      if (b[0][0] === N - b[0][2]) return { par: d, next: f };
+      const g = grid(b);
+      b.forEach(([x, y, l, h], k) => {
+        for (const dir of [-1, 1]) for (let s = 1; ; s++) {
+          const nx = h ? x + dir * s : x, ny = h ? y : y + dir * s, cx = h ? (dir > 0 ? nx + l - 1 : nx) : nx, cy = h ? ny : (dir > 0 ? ny + l - 1 : ny);
+          if (cx < 0 || cy < 0 || cx >= N || cy >= N || g[cy * N + cx] !== -1) break;
+          const nb = b.map((q) => q.slice()); nb[k][0] = nx; nb[k][1] = ny;
+          const kk = key(nb); if (!seen.has(kk)) { seen.add(kk); next.push([nb, f || [k, h ? nx : ny]]); }
+        }
+      });
     }
+    front = next; d++;
   }
-  const h = { pointerdown: onDown };
-  return { hint: 'Tap the leaks to shut them before the room floods', go: 'Plug them!', won: 'Dry as a bone!', done: 'That\'s the lot!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; if (stage) listen(stage, false, h); }, tick,
-    score: () => shut / LEAKS.n, over: () => !plan.length && !live.length, tally: () => `<b>${shut}/${LEAKS.n}</b> leaks shut`,
-    peek: () => live.map((l) => client(stage, l.x, l.y)) };
+  return { par: null, next: null };
+}
+function parkRound({ blocks: n, par: [lo, hi] }) {
+  const N = PARK.n; let best = null;
+  for (let t = 0; t < 3000; t++) {
+    const g = new Array(N * N).fill(-1), b = [[Math.floor(Math.random() * 3), PARK.row, 2, true]];
+    g[PARK.row * N + b[0][0]] = g[PARK.row * N + b[0][0] + 1] = 0;
+    for (let fail = 0; b.length < n && fail < 60;) {
+      const h = Math.random() < 0.5, l = Math.random() < 0.3 ? 3 : 2, x = Math.floor(Math.random() * (h ? N + 1 - l : N)), y = Math.floor(Math.random() * (h ? N : N + 1 - l));
+      const cells = [...Array(l)].map((_, i) => (y + (h ? 0 : i)) * N + x + (h ? i : 0));
+      if ((h && y === PARK.row) || cells.some((c) => g[c] !== -1)) { fail++; continue; } // (nothing else lies along the scooter's row)
+      cells.forEach((c) => { g[c] = b.length; }); b.push([x, y, l, h]);
+    }
+    const p = parkPar(b);
+    if (p.par != null && p.par >= lo && p.par <= hi) return { blocks: b, par: p.par };
+    if (p.par != null && p.par > 0 && (!best || p.par > best.par)) best = { blocks: b, par: p.par };
+  }
+  return best;
 }
 
-// ---------------------------------------------------------------- the weeds
-// Weeds, a can and a broken pot on the paving. A finger down on one and a pull far enough, any way, has it out.
-const WEEDS = { n: 10, art: ['w1', 'w2', 'w3', 'w4', 'w5', 'w1', 'w3', 'w5', 'can', 'pot'], r: 0.15, pull: 0.15, gap: 0.24 }; // (how near a finger has to be, how far the pull, how far apart they stand: of the stage's width)
-
-export function weedsGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, on = false, down = null, out = 0;
+export function parkGame({ sfx = () => {}, buzz = () => {} } = {}) {
+  let stage, el, W, H, on = false, round = -1, rounds = [], cur, cell, gx, gy, moves = 0, out = 0, busy = 0, done = false, drag = null, door;
   const list = [];
+  const par = () => rounds.reduce((s, r) => s + r.par, 0);
 
   async function setup(s) {
     stage = s;
-    ({ el, W, H } = await scene(s, 'terrace', 'weeds', [...new Set(WEEDS.art)].map((n) => `fix/${n}`).concat('fix/dirt', 'fix/glove')));
-    for (const art of shuffle([...WEEDS.art])) {
-      let x, y, n = 0;
-      do { x = rnd(0.15, 0.85); y = rnd(0.2, 0.92); } while (n++ < 60 && list.some((w) => Math.hypot((w.x - x) * W, (w.y - y) * H) < WEEDS.gap * W));
-      const w = { x, y, art, gone: false, el: img(`fix/${art}`, `fw2 ${art.startsWith('w') ? '' : 'junk'}`) };
-      w.el.style.cssText = `left:${x * 100}%;top:${y * 100}%;z-index:${Math.round(y * 100)}`; list.push(w);
-    }
-    list.sort((a, b) => a.y - b.y).forEach((w) => el.append(w.el));
-    el.append(img('fix/glove', 'fglove'));
+    ({ el, W, H } = await scene(s, 'floor', 'park', ['fix/scooter', 'fix/car', 'fix/van', 'fix/crates', 'fix/tyres', 'fix/drums', 'up', 'scrub/sparkle']));
+    rounds = PARK.rounds.map(parkRound);
+    const [bx, by, bw] = PARK.box; cell = bw * W / PARK.n; gx = bx * W; gy = by * H;
+    const yard = div('fyard'); yard.style.cssText = `left:${gx}px;top:${gy}px;width:${cell * PARK.n}px;height:${cell * PARK.n}px`; el.append(yard);
+    door = img('up', 'fdoor'); door.style.cssText = `left:${gx + cell * PARK.n + cell * 0.08}px;top:${gy + (PARK.row + 0.5) * cell}px;width:${cell * 0.62}px`; el.append(door);
+    next();
   }
-  const glove = (x, y, held) => { const g = el.querySelector('.fglove'); g.style.transform = `translate(${x}px, ${y}px)`; g.classList.toggle('on', held); };
+  function next() {
+    round++; cur = rounds[round].blocks.map((q) => q.slice());
+    for (const b of list.splice(0)) b.el.remove();
+    cur.forEach(([x, y, l, h], i) => {
+      const name = i ? shuffle([...PARK.art[l]])[0] : 'scooter', b = { i, el: div(`fblk ${i ? '' : 'me'} ${h ? '' : 'up'}`, `<img src="${IMG(`fix/${name}`)}" alt="" draggable="false">`) };
+      b.el.style.width = `${(h ? l : 1) * cell}px`; b.el.style.height = `${(h ? 1 : l) * cell}px`; b.el.style.animationDelay = `${i * 50}ms`;
+      const im = b.el.firstChild; im.style.width = `${l * cell}px`; im.style.height = `${cell}px`;
+      el.append(b.el); list.push(b); put(b);
+    });
+    if (round) { const t = div('fround', `${round + 1}/${rounds.length}`); el.append(t); t.addEventListener('animationend', () => t.remove()); }
+    busy = 0.4;
+  }
+  function put(b, off = 0) {
+    const [x, y, , h] = cur[b.i];
+    b.el.style.transform = `translate(${gx + (x + (h ? off : 0)) * cell}px, ${gy + (y + (h ? 0 : off)) * cell}px)`;
+  }
+  function room(i) { // how far block i can slide back and forth
+    const N = PARK.n, g = new Array(N * N).fill(-1);
+    cur.forEach(([x, y, l, h], k) => { for (let q = 0; q < l; q++) g[(y + (h ? 0 : q)) * N + x + (h ? q : 0)] = k; });
+    const [x, y, l, h] = cur[i]; let lo = 0, hi = 0;
+    for (;;) { const cx = h ? x + lo - 1 : x, cy = h ? y : y + lo - 1; if (cx < 0 || cy < 0 || g[cy * N + cx] !== -1) break; lo--; }
+    for (;;) { const cx = h ? x + l + hi : x, cy = h ? y : y + l + hi; if (cx >= N || cy >= N || g[cy * N + cx] !== -1) break; hi++; }
+    return [lo, hi];
+  }
   function onDown(e) {
-    if (!on || down) return;
-    e.preventDefault();
-    const [x, y] = at(stage, e, W, H);
-    // (a weed is held by its leaves: a little above where it stands)
-    const w = list.filter((q) => !q.gone).map((q) => [q, Math.hypot(q.x * W - x, (q.y - 0.05) * H - y)]).filter(([, d]) => d < WEEDS.r * W).sort((a, b) => a[1] - b[1])[0]?.[0];
-    glove(x, y, !!w);
-    if (!w) return;
-    stage.setPointerCapture?.(e.pointerId); down = { id: e.pointerId, w, x, y }; w.el.classList.add('held'); sfx('bag-rustle', { vol: 0.2 });
+    if (!on || busy > 0 || done || drag) return;
+    const [px, py] = at(stage, e, W, H), cx = (px - gx) / cell, cy = (py - gy) / cell;
+    const i = cur.findIndex(([x, y, l, h]) => cx >= x && cy >= y && cx < x + (h ? l : 1) && cy < y + (h ? 1 : l));
+    if (i < 0) return;
+    e.preventDefault(); stage.setPointerCapture?.(e.pointerId);
+    drag = { id: e.pointerId, i, px, py, room: room(i), off: 0 }; list[i].el.classList.add('held'); sfx('ui-tap', { vol: 0.4 }); buzz(5);
   }
   function onMove(e) {
-    if (!down || e.pointerId !== down.id) return;
+    if (!drag || e.pointerId !== drag.id) return;
     e.preventDefault();
-    const [x, y] = at(stage, e, W, H), dx = x - down.x, dy = y - down.y, d = Math.hypot(dx, dy), w = down.w;
-    glove(x, y, true);
-    if (d < WEEDS.pull * W) { w.el.style.setProperty('--x', `${dx * 0.5}px`); w.el.style.setProperty('--y', `${dy * 0.5}px`); return; }
-    w.gone = true; out++; down = null;
-    w.el.classList.remove('held'); w.el.classList.add('out'); w.el.style.setProperty('--x', `${dx / d * W * 0.9}px`); w.el.style.setProperty('--y', `${dy / d * W * 0.9}px`);
-    w.el.addEventListener('transitionend', () => w.el.remove(), { once: true });
-    puff(el, 'fix/dirt', w.x, w.y, 0.26); sfx('event-pop', { vol: 0.5 }); buzz(14); el.querySelector('.fglove').classList.remove('on');
+    const [px, py] = at(stage, e, W, H), h = cur[drag.i][3], d = (h ? px - drag.px : py - drag.py) / cell;
+    const off = Math.max(drag.room[0], Math.min(drag.room[1], d));
+    if ((off === drag.room[0] || off === drag.room[1]) && Math.abs(off - drag.off) > 0.05 && off !== 0) buzz(4);
+    drag.off = off; put(list[drag.i], off);
   }
   function onUp(e) {
-    if (!down || e.pointerId !== down.id) return;
-    const w = down.w; down = null;
-    w.el.classList.remove('held'); w.el.style.setProperty('--x', '0px'); w.el.style.setProperty('--y', '0px'); el.querySelector('.fglove').classList.remove('on');
+    if (!drag || e.pointerId !== drag.id) return;
+    const { i, off } = drag, b = list[i], s = Math.round(off); drag = null; b.el.classList.remove('held');
+    if (s) { if (cur[i][3]) cur[i][0] += s; else cur[i][1] += s; moves++; sfx('land', { vol: 0.25 }); }
+    put(b);
+    if (cur[0][0] !== PARK.n - 2) return;
+    // the scooter is at the door: off it goes
+    busy = 9; out++; b.el.classList.add('away'); sfx('horn-scooter', { vol: 0.4 }); buzz(30);
+    setTimeout(() => { b.el.style.transform = `translate(${gx + (PARK.n + 1.5) * cell}px, ${gy + PARK.row * cell}px)`; puff(el, 'scrub/sparkle', (gx + PARK.n * cell) / W, (gy + (PARK.row + 0.5) * cell) / H, 0.3, 'spin'); }, 120);
+    setTimeout(() => { if (round + 1 < rounds.length) next(); else done = true; }, 1100);
   }
+  const score = () => (out / rounds.length) * tierCap(moves - par(), PARK.spare);
   const h = { pointerdown: onDown, pointermove: onMove, pointerup: onUp, pointercancel: onUp };
-  return { hint: 'Swipe the weeds and the rubbish off the terrace', go: 'Clear it!', won: 'All clear!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; down = null; if (stage) listen(stage, false, h); }, tick() {},
-    score: () => out / list.length, over: () => out >= list.length, tally: () => `<b>${out}/${list.length}</b> cleared`,
-    peek: () => list.filter((w) => !w.gone).map((w) => client(stage, w.x, w.y - 0.05)) };
+  return { hint: 'Slide the junk: get the scooter out', go: 'Slide!', won: 'Off it goes!', setup,
+    meter: { icon: 'fix/scooter', text: () => `${moves}/${par() + PARK.spare[moves - par() <= PARK.spare[0] ? 0 : 1]}` },
+    start() { on = true; listen(stage, true, h); }, stop() { on = false; drag = null; if (stage) listen(stage, false, h); },
+    tick(dt) { busy -= dt; }, score, over: () => done, tally: () => `<b>${moves}</b> moves · the fewest: ${par()}`,
+    // (for the tests: the best next slide, from the middle of the thing to where it goes)
+    peek: () => {
+      if (busy > 0 || done || drag) return null;
+      const p = parkPar(cur); if (!p.next) return null;
+      const [i, to] = p.next, [x, y, l, h] = cur[i], m = (bx2, by2) => client(stage, (gx + bx2 * cell) / W, (gy + by2 * cell) / H);
+      return { from: m(x + (h ? l / 2 : 0.5), y + (h ? 0.5 : l / 2)), to: m((h ? to : x) + (h ? l / 2 : 0.5), (h ? y : to) + (h ? 0.5 : l / 2)) };
+    } };
 }
 
-// ---------------------------------------------------------------- the bolts
-// Four loose bolts on the garage door's plate. A finger going round one, clockwise, turns it in (the other way the
-// wrench only clicks back, like a ratchet); `turns` round and it's tight.
-const BOLTS = { at: [[0.31, 0.27], [0.69, 0.27], [0.31, 0.73], [0.69, 0.73]], turns: [1.25, 1.5, 1.5, 1.75], dead: 0.05, click: Math.PI / 3 }; // (dead: too near the middle to tell which way, of the width)
-
-export function boltsGame({ sfx = () => {}, buzz = () => {} } = {}) {
-  let stage, el, W, H, wrench, on = false, down = null;
-  const list = [];
-
-  async function setup(s) {
-    stage = s;
-    ({ el, W, H } = await scene(s, 'garage', 'bolts', ['fix/bolt', 'fix/wrench', 'scrub/sparkle']));
-    const turns = shuffle([...BOLTS.turns]);
-    BOLTS.at.forEach(([x, y], i) => {
-      const d = div('fb', `<i class="fring"></i><img src="${IMG('fix/bolt')}" alt="" draggable="false">`); d.style.cssText = `left:${x * 100}%;top:${y * 100}%`;
-      el.append(d); list.push({ x, y, need: turns[i] * Math.PI * 2, a: 0, tick: 0, done: false, el: d, rot: rnd(0, 1) });
-    });
-    wrench = img('fix/wrench', 'fwrench'); el.append(wrench);
-    list.forEach(look);
-  }
-  const prog = (b) => clamp(b.a / b.need);
-  function look(b) { b.el.style.setProperty('--p', prog(b).toFixed(3)); b.el.style.setProperty('--a', `${(b.rot + b.a).toFixed(3)}rad`); }
-  const hold = (b, ang) => { wrench.style.transform = `translate(${b.x * W}px, ${b.y * H}px) rotate(${ang}rad)`; wrench.classList.add('on'); };
-  function onDown(e) {
-    if (!on || down) return;
-    e.preventDefault();
-    const [x, y] = at(stage, e, W, H);
-    const b = list.filter((q) => !q.done).map((q) => [q, Math.hypot(q.x * W - x, q.y * H - y)]).sort((p, q) => p[1] - q[1])[0]?.[0];
-    if (!b) return;
-    stage.setPointerCapture?.(e.pointerId);
-    down = { id: e.pointerId, b, ang: Math.atan2(y - b.y * H, x - b.x * W) }; b.el.classList.add('now'); hold(b, down.ang);
-  }
-  function onMove(e) {
-    if (!down || e.pointerId !== down.id) return;
-    e.preventDefault();
-    const b = down.b;
-    for (const p of e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]) {
-      const [x, y] = at(stage, p, W, H), dx = x - b.x * W, dy = y - b.y * H;
-      if (Math.hypot(dx, dy) < BOLTS.dead * W) continue;
-      const ang = Math.atan2(dy, dx); let d = ang - down.ang;
-      if (d > Math.PI) d -= Math.PI * 2; else if (d < -Math.PI) d += Math.PI * 2;
-      down.ang = ang;
-      if (d <= 0) continue;
-      b.a += d; b.tick += d;
-      if (b.tick >= BOLTS.click) { b.tick = 0; sfx('ui-tap', { vol: 0.35 }); buzz(5); }
-      if (b.a >= b.need) { tight(b); return; }
-    }
-    hold(b, down.ang); look(b);
-  }
-  function tight(b) {
-    b.a = b.need; b.done = true; look(b); b.el.classList.remove('now'); b.el.classList.add('done'); wrench.classList.remove('on'); down = null;
-    puff(el, 'scrub/sparkle', b.x, b.y, 0.34, 'spin'); sfx('land', { vol: 0.6 }); sfx('qte-good', { vol: 0.4 }); buzz(25);
-  }
-  function onUp(e) { if (down && e.pointerId === down.id) { down.b.el.classList.remove('now'); wrench.classList.remove('on'); down = null; } }
-  const h = { pointerdown: onDown, pointermove: onMove, pointerup: onUp, pointercancel: onUp };
-  const tightN = () => list.filter((b) => b.done).length;
-  return { hint: 'Circle each bolt clockwise with your finger till it\'s tight', go: 'Tighten!', won: 'Rock solid!', setup,
-    start() { on = true; listen(stage, true, h); }, stop() { on = false; down = null; wrench?.classList.remove('on'); if (stage) listen(stage, false, h); }, tick() {},
-    score: () => list.reduce((s, b) => s + prog(b), 0) / list.length, over: () => list.every((b) => b.done), tally: () => `<b>${tightN()}/${list.length}</b> bolts tight`,
-    peek: () => list.filter((b) => !b.done).map((b) => ({ ...client(stage, b.x, b.y), r: stage.getBoundingClientRect().width * 0.16, left: b.need - b.a })) };
-}
-
-export const GAMES = { wash: washGame, coins: coinsGame, paint: paintGame, leaks: leaksGame, weeds: weedsGame, bolts: boltsGame };
+export const GAMES = { wash: washGame, coins: coinsGame, photo: photoGame, pipes: pipesGame, mow: mowGame, park: parkGame };

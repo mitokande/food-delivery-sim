@@ -911,11 +911,6 @@
 .fpuff.spin { animation-name: fspark; }
 @keyframes fpuff { from { transform: translate(-50%, -50%) scale(.4); } to { transform: translate(-50%, -62%) scale(1.25); opacity: 0; } }
 @keyframes fspark { from { transform: translate(-50%, -50%) scale(.3); } to { transform: translate(-50%, -50%) scale(1.3) rotate(90deg); opacity: 0; } }
-/* (the tool that strikes where you tapped: the crowbar's hook, the wrench's jaw on the point) */
-.ftool { position: absolute; z-index: 150; width: 30%; margin: -20% 0 0 -1%; opacity: 0; transform-origin: 4% 77%; filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); }
-.leaks .ftool { margin: -5% 0 0 -24%; transform-origin: 80% 18%; }
-.ftool.go { animation: ftool .32s ease-out; }
-@keyframes ftool { 0% { opacity: 1; transform: rotate(18deg); } 60% { opacity: 1; transform: rotate(-22deg); } 100% { opacity: 0; transform: rotate(-22deg); } }
 /* the front washed: the tarps over the sign, the gun at the bottom, the splash where the jet hits */
 .ftarp { position: absolute; z-index: 1; transform: translate(-50%, -50%) rotate(var(--r)); filter: drop-shadow(0 6px 4px rgba(0,0,0,.4)); transition: transform .9s cubic-bezier(.5,0,.9,.5), opacity .3s .6s; }
 .ftarp.hit { animation: fflap .12s linear infinite alternate; }
@@ -941,33 +936,41 @@
 @keyframes fround { 0% { transform: scale(.4); opacity: 0; } 20% { transform: scale(1.1); opacity: 1; } 30% { transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
 .coins.cha::after { content: ''; position: absolute; left: 15%; right: 15%; top: -4%; height: 26%; background: radial-gradient(closest-side, rgba(255,240,170,.95), transparent); animation: fcha .9s ease-out both; }
 @keyframes fcha { from { opacity: 0; transform: scale(.6); } 30% { opacity: 1; } to { opacity: 0; transform: scale(1.4); } }
-/* the paint */
-.froller { position: absolute; left: 0; top: 0; z-index: 3; width: 34%; margin: -9% 0 0 -9.5%; filter: drop-shadow(0 6px 4px rgba(0,0,0,.35)); will-change: transform; }
-.froller.idle { animation: frollidle 1s ease-in-out infinite; }
-@keyframes frollidle { 50% { margin-top: calc(-9% - 10px); } }
-/* the leaks */
-.fl { position: absolute; width: 36%; transform: translate(-100%, -50%) rotate(calc(var(--r) - 180deg)); transform-origin: 100% 50%; }
-.fl img { width: 100%; transform: scale(calc(.55 + var(--f, 0) * .6)); transform-origin: 100% 50%; animation: fspray .14s linear infinite alternate; }
-@keyframes fspray { to { opacity: .8; } }
-.fl.shut { width: 22%; transform: translate(-50%, -50%); animation: fshut .9s both; }
-.fl.shut img { transform: none; animation: none; filter: drop-shadow(0 4px 2px rgba(0,0,0,.4)); }
-@keyframes fshut { 0% { transform: translate(-50%, -50%) scale(1.6); } 20%, 75% { transform: translate(-50%, -50%); opacity: 1; } 100% { transform: translate(-50%, -50%); opacity: 0; } }
-.fwater { position: absolute; left: 0; right: 0; bottom: 0; height: 0; z-index: 100; background: linear-gradient(180deg, rgba(120,195,255,.6), rgba(40,110,220,.7)); border-top: 4px solid rgba(255,255,255,.7); transition: height .4s; }
-/* the weeds */
-.fw2 { position: absolute; width: 24%; transform: translate(calc(-50% + var(--x, 0px)), calc(-85% + var(--y, 0px))); filter: drop-shadow(0 4px 2px rgba(0,0,0,.35)); transition: transform .15s; }
-.fw2.junk { width: 21%; }
-.fw2.held { transition: none; filter: brightness(1.12) drop-shadow(0 8px 4px rgba(0,0,0,.35)); }
-.fw2.out { transform: translate(calc(-50% + var(--x)), calc(-85% + var(--y))) rotate(40deg); opacity: 0; transition: transform .35s ease-in, opacity .35s ease-in; }
-.fglove { position: absolute; left: 0; top: 0; z-index: 250; width: 20%; margin: -24% 0 0 -8%; opacity: 0; transition: opacity .15s; filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); will-change: transform; }
-.fglove.on { opacity: 1; }
-/* the bolts */
-.fb { position: absolute; width: 23%; aspect-ratio: 1; transform: translate(-50%, -50%); transition: transform .12s; }
-.fb img { position: relative; width: 100%; height: 100%; transform: rotate(var(--a, 0rad)) scale(calc(1.16 - var(--p, 0) * .16)); filter: drop-shadow(0 5px 3px rgba(0,0,0,.5)); }
-.fring { position: absolute; inset: -16%; border-radius: 50%; background: conic-gradient(#8be06f calc(var(--p, 0) * 360deg), rgba(15,25,45,.5) 0); -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 82%); mask: radial-gradient(closest-side, transparent 80%, #000 82%); }
-.fb.now { transform: translate(-50%, -50%) scale(1.08); }
-.fb.done .fring { background: #ffd24a; filter: drop-shadow(0 0 6px rgba(255,220,90,.9)); }
-.fwrench { position: absolute; left: 0; top: 0; z-index: 5; width: 42%; margin: -8% 0 0 -33%; transform-origin: 79% 19%; opacity: 0; transition: opacity .12s; filter: drop-shadow(0 6px 4px rgba(0,0,0,.45)); }
-.fwrench.on { opacity: 1; }
+/* the photo: the frame on the desk, the torn pieces */
+.fframe { position: absolute; transform: translate(-50%, -50%); filter: drop-shadow(0 8px 6px rgba(0,0,0,.4)); }
+.fpc { position: absolute; left: 0; top: 0; filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); will-change: transform; }
+.fpc.go { transition: transform .22s ease-out; }
+.fpc.held { filter: drop-shadow(0 12px 8px rgba(0,0,0,.35)) brightness(1.06); }
+.fpc.in { filter: none; }
+.fpc.no { animation: fpcno .35s; }
+@keyframes fpcno { 30% { filter: drop-shadow(0 0 8px rgba(255,60,40,.95)); } }
+.photo.whole .fpc { filter: sepia(.15) saturate(1.15) brightness(1.04); transition: filter .8s; }
+/* the pipes: tiles on the wall (the water glows through the ones it reaches), the tap, the basin */
+.ft { position: absolute; display: grid; place-items: center; animation: fgrow .3s cubic-bezier(.3,1.6,.6,1) both; }
+@keyframes fgrow { from { scale: 0; } }
+.ft img { width: 98%; height: 98%; object-fit: contain; transition: transform .16s ease-out, filter .2s; filter: drop-shadow(0 3px 2px rgba(0,0,0,.35)); }
+.ft.wet img { filter: drop-shadow(0 0 5px rgba(90,190,255,.9)) drop-shadow(0 3px 2px rgba(0,0,0,.35)); }
+.ft.flow img { filter: drop-shadow(0 0 9px rgba(90,200,255,1)) brightness(1.15) hue-rotate(-15deg); }
+.fvalve, .fsink { position: absolute; filter: drop-shadow(0 4px 3px rgba(0,0,0,.35)); }
+.fvalve { transform: translate(0, -50%); }
+.fsink { transform: translate(-50%, 0); }
+.fsink.full { filter: drop-shadow(0 0 10px rgba(90,200,255,.95)); }
+/* the lawn: the pots, the mower */
+.fthing { position: absolute; transform: translate(-50%, -50%) rotate(var(--r)); filter: drop-shadow(0 5px 3px rgba(0,0,0,.35)); }
+.fmower { position: absolute; left: 0; top: 0; z-index: 5; transition: transform .14s linear; filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); }
+.mow.stuck .fmower { animation: fstuck .4s; }
+@keyframes fstuck { 25% { margin-left: -6px; } 50% { margin-left: 6px; } 75% { margin-left: -4px; } }
+/* the yard: the junk on its grid, the scooter, the way out */
+.fyard { position: absolute; border-radius: 10px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 2px, transparent 2px calc(100% / 6)), repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 2px, transparent 2px calc(100% / 6)); box-shadow: inset 0 0 0 3px rgba(255,214,90,.55); }
+.fblk { position: absolute; left: 0; top: 0; transition: transform .18s ease-out; animation: fgrow .3s cubic-bezier(.3,1.6,.6,1) both; }
+.fblk img { position: absolute; left: 50%; top: 50%; object-fit: contain; transform: translate(-50%, -50%) scale(.94); filter: drop-shadow(0 5px 3px rgba(0,0,0,.4)); }
+.fblk.up img { transform: translate(-50%, -50%) rotate(90deg) scale(.94); }
+.fblk.held { z-index: 5; transition: none; }
+.fblk.held img { filter: drop-shadow(0 10px 6px rgba(0,0,0,.35)) brightness(1.08); }
+.fblk.me img { filter: drop-shadow(0 0 6px rgba(255,236,140,.95)) drop-shadow(0 5px 3px rgba(0,0,0,.4)); }
+.fblk.away { transition: transform .9s cubic-bezier(.5,0,.8,.5); }
+.fdoor { position: absolute; transform: translate(0, -50%) rotate(90deg); animation: fdoor .9s ease-in-out infinite; filter: drop-shadow(0 3px 2px rgba(0,0,0,.4)); }
+@keyframes fdoor { 50% { margin-left: 5px; } }
 /* its step in a ruin's panel, the label over the ruin, the card after */
 .fixstep { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; padding: 8px 12px 8px 8px; border-radius: 14px; background: #fff; box-shadow: var(--row); text-align: left; }
 .fixstep .fsi { flex: none; width: 58px; height: 58px; } .fixstep .fsi .u4 { display: block; width: 100%; height: 100%; object-fit: contain; }

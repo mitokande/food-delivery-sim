@@ -900,17 +900,17 @@ export function playMini(G, score) {
 // played again; after FIX_SKIP tries the crew can be left to it (no cash). Rooms repaired already never ask.
 // - entrance, "wash": the front washed, the grime, the graffiti and the old posters off it (no clock: a tank of water),
 // - cashier, "coins": the spilled coins sorted into stacks of one kind (no clock: the fewer moves, the more stars),
-// - office, "paint": the wall painted over with the roller,
-// - staff room, "leaks": the leaks in the pipes shut as they spring,
-// - terrace, "weeds": weeds and rubbish pulled off the paving,
-// - courier bay, "bolts": the bolts of the garage door turned tight.
+// - office, "photo": Uncle Ferdi's torn photo put back together in its frame (the fewer mistakes, the more stars),
+// - staff room, "pipes": the pipe tiles turned till the water runs (the fewer turns, the more stars),
+// - terrace, "mow": the lawn mowed in one go, every patch once (the less backing up, the more stars),
+// - courier bay, "park": the junk slid out of the scooter's way (the fewer moves, the more stars).
 export const FIX = {
   entrance: { game: 'wash', dur: 0, tiers: [0.5, 0.8, 1] },
   cashier: { game: 'coins', dur: 0, tiers: [0.5, 0.8, 1] },
-  office: { game: 'paint', dur: 12, tiers: [0.45, 0.75, 0.97] },
-  staff: { game: 'leaks', dur: 16, tiers: [0.4, 0.65, 0.9] },
-  terrace: { game: 'weeds', dur: 13, tiers: [0.4, 0.7, 1] },
-  bay: { game: 'bolts', dur: 15, tiers: [0.4, 0.7, 1] },
+  office: { game: 'photo', dur: 0, tiers: [0.5, 0.8, 1] },
+  staff: { game: 'pipes', dur: 0, tiers: [0.5, 0.8, 1] },
+  terrace: { game: 'mow', dur: 0, tiers: [0.5, 0.8, 1] },
+  bay: { game: 'park', dur: 0, tiers: [0.5, 0.8, 1] },
 };
 export const FIX_CASH = { back: [0, 0.08, 0.15, 0.25], least: [0, 5, 10, 15] };
 export const FIX_SKIP = 2;

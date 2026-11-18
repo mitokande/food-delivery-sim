@@ -41,16 +41,28 @@ cells('flyers-tools', 3, 2, ['flyer', 'hand', 'love', 'angry', 'truck', 'megapho
 cells('duel-rivals', 4, 2, ['todd', 'pip', 'brick', 'kyle', 'sharp', 'sly', 'dolores', 'baron'], 256, sub='faces', face=True)
 cells('duel-skills', 4, 3, ['flambe', 'express', 'charm', 'tipjar', 'showstopper', 'peptalk', 'rush', 'salt', 'smoke', 'bribe', 'panic', 'crit'], 192)
 cells('duel-icons', 4, 2, ['taste', 'pace', 'calm', 'ticket', 'emblem', 'pin-rival', 'pin-ours', 'pin-boss'], 192)
-cells('fix-tools', 4, 3, [None, None, 'roller', 'wrench', 'spray', 'clamp', 'glove', None, 'bolt', None, 'hammer', 'tin'], 192)
-cells('fix-weeds', 4, 2, ['w1', 'w2', 'w3', 'w4', 'w5', 'can', 'pot', 'dirt'], 256)
+cells('fix-tools', 4, 3, [None] * 10 + ['hammer', 'tin'], 192)
 cells('fix-grime', 4, 2, ['tag1', 'tag2', 'poster1', 'poster2', 'moss', 'web', 'mud', 'soot'], 320)
 cells('fix-wash', 3, 2, ['gun', 'splash', 'drop', 'tarp', 'foam', 'tank'], 384)
 cells('fix-coins', 4, 2, ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'dish', 'roll'], 192)
-for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map'), ('fix-wall-old', 'fix/wall-old'), ('fix-wall-new', 'fix/wall-new'), ('fix-pipes', 'fix/pipes'), ('fix-terrace', 'fix/terrace'), ('fix-garage', 'fix/garage'),
-             ('fix-front', 'fix/front'), ('fix-front-dirty', 'fix/front-dirty'), ('fix-till', 'fix/till')]:
+cells('fix-plumb', 3, 2, ['p-straight', 'p-elbow', 'p-tee', 'p-cross', 'valve', 'sink'], 256)
+cells('fix-garden', 4, 2, ['mower', 'fpot', 'gnome', 'birdbath', 'sprinkler', 'clippings', 'wcan', 'stone'], 256)
+cells('fix-yard', 3, 2, ['scooter', 'car', 'van', 'crates', 'tyres', 'drums'], 384)
+cells('fix-frame', 1, 1, ['frame'], 768)
+for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map'),
+             ('fix-front', 'fix/front'), ('fix-front-dirty', 'fix/front-dirty'), ('fix-till', 'fix/till'),
+             ('fix-desk', 'fix/desk'), ('fix-tilewall', 'fix/tilewall'), ('fix-lawn', 'fix/lawn'), ('fix-lawn-wild', 'fix/lawn-wild'), ('fix-floor', 'fix/floor')]:
     if not have(n): continue
     os.makedirs(os.path.dirname(f'{out}/{f}'), exist_ok=True)
     Image.open(f'{raw}/{n}.png').convert('RGB').resize((720, 1080), Image.LANCZOS).save(f'{out}/{f}.webp', quality=80, method=6)
+if have('fix-frame') and have('fix-photo'):
+    fr = Image.open(f'{out}/fix/frame.webp').convert('RGB'); w, h = fr.size
+    cream = lambda p: p[0] > 225 and p[1] > 215 and 170 < p[2] < 235 and p[0] - p[2] > 12
+    col = [x for x in range(w) if cream(fr.getpixel((x, h // 2)))]; row = [y for y in range(h) if cream(fr.getpixel((w // 2, y)))]
+    mat = (col[0] / w, row[0] / h, (col[-1] + 1) / w, (row[-1] + 1) / h); print('the mat of fix/frame (x0, y0, x1, y1 of it):', [round(v, 4) for v in mat])
+    ph = Image.open(f'{raw}/fix-photo.png').convert('RGB'); k = (mat[2] - mat[0]) * w / ((mat[3] - mat[1]) * h) # (the mat's width : height)
+    cw = min(ph.width, round(ph.height * k)); ch = round(cw / k); x0 = (ph.width - cw) // 2; y0 = (ph.height - ch) // 2
+    ph.crop((x0, y0, x0 + cw, y0 + ch)).resize((600, round(600 / k)), Image.LANCZOS).save(f'{out}/fix/photo.webp', quality=86, method=6)
 if not have('face-critic'): sys.exit()
 face = Image.open(f'{raw}/face-critic.png').convert('RGBA').crop((290, 0, 930, 640))
 face.paste((0, 0, 0, 0), (0, 420, 40, 640)) # (the tips of the fingers round his fork)

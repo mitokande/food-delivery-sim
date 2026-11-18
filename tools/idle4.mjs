@@ -98,6 +98,7 @@ const washFront = async (name) => {
 };
 // the coins (fix.js coins) sorted by their best next move: a tap on the stack, a tap on the dish
 const sortCoins = async (p) => { if (!p) return; if (p.sel !== p.f) { await page.touchscreen.tap(p.from.x, p.from.y); await wait(60); } await page.touchscreen.tap(p.to.x, p.to.y); await wait(220); };
+const slide = (a, b, n = 8) => drag([...Array(n + 1)].map((_, i) => [a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n]));
 const drag = async (pts) => { await page.touchscreen.touchStart(pts[0][0], pts[0][1]); for (const [x, y] of pts.slice(1)) { await page.touchscreen.touchMove(x, y); } await page.touchscreen.touchEnd(); };
 const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
@@ -189,14 +190,17 @@ await page.click('#sheet [data-act="close"]'); await wait(400);
 // (the rules: too little is a try again, two of those and the crew can do it; the gate; what the stars are worth)
 check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); const a = S.fixRoom(g, 'cashier', 0.1), skip0 = S.canSkipFix(g, 'cashier'), b = S.fixRoom(g, 'cashier', 0.2), skip1 = S.canSkipFix(g, 'cashier'), c0 = g.cash, c = S.fixRoom(g, 'cashier', null);
   return !a.done && !skip0 && !b.done && skip1 && c.done && c.cash === 0 && g.cash === c0 && g.rooms.cashier.fix === 0 && S.upBlock(g, 'cashier') !== 'fix'; })()`), 'under one star: try again; after two tries the crew can do it (for nothing)');
-check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); return !S.canFix(g, 'terrace') && S.fixRoom(g, 'terrace', 1) === null && S.upBlock(g, 'terrace') === 'gate' && !S.needsFix(g, 'kitchen') && [1, 2, 3].map((t) => S.fixCash('bay', t)).join() === '200,375,625' && S.fixTier('office', 0.96) === 2 && S.fixTier('office', 0.97) === 3; })()`), 'not before the office lets the room be repaired; the stars pay a share of the repair');
-// the other five, for a try
+check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); return !S.canFix(g, 'terrace') && S.fixRoom(g, 'terrace', 1) === null && S.upBlock(g, 'terrace') === 'gate' && !S.needsFix(g, 'kitchen') && [1, 2, 3].map((t) => S.fixCash('bay', t)).join() === '200,375,625' && S.fixTier('office', 0.99) === 2 && S.fixTier('office', 1) === 3; })()`), 'not before the office lets the room be repaired; the stars pay a share of the repair');
+// the other five, for a try (they show what to do next: peek)
 check(await playFix('cashier', sortCoins, '4e-coins') === 3, 'the coins: three rounds sorted in the fewest moves, three stars');
 check(await ev(`(async () => { const P = (await import('./js/idle4/fix.js')).coinPar; const a = P([[0, 1, 0, 1], [1, 0, 1, 0], []]), b = P([[0, 0, 1, 1], [1, 1, 0, 0], []]), c = P([[0, 0, 0, 1], [1, 1, 1, 0], [], []]); return a.par >= 4 && !a.stuck && b.par === 3 && c.par === 3 && P([[0], [1], [0]]).par === null; })()`), 'the coins\' solver: the fewest moves, never stuck, an impossible one is null');
-check(await playFix('office', async (_, [L, T, W, H], n) => { const y = T + H * (0.04 + (n % 14) * 0.072); await drag([[L + W * 0.1, y], [L + W * 0.35, y], [L + W * 0.65, y], [L + W * 0.9, y], [L + W * 0.5, y + 6], [L + W * 0.1, y + 6]]); }, '4f-paint') >= 2, 'the paint: the wall rolled over');
-check(await playFix('staff', async (list) => { if (list?.[0]) await page.touchscreen.tap(list[0].x, list[0].y); }, '4g-leaks') === 3, 'the leaks: every one shut in time, three stars');
-check(await playFix('terrace', async (list) => { const w = list?.[0]; if (w) await drag([[w.x, w.y], [w.x + 30, w.y - 30], [w.x + 70, w.y - 70], [w.x + 90, w.y - 90]]); }, '4h-weeds') === 3, 'the weeds: all swiped away, three stars');
-check(await playFix('bay', async (list) => { const b = list?.[0]; if (b) await drag([...Array(14)].map((_, i) => [b.x + Math.cos(i) * b.r, b.y + Math.sin(i) * b.r])); }, '4i-bolts') === 3, 'the bolts: turned tight, three stars');
+let wrongOnce = null, backed = null;
+check(await playFix('office', async (p) => { if (!p) return; if (wrongOnce == null) { await slide(p.from, p.wrong); await wait(450); wrongOnce = await ev('[document.querySelector(".mini .mclock b").textContent, game.ui.playing.tally()]'); return; } await slide(p.from, p.to); await wait(250); }, '4f-photo') === 3
+  && wrongOnce?.[0] === '0/12' && /1 in the wrong place/.test(wrongOnce[1]), 'the photo: a piece dropped on another\'s place slides back (a mistake); every piece in its place, three stars');
+check(await playFix('staff', async (p) => { if (p) { await page.touchscreen.tap(p.x, p.y); await wait(60); } }, '4g-pipes') === 3, 'the pipes: turned in the fewest turns, the water runs twice, three stars');
+check(await playFix('terrace', async (p) => { if (!p) return; if (p.n === 3 && backed == null) { await page.touchscreen.tap(p.first.x, p.first.y); await wait(200); backed = await ev('document.querySelector(".mini .mclock b").textContent'); return; } await slide(p.head, p.to, 3); }, '4h-mow') === 3
+  && /^1\//.test(backed || ''), 'the lawn: a tap where it started backs the mower up to there; then every patch once, three stars');
+check(await playFix('bay', async (p) => { if (p) { await slide(p.from, p.to, 10); await wait(250); } }, '4i-park') === 3, 'the yard: the junk slid away in the fewest moves, the scooter out twice, three stars');
 check(await ev('game.G.stats.fixes === 1 && game.G.rooms.cashier.fix == null && !game.paused'), 'a try changes nothing');
 await cash(100);
 check(await buy('up', 'entrance'), 'repairing the entrance');
@@ -314,12 +318,12 @@ await ev('game.openRoom("kitchen")'); await wait(500);
 check(await ev('!!document.querySelector("#sheet .buy.teamfull")'), 'the kitchen panel says the team is full');
 await page.click('#sheet .buy.teamfull'); await wait(500);
 check(await ev('game.ui.room') === 'staff', 'which leads to the staff room');
-// (cleared out by hand first: the leaks, for the room this time)
+// (cleared out by hand first: the pipes, for the room this time)
 await page.click('#sheet [data-act="fix"]');
-await until('!!document.querySelector(".mstage .fix.leaks")', 15000);
+await until('!!document.querySelector(".mstage .fix.pipes")', 15000);
 const cf = await ev('game.G.cash');
-await playMini((list) => list[0] && [list[0].x, list[0].y]);
-check(await ev('game.G.rooms.staff.fix === 3 && Math.abs(game.G.cash - ' + (cf + 75) + ') < 0.01'), 'the staff room\'s leaks shut: three stars, $75 in the mess');
+await playMini((p) => p && [p.x, p.y]);
+check(await ev('game.G.rooms.staff.fix === 3 && Math.abs(game.G.cash - ' + (cf + 75) + ') < 0.01'), 'the staff room\'s pipes turned: three stars, $75 in the mess');
 await page.click('.modal.fixres [data-x="room"]'); await until('game.ui.room === "staff"', 3000); await wait(300);
 await page.click('#sheet [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "staff") === 1', 60000), 'the staff room is repaired');
@@ -537,8 +541,8 @@ await page.click('.citym [data-x="go"]'); await wait(1600);
 check(await ev('!!document.querySelector(".modal.duelm.in") && game.paused && game.G.duel.tix === 4 && !!game.ui.arena.cur && document.querySelectorAll(".duelm .dc.us").length === 1 && document.querySelectorAll(".duelm .dsk").length === 1'), 'the cook-off: its own window, the game paused, a ticket spent');
 await until('game.ui.arena.cur.D.us.pts > 0 && game.ui.arena.cur.D.them.pts > 0', 15000);
 check(await ev('parseInt(document.querySelector(".duelm .dbar.us b").textContent) > 0 && document.querySelector(".duelm .dbar.us i").style.width !== "0%"'), 'plates go to the jury: the scores climb');
-await ev('game.ui.arena.cur.D.us.cooks[0].charge = 1'); await wait(120);
-check(await ev('document.querySelector(".duelm .dsk").classList.contains("ready")'), 'the head chef\'s skill is ready');
+await ev('Object.assign(game.ui.arena.cur.D.us.cooks[0], { charge: 1, out: 0 })'); // (out: a rival's panic may have just knocked them out)
+check(await until('document.querySelector(".duelm .dsk").classList.contains("ready")', 2000), 'the head chef\'s skill is ready');
 await page.click('.duelm .dsk'); await wait(250);
 check(await ev('game.ui.arena.cur.D.us.cooks[0].charge < 0.5 && document.querySelector(".duelm .dcall").textContent.includes("Flambé")'), 'a tap: Flambé!');
 await shot('9e-duel');

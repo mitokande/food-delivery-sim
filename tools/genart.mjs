@@ -177,33 +177,11 @@ export const ART = {
     + `a map pin: a tiny dark tower with red banners and a golden crown standing on a round black base. ${SHEET}` },
   // the repairs by hand (a mini game per room in ruins, before its repair is paid for): what each is played on
   // (portrait) and sheets of the things in them. tools/genart-mini.py cuts them into assets/ui4/fix.
-  'fix-wall-old': { size: '1024x1536', prompt: `${UI4} The wall of an abandoned small office seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
-    + 'Old cracked plaster in a dirty faded beige: long cracks, patches where the plaster has fallen off and the bricks show, brown water stains running down, peeling strips of old paint, '
-    + 'a pale rectangle where a picture used to hang, a dark wooden skirting board along the very bottom with scuffed floorboards under it. '
-    + 'No furniture, no window, no door, no people, no text, no letters.' },
-  'fix-wall-new': { size: '1024x1536', from: 'fix-wall-old', prompt: 'The same wall, same framing, after it was repaired and painted: smooth flawless plaster freshly painted '
-    + 'a warm sage green, still a little glossy and wet, no cracks, no stains, no holes, no bricks showing, no pale rectangle; the skirting board freshly painted glossy cream, '
-    + 'the floorboards sanded and varnished. Same stylized painted game art look. No furniture, no people, no text, no letters.' },
-  'fix-pipes': { size: '1024x1536', prompt: `${UI4} A wall of pale blue-grey square tiles in a staff washroom seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
-    + 'On it a simple network of fat exposed copper water pipes: a few long horizontal and vertical runs joined by seven big chunky brass joints '
-    + '(elbows, T-pieces and one red-wheeled valve), the joints spread out well apart over the whole wall, none close to an edge. '
-    + 'Everything dry: no water, no drips, no puddles. A little old but not dirty. No people, no hands, no sink, no text, no letters.' },
-  'fix-terrace': { size: '1024x1536', prompt: `${UI4} The floor of an old neglected restaurant terrace: big irregular weathered sandstone paving slabs with wide gaps and cracks between them filled with dark earth, `
-    + 'a few slabs chipped, a little dry moss in the joints. Seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge with no border, portrait. '
-    + 'Nothing on it: no plants, no weeds, no leaves, no furniture, no objects, no people, no text, no letters.' },
-  'fix-garage': { size: '1024x1536', prompt: `${UI4} A close view of an old garage roller door seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
-    + 'Horizontal corrugated steel slats painted faded teal with scratches and a few rust spots; over the middle of it a big thick plain steel mounting plate, '
-    + 'a tall rounded rectangle in brushed dark steel taking up about two thirds of the picture, perfectly smooth and empty: no bolts, no screws, no rivets, no holes, no handle on it. '
-    + 'No people, no hands, no text, no letters, no numbers, no stickers.' },
   'fix-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, twelve icons in a neat grid of 4 columns and 3 rows: `
     + 'the round flat head of a big rusty iron nail seen from straight in front; a red steel crowbar; a paint roller with a wooden handle, its roll covered in wet sage green paint; '
     + 'a chunky steel adjustable wrench with a red handle; a jet of blue water spraying out in a fan with white foam and droplets; a grey steel pipe repair clamp with two bolts and a strip of black rubber; '
     + 'a brown leather gardening glove, open hand; a soft beige puff of dust cloud; a big steel hexagonal bolt head on a round washer seen from straight above; '
     + `a red metal toolbox with a hammer and a wrench sticking out of it; a claw hammer with a wooden handle; a small crumpled heap of green banknotes and gold coins in a dusty open tin box. ${SHEET}` },
-  'fix-weeds': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: eight things seen from above at a slight angle, in a neat grid of 4 columns and 2 rows: `
-    + 'a dandelion with jagged leaves and two yellow flowers; a spiky green thistle with a purple flower; a thick tuft of wild grass; a clump of clover with small white flowers; '
-    + 'a sprawling leafy weed with a dandelion seed head; a dented empty tin can without a label; a broken terracotta flower pot with spilled earth; a burst of dark earth clods and small stones flying apart. '
-    + `Each weed complete with a little earth at its root. ${SHEET}` },
   // (the second round of repairs: the entrance washed, the cashier's coins sorted)
   'fix-front': { size: '1024x1536', prompt: `${UI4} The front of a small charming corner diner seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
     + 'Freshly cleaned and bright: a wall of warm red bricks and cream painted trim, over the door a big wooden sign board with the name FERDI\'S in chunky cream retro letters on red, '
@@ -227,7 +205,34 @@ export const ART = {
   'fix-coins': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, eight things in a neat grid of 4 columns and 2 rows, all seen from the same angle: from above at a steep three-quarter angle. `
     + 'Six thick chunky coins lying flat, so each shows its top face as a wide oval with its thick rim as a band under it; all six exactly the same shape, size and angle, only the colour and emblem differ: '
     + 'a copper coin with a star; a silver coin with a burger; a gold coin with a crown; a blue enamel coin with a heart; a green enamel coin with a four-leaf clover; a red enamel coin with a chef\'s hat. '
-    + `Then an empty shallow round wooden dish, wider than a coin; and a fat roll of coins wrapped in brown paper, lying on its side. No numbers, no letters. ${SHEET}` },
+    + `Then an empty shallow round wooden dish, wider than a coin; and a fat roll of coins wrapped in brown paper, lying on its side. No numbers, no letters. ${SHEET}` },  // (the office's photo, the staff room's pipes, the terrace's lawn, the courier bay's yard)
+  'fix-desk': { size: '1024x1536', prompt: `${UI4} An old wooden office desk seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Warm dark walnut wood with a worn green leather writing pad in the lower half; along the very edges a few small things: a brass desk lamp in the top left corner, '
+    + 'a cold cup of coffee and a pen at the right edge, two paper clips. The large middle of the desk is empty. Dusty, cosy. No people, no hands, no paper, no photos, no text, no letters.' },
+  'fix-frame': { size: '1024x1536', background: 'transparent', prompt: `${UI4} An empty ornate carved golden wooden picture frame, portrait, seen flat from the front, filling most of the picture, `
+    + 'the inside of the frame a plain flat smooth cream mat board with nothing on it. A little dusty. Transparent background around the frame, no shadow, no text.' },
+  'fix-photo': { size: '1024x1536', prompt: `${UI4} A faded old photograph from the 1970s, portrait: a cheerful round young man with a big black moustache and a red apron `
+    + 'stands proudly with his arms wide open in front of his brand-new small corner diner on its opening day: a red and cream striped awning, a sign board reading FERDI\'S, '
+    + 'a red ribbon across the door, balloons, two happy neighbours clapping. Warm faded colours, soft vignette, the stylized painted game art look. No other text.' },
+  'fix-tilewall': { size: '1024x1536', prompt: `${UI4} A wall of pale blue-grey square ceramic tiles in a staff washroom seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Clean grout lines, a few chipped tiles, a little old. Nothing on the wall: no pipes, no sink, no mirror, no people, no text.' },
+  'fix-plumb': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, six things in a neat grid of 3 columns and 2 rows, seen flat from the front. `
+    + 'The first four are square puzzle tiles of the same size: each a dark slate grey square plate with softly rounded corners and four tiny rivets, carrying a thick shiny copper pipe: '
+    + '1) a straight pipe from the middle of the left edge to the middle of the right edge; 2) an elbow from the middle of the left edge to the middle of the bottom edge; '
+    + '3) a T-piece joining the middle of the left, right and bottom edges; 4) a cross joining the middle of all four edges. The pipes always reach the very edge of the plate. '
+    + `Then: a red round tap wheel on a short copper pipe stub pointing right; a small white ceramic washbasin seen from the front. ${SHEET}` },
+  'fix-lawn': { size: '1024x1536', prompt: `${UI4} A lawn seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge with no border, portrait. `
+    + 'Freshly mowed short bright green grass in neat wide light and dark green stripes running across. Nothing on it: no paths, no plants, no objects, no people, no text.' },
+  'fix-lawn-wild': { size: '1024x1536', from: 'fix-lawn', prompt: 'The very same lawn, same framing, but badly overgrown: long wild shaggy uncut grass in darker greens and yellows, '
+    + 'tufts, dandelions, clover and a few weeds, no stripes left. Seen straight from above. Same stylized painted game art look. No objects, no people, no text.' },
+  'fix-garden': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, eight things in a neat grid of 4 columns and 2 rows, all seen straight from above (top-down): `
+    + 'a red push lawn mower with its handle pointing down; a terracotta flower pot with red geraniums; a garden gnome with a red hat; a round stone birdbath with water; '
+    + `a yellow garden sprinkler; a burst of flying grass clippings; a green watering can; a big round grey stone. ${SHEET}` },
+  'fix-floor': { size: '1024x1536', prompt: `${UI4} The concrete floor of an old garage seen straight from above (a flat top-down view, no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Grey concrete with cracks and a few oil stains, faded yellow painted lines along the edges, the large middle empty. No vehicles, no objects, no people, no text, no letters.' },
+  'fix-yard': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, six things in a neat grid of 3 columns and 2 rows, all seen straight from above (top-down), each lying left to right: `
+    + 'a mint green delivery scooter with a tan delivery box, pointing right; a small rusty old junk car, pointing right; a long rusty old van, pointing right, half again as long as the car; '
+    + `two wooden crates side by side; two stacks of old tyres side by side; three rusty oil drums in a row. ${SHEET}` },
 };
 
 async function gen(name, outdir) {
