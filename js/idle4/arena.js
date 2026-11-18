@@ -72,7 +72,7 @@ export function arena({ game, G, modal, toast, sfx, buzz, UI, FACE, DICON, M, MG
       const boss = s.boss ? s.cooks.find((c) => D.RIVALS[c].skill && (c === 'victor' || !s.cooks.includes('victor'))) : null;
       const rivals = s.cooks.map((c) => {
         const r = D.rival(s, c), R = D.RIVALS[c];
-        return `<span class="rv ${R.skill ? 'boss' : ''}"><span class="mi">${face(c)}</span><b>${R.name}</b><small>${DU('taste')}${Math.round(r.taste)} ${DU('calm')}${Math.round(r.calm)}</small>${R.skill ? `<em>${DU(R.skill)}${D.SKILLS[R.skill].name}</em>` : ''}</span>`;
+        return `<span class="foe ${R.skill ? 'boss' : ''}"><span class="mi">${face(c)}</span><b>${R.name}</b><small>${DU('taste')}${Math.round(r.taste)} ${DU('calm')}${Math.round(r.calm)}</small>${R.skill ? `<em>${DU(R.skill)}${D.SKILLS[R.skill].name}</em>` : ''}</span>`;
       }).join('');
       const crewChips = Object.keys(D.HEROES).filter((r) => S.hasMgr(g, r)).map((r) => {
         const h = D.hero(g, r);
@@ -84,7 +84,7 @@ export function arena({ game, G, modal, toast, sfx, buzz, UI, FACE, DICON, M, MG
       panel.innerHTML = `<div class="sthead ${s.boss ? 'boss' : ''}">${DU(s.boss ? 'pin-boss' : 'pin-rival')}<span><b>${s.name}</b><small>${D.DISTRICTS[s.district].name} · ${s.boss ? 'Gristle head office' : `Gristle Burger no. ${s.id + 1}`}</small></span><button class="btn ghost sm" data-x="back">Map</button></div>
         <div class="stbody">
         ${boss ? `<div class="rsay bad"><img src="${FACE(boss)}" alt=""><p><b>${D.RIVALS[boss].name}, ${D.RIVALS[boss].title.toLowerCase()}:</b> ${BOSS_SAYS[boss]}</p></div>` : ''}
-        <div class="rvs">${rivals}</div>
+        <div class="foes">${rivals}</div>
         <p class="weakl ${weakOn ? '' : 'off'}">${DICON(s.weak)}<span>Weak against <b>${S.DISH[s.weak].name}</b>: it scores ×${D.DUEL.weak} here${weakOn ? '' : '. Not on your menu yet'}</span></p>
         <h3 class="sh">Your team</h3>
         ${crewChips ? `<div class="cchips">${crewChips}</div><ul class="skl">${skills}</ul>` : '<p class="small">Nobody to send yet: hire a manager in the Crew card.</p>'}

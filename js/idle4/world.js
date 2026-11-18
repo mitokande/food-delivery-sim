@@ -1,5 +1,6 @@
 // Ferdi's (idle4.html): the building, seen from above at an angle (an orthographic, isometric camera), cut away so every
-// room shows: floors and walls per room and level (in ruins at level 0: planks, crates, dust), the furniture the room
+// room shows: floors and walls per room and level (in ruins at level 0: planks, crates, dust; once cleared out by hand,
+// only the dust: the junk flies off when the camera is there to see it), the furniture the room
 // has bought, the street in front. Everyone in it follows the rules (sim.js) exactly: customers and staff stand at
 // their spots or walk the routes of the floor plan (plan.js) at the times the sim gives. Rooms carry a label with their
 // name, level badge and a green arrow when something in them is affordable (a gold one when the renovation is); a tap
@@ -350,7 +351,11 @@ export async function createWorld(game, markerEl) {
   // ---------- rooms: floor + furniture per level and items ----------
   const roomGroups = {}; // room → { g, sig, tags }
   const pops = []; // { o, t }
-  function sigOf(room) { const r = G().rooms[room]; return r.lv + '|' + Object.values(r.it).join(',') + '|' + (room === 'kitchen' ? S.menu(G()).length : ''); }
+  function sigOf(room) { const r = G().rooms[room]; return r.lv + '|' + Object.values(r.it).join(',') + '|' + (room === 'kitchen' ? S.menu(G()).length : '') + (cleared(room) ? '|c' : ''); }
+  // a ruin cleared out by hand (sim.js FIX) has no junk left in it; while `held`, it keeps it (its game is on, or its
+  // card: the junk goes once the camera is on the room, clearOut)
+  const held = new Set();
+  const cleared = (room) => { const r = G().rooms[room]; return r.lv === 0 && r.fix != null && !held.has(room); };
   function rebuildRoom(room, animate) {
     const R = P.ROOMS[room], old = roomGroups[room];
     const oldTags = old ? old.tags : null;
@@ -365,9 +370,27 @@ export async function createWorld(game, markerEl) {
     const tags = new Set();
     const tag = (o, t) => { o.userData.tag = t; tags.add(t); return o; };
     FURNISH[room]?.(g, lv, G().rooms[room].it, tag);
-    if (lv === 0) ruins(g, room);
+    if (lv === 0) ruins(g, room, cleared(room));
+    if (animate && old && lv === 0 && cleared(room)) fling(old.g);
     roomGroups[room] = { g, sig: sigOf(room), tags, floor: fl };
     if (animate) for (const o of g.children) if (o.userData.tag && (!oldTags || !oldTags.has(o.userData.tag))) { o.userData.s = o.scale.clone(); o.scale.setScalar(0.001); pops.push({ o, t: -Math.random() * 0.15 }); }
+  }
+  // the junk of a ruin just cleared out: one bit after another hops up, spins and shrinks away in a puff of dust
+  const flung = [];
+  function fling(old) {
+    const bits = old.children.filter((o) => o.userData.junk).sort((a, b) => a.position.x + a.position.z - b.position.x - b.position.z);
+    bits.forEach((o, i) => { dyn.add(o); flung.push({ o, t: -i * 0.07, s: o.scale.clone(), y: o.position.y, spin: (Math.random() - 0.5) * 9, puffed: false }); });
+  }
+  function flingTick(dt) {
+    for (let i = flung.length - 1; i >= 0; i--) {
+      const f = flung[i]; f.t += dt;
+      if (f.t < 0) continue;
+      if (!f.puffed) { f.puffed = true; const p = f.o.position; puffAt(p.x, p.z); }
+      const t = Math.min(1, f.t / 0.55);
+      f.o.position.y = f.y + Math.sin(t * Math.PI) * 1.1 + t * 0.6; f.o.rotation.y += f.spin * dt;
+      f.o.scale.copy(f.s).multiplyScalar(Math.max(0.001, 1 - t * t));
+      if (t >= 1) { f.o.removeFromParent(); flung.splice(i, 1); }
+    }
   }
   function popTick(dt) {
     for (let i = pops.length - 1; i >= 0; i--) {
@@ -425,13 +448,18 @@ export async function createWorld(game, markerEl) {
     return c;
   }
   function plank(g, x, z, len, ry, tilt = 0.1, y = 0.05) { const p = box(len, 0.06, 0.22, M('#9c7a52'), x, y, z, g); p.rotation.set(0, ry, tilt); return p; }
-  function ruins(g, room) {
+  function ruins(g, room, clear) {
     const R = P.ROOMS[room], w = R.x1 - R.x0, d = R.z1 - R.z0, cx = (R.x0 + R.x1) / 2, cz = (R.z0 + R.z1) / 2;
     const rnd = (i) => ((Math.sin(i * 91.7 + cx * 7.3 + cz * 3.1) + 1) / 2);
-    for (let i = 0; i < 4 + Math.floor(w * d / 18); i++) plank(g, R.x0 + 0.8 + rnd(i) * (w - 1.6), R.z0 + 0.8 + rnd(i + 50) * (d - 1.6), 1.2 + rnd(i + 9), rnd(i + 3) * 3, (rnd(i + 7) - 0.5) * 0.4);
-    for (let i = 0; i < 2 + Math.floor(w * d / 30); i++) { const s = 0.45 + rnd(i + 20) * 0.35; crate(g, R.x0 + 0.9 + rnd(i + 30) * (w - 1.8), R.z0 + 0.9 + rnd(i + 40) * (d - 1.8), s, rnd(i + 11)); }
-    for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.45, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2), M('#8f8576')); m.scale.set(1.3, 0.35, 1); m.position.set(R.x0 + 1 + rnd(i + 60) * (w - 2), 0, R.z0 + 1 + rnd(i + 70) * (d - 2)); g.add(m); }
-    if (R.outdoor) for (let i = 0; i < 8; i++) ball(0.18, M('#6f9a43'), R.x0 + 0.5 + rnd(i + 80) * (w - 1), 0.05, R.z0 + 0.5 + rnd(i + 90) * (d - 1), g, 1.4, 0.6, 1.2);
+    const n0 = g.children.length;
+    if (!clear) junk();
+    for (const o of g.children.slice(n0)) o.userData.junk = true;
+    function junk() {
+      for (let i = 0; i < 4 + Math.floor(w * d / 18); i++) plank(g, R.x0 + 0.8 + rnd(i) * (w - 1.6), R.z0 + 0.8 + rnd(i + 50) * (d - 1.6), 1.2 + rnd(i + 9), rnd(i + 3) * 3, (rnd(i + 7) - 0.5) * 0.4);
+      for (let i = 0; i < 2 + Math.floor(w * d / 30); i++) { const s = 0.45 + rnd(i + 20) * 0.35; crate(g, R.x0 + 0.9 + rnd(i + 30) * (w - 1.8), R.z0 + 0.9 + rnd(i + 40) * (d - 1.8), s, rnd(i + 11)); }
+      for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.45, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2), M('#8f8576')); m.scale.set(1.3, 0.35, 1); m.position.set(R.x0 + 1 + rnd(i + 60) * (w - 2), 0, R.z0 + 1 + rnd(i + 70) * (d - 2)); g.add(m); }
+      if (R.outdoor) for (let i = 0; i < 8; i++) ball(0.18, M('#6f9a43'), R.x0 + 0.5 + rnd(i + 80) * (w - 1), 0.05, R.z0 + 0.5 + rnd(i + 90) * (d - 1), g, 1.4, 0.6, 1.2);
+    }
     // tape across the way in
     const tape = M('#f2c230', { roughness: 0.5 });
     for (const dr of P.DOORS) if (dr.a === room || dr.b === room) {
@@ -909,10 +937,10 @@ export async function createWorld(game, markerEl) {
     puffT -= dt;
     if (puffT <= 0 && puffs.length < 14) { puffT = 0.25; puff(R); }
   }
-  function puff(R, y = 0.2) {
+  function puff(R, y = 0.2) { puffAt(R.x0 + 0.8 + Math.random() * (R.x1 - R.x0 - 1.6), R.z0 + 0.8 + Math.random() * (R.z1 - R.z0 - 1.6), y); }
+  function puffAt(x, z, y = 0.2) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), puffMat.clone());
-    m.position.set(R.x0 + 0.8 + Math.random() * (R.x1 - R.x0 - 1.6), y, R.z0 + 0.8 + Math.random() * (R.z1 - R.z0 - 1.6));
-    dyn.add(m); puffs.push({ m, t: 0 });
+    m.position.set(x, y, z); dyn.add(m); puffs.push({ m, t: 0 });
   }
 
   // ---------- the scaffolding over the room being worked on, the timer over it ----------
@@ -1391,7 +1419,7 @@ export async function createWorld(game, markerEl) {
     syncLabels();
     syncScaffold(dt); syncTimer();
     fullT -= dt;
-    popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt); tipsTick(dt);
+    popTick(dt); puffTick(dt); popsTick(dt); confettiTick(dt); tipsTick(dt); flingTick(dt);
     camTick(dt);
     markers.update(w, h);
     void g;
@@ -1404,6 +1432,7 @@ export async function createWorld(game, markerEl) {
   applyCam();
   return {
     scene, camera, update, event, focus, focusEvent, snap, markers, hurried, snapRoom,
+    hold: (room) => held.add(room), clearOut: (room) => held.delete(room),
     lookAt(x, z, zoom) { cam.aim = [x, z]; if (zoom) cam.tvh = zoom; cam.vx = cam.vz = 0; },
     setShift(px) { cam.tshift = px; },
     resize(w, h) { W = w; Hh = h; applyCam(); },

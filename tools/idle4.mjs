@@ -81,6 +81,23 @@ const playFix = async (room, move, name) => {
   await ev('document.querySelector(".modal.mres [data-x=close]").click()'); await wait(450);
   return stars;
 };
+// the front washed as a player would (fix.js wash): the jet held on each tarp, wiggled over each bit of mess, the
+// grime swept off row by row, then whatever is left → the % of water left in the tank
+const washFront = async (name) => {
+  await until('document.querySelector(".mcount").hidden', 5000);
+  const hold = async (x, y, ms, r = 0) => { await page.touchscreen.touchStart(x, y); for (let t0 = Date.now(), i = 0; Date.now() - t0 < ms; i++) { await page.touchscreen.touchMove(x + Math.cos(i * 0.9) * r, y + Math.sin(i * 1.3) * r); await wait(16); } await page.touchscreen.touchEnd(); };
+  let p = await ev('game.ui.playing.peek()');
+  const b = p.box;
+  for (const t of p.tarps) { await hold(t.x, t.y, 1100); if (t === p.tarps[0]) { await page.screenshot({ path: `${OUT}/idle4-${name}.png` }); console.log('shot', name); } }
+  for (const m of p.marks) await hold(m.x, m.y, 900, 24);
+  await page.touchscreen.touchStart(b.x + 4, b.y + 6);
+  for (let y = b.y + 6, row = 0; y < b.y + b.height; y += b.width * 0.11, row++) { const [x0, x1] = row % 2 ? [b.x + b.width - 4, b.x + 4] : [b.x + 4, b.x + b.width - 4]; for (let s = 0; s <= 6; s++) await page.touchscreen.touchMove(x0 + (x1 - x0) * s / 6, y); }
+  await page.touchscreen.touchEnd();
+  for (let k = 0; k < 4; k++) { await wait(200); p = await ev('game.ui.playing?.peek?.() ?? null'); if (!p) break; for (const m of p.marks) await hold(m.x, m.y, 700, 24); for (const t of p.tarps) await hold(t.x, t.y, 600); }
+  return parseInt(await ev('document.querySelector(".mini .mclock b")?.textContent ?? "-1"'), 10);
+};
+// the coins (fix.js coins) sorted by their best next move: a tap on the stack, a tap on the dish
+const sortCoins = async (p) => { if (!p) return; if (p.sel !== p.f) { await page.touchscreen.tap(p.from.x, p.from.y); await wait(60); } await page.touchscreen.tap(p.to.x, p.to.y); await wait(220); };
 const drag = async (pts) => { await page.touchscreen.touchStart(pts[0][0], pts[0][1]); for (const [x, y] of pts.slice(1)) { await page.touchscreen.touchMove(x, y); } await page.touchscreen.touchEnd(); };
 const closeCard = async () => { await ev('document.querySelector(".modal.upcard")?.click()'); await wait(400); };
 
@@ -146,7 +163,7 @@ await cash(50); check(await buy('item', 'dining', 'waiters'), 'hiring a waiter')
 check(await until('game.G.staff[0].at === "host"', 30000), 'nobody needs you on the floor: you wait at the door (the office is in ruins)');
 
 // repairs: the entrance (a builder, a timer), benches; the office (you sit down in it, the restaurant level)
-// first a ruin is cleared out by hand (fix.js): the entrance's boards, from its panel
+// first a ruin is cleared out by hand (fix.js): the entrance's front washed, from its panel
 await cash(100);
 check(!(await ev('!!game.S.act(game.G, "up", "entrance")')) && await ev('game.S.upBlock(game.G, "entrance") === "fix" && !game.G.build'), 'a ruin can\'t be repaired before it is cleared out by hand');
 check(await until('[...document.querySelectorAll("#markers .rfix.byhand")].length >= 3 && !!document.querySelector("#markers .rfix.locked")', 3000), 'the ruins say "Fix it up!" (not the ones the office gates)');
@@ -154,14 +171,18 @@ await ev('game.openRoom("entrance")'); await wait(600);
 check(await ev('!!document.querySelector("#sheet [data-act=fix]") && !document.querySelector("#sheet [data-act=up]") && document.querySelectorAll("#sheet .mtiers > span").length === 3 && !document.querySelector("#sheet [data-act=fixskip]")'), 'its panel: the game first, what the stars find, no repair button yet');
 check(await ev('document.querySelector("#sheet .mtiers").textContent.replace(/\\s/g, "") === "+$5+$10+$15"'), 'the entrance: $5, $10, $15 in the mess');
 await shot('4a-fix-panel');
+const junk0 = await ev('game.world.peek().rooms.entrance');
 await page.click('#sheet [data-act="fix"]');
-check(await until('document.querySelectorAll(".mstage .fp").length === 5 && document.querySelectorAll(".mstage .fn").length === 10 && document.querySelector(".mstage .msurf").naturalWidth > 0', 10000) && await ev('game.paused'), 'the boards over the door: five, two nails each, the game paused');
-const pulls = await playMini((list) => list[0] && [list[0].x, list[0].y], '4b-planks');
-check(pulls >= 10 && pulls <= 20, `every nail pulled, the rusty ones twice (${pulls} taps)`);
+check(await until('document.querySelectorAll(".mstage .fix.wash .ftarp").length === 2 && document.querySelector(".mstage .msurf").naturalWidth > 0 && !!document.querySelector(".mini.untimed") && document.querySelector(".mini .mclock b").textContent === "100%"', 10000) && await ev('game.paused'), 'the front to wash: two tarps over the sign, a full tank where the clock was, the game paused');
+const tank = await washFront('4b-wash');
+check(tank > 0 && tank < 100, `washed clean with water to spare (${tank}% left in the tank)`);
+check(await until('!!document.querySelector(".modal.fixres.in")', 4000) && await ev('game.world.peek().rooms.entrance') === junk0, 'its card; the junk is still in the room behind it');
 check(await ev('game.G.rooms.entrance.fix === 3 && Math.abs(game.G.cash - 115) < 0.01 && game.G.stats.fixes === 1 && /\\+\\$15/.test(document.querySelector(".modal.fixres").textContent)'), 'three stars: $15 found in the mess');
 await shot('4c-fix-done');
-await page.click('.modal.fixres [data-x="room"]'); await wait(700);
-check(await ev('game.ui.room === "entrance" && !!document.querySelector("#sheet [data-act=up]") && !!document.querySelector("#sheet .fixed") && !document.querySelector("#sheet [data-act=fix]")'), 'back in its panel: cleared, now the builders (Repair)');
+await page.click('.modal.fixres [data-x="room"]'); await wait(900);
+check(await ev('!game.ui.room && game.world.peek().rooms.entrance === game.world.peek().rooms.entrance.replace(/\\|c$/, "") + "|c"'), 'to the builders: first the camera on the room, its junk flying off');
+await shot('4c2-cleared');
+check(await until('game.ui.room === "entrance"', 2500) && await ev('!!document.querySelector("#sheet [data-act=up]") && !!document.querySelector("#sheet .fixed") && !document.querySelector("#sheet [data-act=fix]")'), 'then its panel: cleared, now the builders (Repair)');
 check(await ev('game.S.fixRoom(game.G, "entrance", 1) === null'), 'once only');
 await shot('4d-fix-repair');
 await page.click('#sheet [data-act="close"]'); await wait(400);
@@ -170,7 +191,8 @@ check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)
   return !a.done && !skip0 && !b.done && skip1 && c.done && c.cash === 0 && g.cash === c0 && g.rooms.cashier.fix === 0 && S.upBlock(g, 'cashier') !== 'fix'; })()`), 'under one star: try again; after two tries the crew can do it (for nothing)');
 check(await ev(`(() => { const S = game.S, g = JSON.parse(JSON.stringify(game.G)); return !S.canFix(g, 'terrace') && S.fixRoom(g, 'terrace', 1) === null && S.upBlock(g, 'terrace') === 'gate' && !S.needsFix(g, 'kitchen') && [1, 2, 3].map((t) => S.fixCash('bay', t)).join() === '200,375,625' && S.fixTier('office', 0.96) === 2 && S.fixTier('office', 0.97) === 3; })()`), 'not before the office lets the room be repaired; the stars pay a share of the repair');
 // the other five, for a try
-check(await playFix('cashier', async (list) => { const w = list?.[0]; if (w) await drag([[w.from.x, w.from.y], [(w.from.x + w.to.x) / 2, w.to.y - 20], [w.to.x, w.to.y]]); }, '4e-wires') === 3, 'the wires: each dragged to its colour, three stars');
+check(await playFix('cashier', sortCoins, '4e-coins') === 3, 'the coins: three rounds sorted in the fewest moves, three stars');
+check(await ev(`(async () => { const P = (await import('./js/idle4/fix.js')).coinPar; const a = P([[0, 1, 0, 1], [1, 0, 1, 0], []]), b = P([[0, 0, 1, 1], [1, 1, 0, 0], []]), c = P([[0, 0, 0, 1], [1, 1, 1, 0], [], []]); return a.par >= 4 && !a.stuck && b.par === 3 && c.par === 3 && P([[0], [1], [0]]).par === null; })()`), 'the coins\' solver: the fewest moves, never stuck, an impossible one is null');
 check(await playFix('office', async (_, [L, T, W, H], n) => { const y = T + H * (0.04 + (n % 14) * 0.072); await drag([[L + W * 0.1, y], [L + W * 0.35, y], [L + W * 0.65, y], [L + W * 0.9, y], [L + W * 0.5, y + 6], [L + W * 0.1, y + 6]]); }, '4f-paint') >= 2, 'the paint: the wall rolled over');
 check(await playFix('staff', async (list) => { if (list?.[0]) await page.touchscreen.tap(list[0].x, list[0].y); }, '4g-leaks') === 3, 'the leaks: every one shut in time, three stars');
 check(await playFix('terrace', async (list) => { const w = list?.[0]; if (w) await drag([[w.x, w.y], [w.x + 30, w.y - 30], [w.x + 70, w.y - 70], [w.x + 90, w.y - 90]]); }, '4h-weeds') === 3, 'the weeds: all swiped away, three stars');
@@ -298,7 +320,7 @@ await until('!!document.querySelector(".mstage .fix.leaks")', 15000);
 const cf = await ev('game.G.cash');
 await playMini((list) => list[0] && [list[0].x, list[0].y]);
 check(await ev('game.G.rooms.staff.fix === 3 && Math.abs(game.G.cash - ' + (cf + 75) + ') < 0.01'), 'the staff room\'s leaks shut: three stars, $75 in the mess');
-await page.click('.modal.fixres [data-x="room"]'); await wait(700);
+await page.click('.modal.fixres [data-x="room"]'); await until('game.ui.room === "staff"', 3000); await wait(300);
 await page.click('#sheet [data-act="up"]');
 check(await until('game.S.lvOf(game.G, "staff") === 1', 60000), 'the staff room is repaired');
 check(await buy('item', 'staff', 'lockers') && await ev('game.S.staffCap(game.G)') === 6, 'a locker: room for 6');
@@ -317,6 +339,7 @@ check(await ev('game.G.rep.reviews.length > 0 && game.G.rep.mood > 0 && game.G.r
 await ev('game.ui.mailbox()'); await wait(500);
 await page.click('.modal.mailbox [data-tab="reviews"]'); await wait(400);
 check(await ev('document.querySelectorAll(".modal.mailbox .rv").length') === Math.min(30, await ev('game.G.rep.reviews.length')) && /^\d+%$/.test(await ev('document.querySelector(".mtrack b").textContent')), 'the mailbox\'s Reviews tab: the mood bar, what people wrote');
+check(await ev('(() => { const p = document.querySelector(".modal.mailbox .mpane").getBoundingClientRect(); return [...document.querySelectorAll(".modal.mailbox .rv")].every((e) => { const r = e.getBoundingClientRect(); return r.width > p.width * 0.9 && r.height < 90; }); })()'), 'each review a row across the pane (no other card\'s look on it)');
 check(await ev('game.G.rep.seen > 0 && game.G.rep.reviews.filter((r) => r.id <= game.G.rep.seen).length > 0'), 'and they count as read');
 await shot('6c-reviews');
 await page.click('.modal.mailbox [data-x="days"]'); await wait(600);
@@ -451,8 +474,12 @@ const five = await ev(`(() => { const S = game.S, run = (clean) => { const g = J
   check(t0.grade === no.grade && t0.cash === no.cash && t1.grade === no.grade && t1.cash > no.cash, 'too little changes nothing; one star: a tip');
   check(gi(t2) === Math.min(1, gi(no)) && t2.cash > t1.cash - 0.01 && gi(t3) === Math.max(0, gi(no) - 1) && t3.cash > t2.cash && (gi(no) > 0 || t3.mod.dur > no.mod.dur), `two stars: never a C (${t2.grade}); three: a grade better (${t3.grade})`);
 }
-// what a plate cooked by hand is worth (the same critic, five ways), and what the flyers are
-const crit = await ev(`(() => { const S = game.S, run = (score) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip); S.startEvent(g, 'critic'); const t = score == null ? null : S.playMini(g, score); for (let i = 0; i < 9000 && g.event; i++) S.tick(g, 0.1, 1); return { ...g.evLog[0], t, again: S.playMini(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
+// what a plate cooked by hand is worth (the same critic, five ways), and what the flyers are. (In a copy of the
+// restaurant with the guests who are eating gone, so the critic finds a table: in a full one they walk out, and then
+// no plate helps, as it should.)
+const crit = await ev(`(() => { const S = game.S, run = (score) => { const g = JSON.parse(JSON.stringify(game.G)); g.event = null; g.cust = g.cust.filter((c) => !c.vip);
+  const eating = new Set(g.cust.filter((c) => c.st === 'eat').map((c) => c.id)); g.cust = g.cust.filter((c) => !eating.has(c.id)); for (const k in g.seats) if (eating.has(g.seats[k])) delete g.seats[k];
+  S.startEvent(g, 'critic'); const t = score == null ? null : S.playMini(g, score); for (let i = 0; i < 9000 && g.event; i++) S.tick(g, 0.1, 1); return { ...g.evLog[0], t, again: S.playMini(g, 1) }; }; return [null, 0.2, 0.5, 0.7, 1].map(run); })()`);
 {
   const [no, t0, t1, t2, t3] = crit;
   check(crit.every((r) => r.kind === 'critic' && r.stars >= 1 && r.again == null) && no.stars > 1 && no.mini === undefined && t0.t === 0 && t1.t === 1 && t2.t === 2 && t3.t === 3, `the critic alone: ${no.stars} stars; the tiers 0…3`);
@@ -500,7 +527,7 @@ await shot('9c-city');
 await page.click('.citym .pin[data-stage="1"]'); await wait(300);
 check(await ev('document.querySelector(".citym .stage").hidden && [...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Beat Market Street first"))'), 'the second one: beat the first one first');
 await page.click('.citym .pin.now'); await wait(400);
-check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelectorAll(".rv").length === game.D.STAGES[0].cooks.length && p.querySelectorAll(".cchip.on").length === 1 && p.querySelector(".cchip.on").dataset.crew === "kitchen" && p.querySelectorAll(".dchip.on").length >= 1 && p.querySelectorAll(".dchip.on").length <= 3 && !!p.querySelector(".dchip.weak.on") && !p.querySelector(\'[data-x="go"]\').disabled && p.querySelector(".pays").textContent.includes("3"); })()'), 'its panel: who cooks there, the head chef goes, the weak dish is picked, what a win pays');
+check(await ev('(() => { const p = document.querySelector(".citym .stage"); return !p.hidden && p.querySelectorAll(".foe").length === game.D.STAGES[0].cooks.length && p.querySelectorAll(".cchip.on").length === 1 && p.querySelector(".cchip.on").dataset.crew === "kitchen" && p.querySelectorAll(".dchip.on").length >= 1 && p.querySelectorAll(".dchip.on").length <= 3 && !!p.querySelector(".dchip.weak.on") && !p.querySelector(\'[data-x="go"]\').disabled && p.querySelector(".pays").textContent.includes("3"); })()'), 'its panel: who cooks there, the head chef goes, the weak dish is picked, what a win pays');
 await shot('9d-stage');
 await page.click('.citym .cchip.on'); await wait(200);
 check(await ev('document.querySelector(\'.citym [data-x="go"]\').disabled && document.querySelector(\'.citym [data-x="go"]\').textContent === "Pick your team"'), 'nobody picked: no cook-off');

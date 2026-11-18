@@ -3,7 +3,7 @@
 Everything in `assets/audio/` is either **CC0 1.0 (public domain dedication)** material from the sources below, or sounds
 **synthesised in this repository** (`tools/audio/synth.py`, `tools/audio/recipes.py`, released CC0 as well).
 No attribution is required; credit is given here anyway. The CC0 licence of every downloaded sound was verified on its own
-source page by `tools/audio/fetch.py` (build of 2026-11-15). Freesound items are the site's HQ preview
+source page by `tools/audio/fetch.py` (build of 2026-11-18). Freesound items are the site's HQ preview
 (128 kbps MP3 decoded and re-encoded) because original downloads need a login; Kenney packs and OpenGameArt files are the originals.
 
 Output format: MP3 (LAME via ffmpeg, 44.1 kHz, gapless header). One-shots are mono 96 kbps, engines mono 96 kbps, ambience and music stereo 128 kbps.
@@ -72,6 +72,8 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 | `cook-burnt.mp3` | [Sizzling Pan](https://freesound.org/people/AntoineRomo/sounds/587050/) (Freesound #587050; the flare-up, 2.1-3.7 s) | AntoineRomo | CC0 1.0 | cut the flare-up of a very hot pan (1.6 s), low-passed at 9 kHz, fades in and out. |
 | `cook-ignite.mp3` | [electric-gas-stove-ignite.wav](https://freesound.org/people/Squidocto/sounds/262582/) (Freesound #262582; 0.62-2.3 s) | Squidocto | CC0 1.0 | kept the last clicks of the igniter and the burner catching, fade-out. |
 | `cook-bell.mp3` | [service bell ring](https://freesound.org/people/AlaskaRobotics/sounds/221515/) (Freesound #221515; the ring, 0.15-2.8 s) | AlaskaRobotics | CC0 1.0 | kept the ring of a counter bell and its ring-out, long fade-out. |
+| `wash-jet.mp3` | [Pressure Washer](https://freesound.org/people/richwise/sounds/580534/) (Freesound #580534; steadiest 4 s of 84-106 s) | richwise | CC0 1.0 | picked the steadiest 4 s of a pressure washer spraying, high-passed at 150 Hz, cross-faded a 1 s pre-roll (equal-power) for a seamless loop; mono (the game turns it up while the jet is on). |
+| `coin-drop.mp3` | [Coin Dropped](https://freesound.org/people/kermite607/sounds/368203/) (Freesound #368203; the whole drop, 0.32 s) | kermite607 | CC0 1.0 | kept a coin dropped on a hard surface with its little bounces, short fade-out. |
 
 ## Source pages
 
@@ -88,6 +90,7 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 - **electric-gas-stove-ignite.wav** - Squidocto - <https://freesound.org/people/Squidocto/sounds/262582/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #262582)
 - **BerlinGameScene.com Crowd Cheer 1** - BerlinGameScene - <https://freesound.org/people/BerlinGameScene/sounds/267249/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #267249)
 - **Plastic bags rustling.mp3** - Caitlin_100 - <https://freesound.org/people/Caitlin_100/sounds/365520/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #365520)
+- **Coin Dropped** - kermite607 - <https://freesound.org/people/kermite607/sounds/368203/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #368203)
 - **Camera shutter.wav** - jdaniel1999 - <https://freesound.org/people/jdaniel1999/sounds/376205/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #376205)
 - **Pumping bicycle air pump** - 13GPanska_Lakota_Jan - <https://freesound.org/people/13GPanska_Lakota_Jan/sounds/378359/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #378359)
 - **City ambience - Berlin** - vdr3 - <https://freesound.org/people/vdr3/sounds/393701/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #393701)
@@ -104,6 +107,7 @@ Loudness (ITU-R BS.1770 integrated): one-shots about -16 LUFS, engines -20, ambi
 - **Boing 2** - magnuswaker - <https://freesound.org/people/magnuswaker/sounds/540790/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #540790)
 - **Plastic Spatula on Non Stick pan.wav** - miwilson - <https://freesound.org/people/miwilson/sounds/546452/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #546452)
 - **Jerry Honda 125 Kickstart & ride off.wav** - 3bagbrew - <https://freesound.org/people/3bagbrew/sounds/574322/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #574322)
+- **Pressure Washer** - richwise - <https://freesound.org/people/richwise/sounds/580534/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #580534)
 - **Sizzling Pan** - AntoineRomo - <https://freesound.org/people/AntoineRomo/sounds/587050/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #587050)
 - **TukTuk_Drive_Transport.wav** - uniuniversal - <https://freesound.org/people/uniuniversal/sounds/658928/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #658928)
 - **Short_Thunder_Mid.wav** - SholeColtis - <https://freesound.org/people/SholeColtis/sounds/683421/> - licence <http://creativecommons.org/publicdomain/zero/1.0/> (Freesound #683421)

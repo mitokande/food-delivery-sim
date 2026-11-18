@@ -619,5 +619,27 @@
   "peak": -2.8,
   "ch": 1,
   "kb": 31.8
+ },
+ "wash-jet": {
+  "file": "wash-jet.mp3",
+  "loop": true,
+  "gain": 0.8,
+  "dur": 4.0,
+  "src": "freesound:580534",
+  "lufs": -20.4,
+  "peak": -8.5,
+  "ch": 1,
+  "kb": 48.7
+ },
+ "coin-drop": {
+  "file": "coin-drop.mp3",
+  "loop": false,
+  "gain": 0.6,
+  "dur": 0.282,
+  "src": "freesound:368203",
+  "lufs": -18.5,
+  "peak": -2.1,
+  "ch": 1,
+  "kb": 4.0
  }
 }

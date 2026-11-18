@@ -24,6 +24,7 @@ def cells(name, cols, rows, names, size, sub=None, face=False):
     d = f'{out}/{sub or name.split("-")[0]}'; os.makedirs(d, exist_ok=True)
     xs, ys = cuts(a, cols, True), cuts(a, rows, False); print(name, 'cut at', xs, ys)
     for i, n in enumerate(names):
+        if not n: continue # (a picture of the sheet no game uses any more)
         c, r = i % cols, i // cols
         cell = im.crop((xs[c], ys[r], xs[c + 1], ys[r + 1]))
         cell = cell.crop(cell.getchannel('A').point(lambda v: 255 if v > 12 else 0).getbbox())
@@ -40,12 +41,13 @@ cells('flyers-tools', 3, 2, ['flyer', 'hand', 'love', 'angry', 'truck', 'megapho
 cells('duel-rivals', 4, 2, ['todd', 'pip', 'brick', 'kyle', 'sharp', 'sly', 'dolores', 'baron'], 256, sub='faces', face=True)
 cells('duel-skills', 4, 3, ['flambe', 'express', 'charm', 'tipjar', 'showstopper', 'peptalk', 'rush', 'salt', 'smoke', 'bribe', 'panic', 'crit'], 192)
 cells('duel-icons', 4, 2, ['taste', 'pace', 'calm', 'ticket', 'emblem', 'pin-rival', 'pin-ours', 'pin-boss'], 192)
-cells('fix-planks', 1, 4, ['plank1', 'plank2', 'plank3', 'plank4'], 640)
-cells('fix-tools', 4, 3, ['nail', 'crowbar', 'roller', 'wrench', 'spray', 'clamp', 'glove', 'dust', 'bolt', 'toolbox', 'hammer', 'tin'], 192)
+cells('fix-tools', 4, 3, [None, None, 'roller', 'wrench', 'spray', 'clamp', 'glove', None, 'bolt', None, 'hammer', 'tin'], 192)
 cells('fix-weeds', 4, 2, ['w1', 'w2', 'w3', 'w4', 'w5', 'can', 'pot', 'dirt'], 256)
-cells('fix-knobs', 3, 2, ['red', 'yellow', 'blue', 'green', 'purple', 'orange'], 160)
-for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map'), ('fix-door', 'fix/door'), ('fix-box', 'fix/box'),
-             ('fix-wall-old', 'fix/wall-old'), ('fix-wall-new', 'fix/wall-new'), ('fix-pipes', 'fix/pipes'), ('fix-terrace', 'fix/terrace'), ('fix-garage', 'fix/garage')]:
+cells('fix-grime', 4, 2, ['tag1', 'tag2', 'poster1', 'poster2', 'moss', 'web', 'mud', 'soot'], 320)
+cells('fix-wash', 3, 2, ['gun', 'splash', 'drop', 'tarp', 'foam', 'tank'], 384)
+cells('fix-coins', 4, 2, ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'dish', 'roll'], 192)
+for n, f in [('cook-stove', 'cook/stove'), ('flyers-street', 'flyers/street'), ('duel-arena', 'duel/arena'), ('duel-map', 'duel/map'), ('fix-wall-old', 'fix/wall-old'), ('fix-wall-new', 'fix/wall-new'), ('fix-pipes', 'fix/pipes'), ('fix-terrace', 'fix/terrace'), ('fix-garage', 'fix/garage'),
+             ('fix-front', 'fix/front'), ('fix-front-dirty', 'fix/front-dirty'), ('fix-till', 'fix/till')]:
     if not have(n): continue
     os.makedirs(os.path.dirname(f'{out}/{f}'), exist_ok=True)
     Image.open(f'{raw}/{n}.png').convert('RGB').resize((720, 1080), Image.LANCZOS).save(f'{out}/{f}.webp', quality=80, method=6)

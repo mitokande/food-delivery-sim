@@ -177,14 +177,6 @@ export const ART = {
     + `a map pin: a tiny dark tower with red banners and a golden crown standing on a round black base. ${SHEET}` },
   // the repairs by hand (a mini game per room in ruins, before its repair is paid for): what each is played on
   // (portrait) and sheets of the things in them. tools/genart-mini.py cuts them into assets/ui4/fix.
-  'fix-door': { size: '1024x1536', prompt: `${UI4} The front of an old closed-down corner diner seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
-    + 'In the middle a big dusty double wooden door painted faded red with two glass panes covered from inside with yellowed newspaper, a brass handle, a worn stone step under it. '
-    + 'Old red-brown brick wall around it, the torn edge of a faded red and cream striped awning along the top, a dead plant in a pot at the bottom left. '
-    + 'The door is not boarded up: no planks, no boards, no nails. Dusty, abandoned but charming. No people, no text, no letters, no signs with writing.' },
-  'fix-box': { size: '1024x1536', prompt: `${UI4} The inside of a big old open electrical fuse box seen flat, front on, filling the whole picture edge to edge, portrait. `
-    + 'A dark grey-green painted steel back plate with a few scratches, rivets along the edges and a brass screw in each corner; the rim of the box around it in worn cream enamel. '
-    + 'The large middle of the plate is completely empty: no wires, no cables, no switches, no fuses, no sockets. A little dust and one small cobweb in a corner. '
-    + 'No people, no hands, no text, no letters, no numbers, no warning signs.' },
   'fix-wall-old': { size: '1024x1536', prompt: `${UI4} The wall of an abandoned small office seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
     + 'Old cracked plaster in a dirty faded beige: long cracks, patches where the plaster has fallen off and the bricks show, brown water stains running down, peeling strips of old paint, '
     + 'a pale rectangle where a picture used to hang, a dark wooden skirting board along the very bottom with scuffed floorboards under it. '
@@ -203,9 +195,6 @@ export const ART = {
     + 'Horizontal corrugated steel slats painted faded teal with scratches and a few rust spots; over the middle of it a big thick plain steel mounting plate, '
     + 'a tall rounded rectangle in brushed dark steel taking up about two thirds of the picture, perfectly smooth and empty: no bolts, no screws, no rivets, no holes, no handle on it. '
     + 'No people, no hands, no text, no letters, no numbers, no stickers.' },
-  'fix-planks': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: four old weathered wooden boards seen flat from the front, lying horizontally one under the other in four separate rows, `
-    + 'each a long thick plank almost as wide as the picture: one pale grey wood with a knot, one warm brown with a split end, one reddish with flaking white paint, one dark with a chipped corner. '
-    + 'Rough sawn ends, wood grain, no nails in them. Transparent background, no ground shadows, no text. Each one separate with generous empty space between the rows so that none touch.' },
   'fix-tools': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game UI icon sheet, twelve icons in a neat grid of 4 columns and 3 rows: `
     + 'the round flat head of a big rusty iron nail seen from straight in front; a red steel crowbar; a paint roller with a wooden handle, its roll covered in wet sage green paint; '
     + 'a chunky steel adjustable wrench with a red handle; a jet of blue water spraying out in a fan with white foam and droplets; a grey steel pipe repair clamp with two bolts and a strip of black rubber; '
@@ -215,9 +204,30 @@ export const ART = {
     + 'a dandelion with jagged leaves and two yellow flowers; a spiky green thistle with a purple flower; a thick tuft of wild grass; a clump of clover with small white flowers; '
     + 'a sprawling leafy weed with a dandelion seed head; a dented empty tin can without a label; a broken terracotta flower pot with spilled earth; a burst of dark earth clods and small stones flying apart. '
     + `Each weed complete with a little earth at its root. ${SHEET}` },
-  'fix-knobs': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: six identical round electrical terminal knobs seen from straight in front, in a neat grid of 3 columns and 2 rows, `
-    + 'each a glossy coloured dome in a chunky brass ring with a small dark hole in the middle, the same shape and size, only the colour differs: '
-    + `red, yellow, blue, green, purple, orange. ${SHEET}` },
+  // (the second round of repairs: the entrance washed, the cashier's coins sorted)
+  'fix-front': { size: '1024x1536', prompt: `${UI4} The front of a small charming corner diner seen flat, front on (no perspective), filling the whole picture edge to edge, portrait. `
+    + 'Freshly cleaned and bright: a wall of warm red bricks and cream painted trim, over the door a big wooden sign board with the name FERDI\'S in chunky cream retro letters on red, '
+    + 'under it a red and cream striped awning, a glass door with a brass handle in the middle, a window with a flower box on each side of it, '
+    + 'a worn stone step and a strip of pale pavement tiles along the very bottom. Everything clean and sparkling. No people, no other text, no letters except FERDI\'S.' },
+  'fix-front-dirty': { size: '1024x1536', from: 'fix-front', prompt: 'The very same diner front, exactly the same framing, every shape in exactly the same place, '
+    + 'but filthy after years of neglect: everything covered in a dull layer of grey-brown grime and soot, dark streaks running down from the sign and the window sills, '
+    + 'green moss in the brick joints, dusty clouded glass, the colours faded and dirty. Nothing added and nothing moved. Same stylized painted game art look. No people, no other text.' },
+  'fix-grime': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet: eight kinds of mess on a wall, seen flat from the front, in a neat grid of 4 columns and 2 rows: `
+    + 'a messy pink and purple spray paint graffiti swirl (an abstract scribble, no letters); a green and blue spray paint graffiti zigzag (abstract, no letters); '
+    + 'a torn faded paper poster hanging crooked with a blank pale picture on it; a torn red poster of a mean-looking cartoon burger with sharp teeth (no text); '
+    + `a fuzzy patch of green moss; a big grey dusty cobweb; a dark brown mud splash; a black smudge of soot. ${SHEET}` },
+  'fix-wash': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, six things in a neat grid of 3 columns and 2 rows: `
+    + 'a bright yellow pressure washer spray gun with a long black lance, pointing straight up; a burst of white and light blue water splash with droplets; '
+    + 'a single big glossy light blue water drop; a dusty grey canvas cloth tied with brown rope, a wide rectangle hanging flat as if covering a sign; '
+    + `a cluster of white soap foam bubbles; a chunky blue plastic water tank with a white cap. ${SHEET}` },
+  'fix-till': { size: '1024x1536', prompt: `${UI4} An old shop counter seen from above at a steep angle, filling the whole picture edge to edge, portrait. `
+    + 'Along the very top edge the bottom of an old brass cash register with its empty drawer pulled open. The rest is a worn wooden counter top '
+    + 'with a big worn dark green felt mat on it that fills most of the picture; the mat is completely empty: no coins, no objects. A little dust. '
+    + 'No people, no hands, no text, no letters, no numbers.' },
+  'fix-coins': { size: '1536x1024', background: 'transparent', prompt: `${UI4} Game sprite sheet, eight things in a neat grid of 4 columns and 2 rows, all seen from the same angle: from above at a steep three-quarter angle. `
+    + 'Six thick chunky coins lying flat, so each shows its top face as a wide oval with its thick rim as a band under it; all six exactly the same shape, size and angle, only the colour and emblem differ: '
+    + 'a copper coin with a star; a silver coin with a burger; a gold coin with a crown; a blue enamel coin with a heart; a green enamel coin with a four-leaf clover; a red enamel coin with a chef\'s hat. '
+    + `Then an empty shallow round wooden dish, wider than a coin; and a fat roll of coins wrapped in brown paper, lying on its side. No numbers, no letters. ${SHEET}` },
 };
 
 async function gen(name, outdir) {

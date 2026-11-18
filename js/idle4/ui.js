@@ -505,15 +505,15 @@ export function createUI(game) {
   // A room in ruins is cleared out in a mini game (S.FIX, fix.js) before the builders are paid: its step in the room's
   // panel (renderRoom), the game in the same window as the others, and the card of what was found in the mess.
   const FX = {
-    entrance: { icon: 'fix/crowbar', title: 'Boarded up!', lead: 'Somebody nailed the door shut. Pull the boards off it yourself.', go: 'Pull the boards', play: 'Pull the boards!', done: 'Boards pulled off' },
-    cashier: { icon: 'fix/toolbox', title: 'No power!', lead: 'The fuse box is a tangle. Put every wire back where it belongs.', go: 'Fix the wiring', play: 'Fix the wiring!', done: 'Wiring fixed' },
+    entrance: { icon: 'fix/gun', title: 'Filthy front!', lead: 'Years of grime, graffiti and old posters, and tarps over the sign. Wash it all off.', go: 'Wash the front', play: 'Wash the front!', done: 'Front washed' },
+    cashier: { icon: 'fix/roll', title: 'Coins everywhere!', lead: 'The old till spilled its coins. Stack them by kind: four alike roll back into the till.', go: 'Sort the coins', play: 'Sort the coins!', done: 'Coins sorted' },
     office: { icon: 'fix/roller', title: 'Peeling walls!', lead: 'Uncle Ferdi never painted this wall. Roll a fresh coat over it.', go: 'Paint the wall', play: 'Paint the wall!', done: 'Wall painted' },
     staff: { icon: 'fix/wrench', title: 'Leaky pipes!', lead: 'The old pipes leak at every joint. Shut the leaks as they spring.', go: 'Stop the leaks', play: 'Stop the leaks!', done: 'Leaks stopped' },
     terrace: { icon: 'fix/glove', title: 'Overgrown!', lead: 'Weeds and rubbish all over the paving. Pull them out.', go: 'Clear the weeds', play: 'Clear the weeds!', done: 'Weeds cleared' },
     bay: { icon: 'fix/bolt', title: 'Loose door!', lead: 'The garage door hangs by its bolts. Tighten them up.', go: 'Tighten the bolts', play: 'Tighten the bolts!', done: 'Bolts tightened' },
   };
-  const FIX_TIERS = [['Not quite…', 'It has to be cleared before the builders can start.'], ['That will do', 'Cleared out.'], ['Good work!', 'Cleared out, and quickly.'], ['Perfect!', 'Not a thing left to do.']];
-  const fixPlay = (room) => { const d = FX[room], cfg = S.FIX[room]; return playIn(Fix.GAMES[cfg.game]({ sfx, buzz }), d.icon, d.play, `k-fix k-${cfg.game}`, cfg); };
+  const FIX_TIERS = [['Not quite…', 'It has to be cleared before the builders can start.'], ['That will do', 'Cleared out.'], ['Good work!', 'Nearly spotless.'], ['Perfect!', 'Not a thing left to do.']];
+  const fixPlay = (room) => { const d = FX[room], cfg = S.FIX[room]; return playIn(Fix.GAMES[cfg.game]({ sfx, buzz, loop: sfxLoop }), d.icon, d.play, `k-fix k-${cfg.game}`, cfg); };
   // what came of it: res = S.fixRoom's { tier, cash, done } (`practice`: nothing was at stake)
   function fixDone(room, res, tally, practice) {
     const d = FX[room], R = S.ROOMS[room], [title, what] = FIX_TIERS[res.tier], g = G();
@@ -527,7 +527,7 @@ export function createUI(game) {
     m.card.addEventListener('click', (ev) => {
       const x = ev.target.closest('[data-x]')?.dataset.x; if (!x) return;
       m.close();
-      if (x === 'again') game.fix(room); else if (x === 'skip') game.fixSkip(room); else if (x === 'room') game.openRoom(room);
+      if (x === 'again') game.fix(room); else if (x === 'skip') game.fixSkip(room); else if (x === 'room') game.showCleared(room);
     });
     [1, 2, 3].forEach((i) => { if (i <= res.tier) setTimeout(() => sfx('qte-good', { vol: 0.5 }), 250 * i); });
     if (res.cash) setTimeout(() => sfx('ui-coins', { vol: 0.5 }), 900);
